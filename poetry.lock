@@ -445,12 +445,12 @@ version = "0.4.6"
 description = "Cross-platform colored terminal text."
 optional = false
 python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*,!=3.6.*,>=2.7"
-groups = ["dev"]
-markers = "sys_platform == \"win32\""
+groups = ["main", "dev"]
 files = [
     {file = "colorama-0.4.6-py2.py3-none-any.whl", hash = "sha256:4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6"},
     {file = "colorama-0.4.6.tar.gz", hash = "sha256:08695f5cb7ed6e0531a20572697297273c47b8cae5a63ffc6d6ed5c201be6e44"},
 ]
+markers = {main = "platform_system == \"Windows\"", dev = "sys_platform == \"win32\""}
 
 [[package]]
 name = "comm"
@@ -640,6 +640,50 @@ files = [
 ]
 
 [[package]]
+name = "diffrax"
+version = "0.7.0"
+description = "GPU+autodiff-capable ODE/SDE/CDE solvers written in JAX."
+optional = false
+python-versions = "<4.0,>=3.10"
+groups = ["main"]
+files = [
+    {file = "diffrax-0.7.0-py3-none-any.whl", hash = "sha256:aa9645c40552f11a2d32042ef6b9fcd53c1f0f6bdbe32d37cb788669ca9910be"},
+    {file = "diffrax-0.7.0.tar.gz", hash = "sha256:f3bcc578cd92a9ca86fc6f5a54c1de76c1ba62f74de69b56002624bf205316f1"},
+]
+
+[package.dependencies]
+equinox = ">=0.11.10"
+jax = ">=0.4.38"
+jaxtyping = ">=0.2.24"
+lineax = ">=0.0.5"
+optimistix = ">=0.0.10"
+typing-extensions = ">=4.5.0"
+wadler-lindig = ">=0.1.1"
+
+[[package]]
+name = "equinox"
+version = "0.13.2"
+description = "Elegant easy-to-use neural networks in JAX."
+optional = false
+python-versions = ">=3.10"
+groups = ["main"]
+files = [
+    {file = "equinox-0.13.2-py3-none-any.whl", hash = "sha256:bc1ee687e4841945d8b776664403839639a05e2f2c02c1da353ff3386e0e43b0"},
+    {file = "equinox-0.13.2.tar.gz", hash = "sha256:509ad744ff99b7c684d45230d6890f9e78eac1a556d7a06db1eff664a3cac74f"},
+]
+
+[package.dependencies]
+jax = ">=0.4.38,<0.7.0 || >0.7.0,<0.7.1 || >0.7.1"
+jaxtyping = ">=0.2.20"
+typing-extensions = ">=4.5.0"
+wadler-lindig = ">=0.1.0"
+
+[package.extras]
+dev = ["pre-commit"]
+docs = ["griffe (==1.7.3)", "hippogriffe (==0.2.2)", "mkdocs (==1.6.1)", "mkdocs-include-exclude-files (==0.1.0)", "mkdocs-ipynb (==0.1.1)", "mkdocs-material (==9.6.7)", "mkdocstrings (==0.28.3)", "mkdocstrings-python (==1.16.8)", "pymdown-extensions (==10.14.3)"]
+tests = ["beartype", "jaxlib", "optax", "pytest"]
+
+[[package]]
 name = "executing"
 version = "2.2.1"
 description = "Get the currently executing AST node of a frame, and other information"
@@ -764,25 +808,11 @@ woff = ["brotli (>=1.0.1) ; platform_python_implementation == \"CPython\"", "bro
 
 [[package]]
 name = "fqdn"
-version = "1.4.0"
-description = "Validate fully-qualified domain names compliant to RFC 1035 and the preferred form in RFC 3686 s. 2."
-optional = false
-python-versions = "*"
-groups = ["dev"]
-markers = "python_version >= \"3.14\""
-files = [
-    {file = "fqdn-1.4.0-py3-none-any.whl", hash = "sha256:e935616ae81c9c60a22267593fe8e6af68cecc68549cc71bb9bfbcbbcb383386"},
-    {file = "fqdn-1.4.0.tar.gz", hash = "sha256:30e8f2e685ce87cdace4712fd97c5d09f5e6fa519bbb66e8f188f6a7cb3a5c4e"},
-]
-
-[[package]]
-name = "fqdn"
 version = "1.5.1"
 description = "Validates fully-qualified domain names against RFC 1123, so that they are acceptable to modern bowsers"
 optional = false
 python-versions = ">=2.7, !=3.0, !=3.1, !=3.2, !=3.3, !=3.4, <4"
 groups = ["dev"]
-markers = "python_version < \"3.14\""
 files = [
     {file = "fqdn-1.5.1-py3-none-any.whl", hash = "sha256:3a179af3761e4df6eb2e026ff9e1a3033d3587bf980a0b1b2e1e5d08d7358014"},
     {file = "fqdn-1.5.1.tar.gz", hash = "sha256:105ed3677e767fb5ca086a0c1f4bb66ebc3c100be518f0e0d755d9eae164d89f"},
@@ -1046,6 +1076,75 @@ files = [
 
 [package.dependencies]
 arrow = ">=0.15.0"
+
+[[package]]
+name = "jax"
+version = "0.8.0"
+description = "Differentiate, compile, and transform Numpy code."
+optional = false
+python-versions = ">=3.11"
+groups = ["main"]
+files = [
+    {file = "jax-0.8.0-py3-none-any.whl", hash = "sha256:d190158bc019756c6a0f6b3d5fc8783471fb407e6deaff559eaac60dd5ee850a"},
+    {file = "jax-0.8.0.tar.gz", hash = "sha256:0ea5a7be7068c25934450dfd87d7d80a18a5d30e0a53454e7aade525b23accd5"},
+]
+
+[package.dependencies]
+jaxlib = "0.8.0"
+ml_dtypes = ">=0.5.0"
+numpy = ">=2.0"
+opt_einsum = "*"
+scipy = ">=1.13"
+
+[package.extras]
+ci = ["jaxlib (==0.7.2)"]
+cuda = ["jax-cuda12-plugin[with-cuda] (==0.8.0)", "jaxlib (==0.8.0)"]
+cuda12 = ["jax-cuda12-plugin[with-cuda] (==0.8.0)", "jaxlib (==0.8.0)"]
+cuda12-local = ["jax-cuda12-plugin (==0.8.0)", "jaxlib (==0.8.0)"]
+cuda13 = ["jax-cuda13-plugin[with-cuda] (==0.8.0)", "jaxlib (==0.8.0)"]
+cuda13-local = ["jax-cuda13-plugin (==0.8.0)", "jaxlib (==0.8.0)"]
+k8s = ["kubernetes"]
+minimum-jaxlib = ["jaxlib (==0.8.0)"]
+rocm = ["jax-rocm60-plugin (==0.8.0)", "jaxlib (==0.8.0)"]
+tpu = ["jaxlib (==0.8.0)", "libtpu (==0.0.24.*)", "requests"]
+xprof = ["xprof"]
+
+[[package]]
+name = "jaxlib"
+version = "0.8.0"
+description = "XLA library for JAX"
+optional = false
+python-versions = ">=3.11"
+groups = ["main"]
+files = [
+    {file = "jaxlib-0.8.0-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:bb602a8c24c614cb8ca6eeed3e70a733d9399c6a2f88900a0252623cd67276b5"},
+    {file = "jaxlib-0.8.0-cp311-cp311-manylinux_2_27_aarch64.whl", hash = "sha256:41aebddef67a555a6de17427a4e66ce60a528a815847e2dd96dabce579f7acf8"},
+    {file = "jaxlib-0.8.0-cp311-cp311-manylinux_2_27_x86_64.whl", hash = "sha256:ff53e8baf978f6b7c4076215af78f0ba969cac434ed2f72565d87e38c23f00e7"},
+    {file = "jaxlib-0.8.0-cp311-cp311-win_amd64.whl", hash = "sha256:9cd4c7a8acc5b3dee4ad28a5d101264d89754e29553b0cdb92c79f5b460a511b"},
+    {file = "jaxlib-0.8.0-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:f60aac0f64e9e70a5cef341fe292684518695514c71ad00036774bbed5f7312e"},
+    {file = "jaxlib-0.8.0-cp312-cp312-manylinux_2_27_aarch64.whl", hash = "sha256:d83ff8cf1b070299639cda4f8427707f69051dc8421e59fbb73305523937570d"},
+    {file = "jaxlib-0.8.0-cp312-cp312-manylinux_2_27_x86_64.whl", hash = "sha256:2c8675bf86e391afe4f8d863080be1a024d734dfd3dd137f7aa8e7f22091adcd"},
+    {file = "jaxlib-0.8.0-cp312-cp312-win_amd64.whl", hash = "sha256:659d894d93876e3675c2132d13c3d241f204b21172a58f928b96f654f603f6dc"},
+    {file = "jaxlib-0.8.0-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:5fcf33a5639f8f164a473a9c78a1fa0b2e15ac3fcbecd6d96aa0f88bf25ea6bb"},
+    {file = "jaxlib-0.8.0-cp313-cp313-manylinux_2_27_aarch64.whl", hash = "sha256:b3eac503b90ffecc68f11fa122133eef2c62c536db28e801e436d7e7a9b67bf8"},
+    {file = "jaxlib-0.8.0-cp313-cp313-manylinux_2_27_x86_64.whl", hash = "sha256:66c6f576f54a63ed052f5c469bef4db723f5f050b839ec0c429573011341bd58"},
+    {file = "jaxlib-0.8.0-cp313-cp313-win_amd64.whl", hash = "sha256:72759ebbfb40a717349f174712207d306aa28630359f05cd69b091bd4efa0603"},
+    {file = "jaxlib-0.8.0-cp313-cp313t-macosx_11_0_arm64.whl", hash = "sha256:df2781e0fc93fb6f42111b385b90126b9571eafe0e860f033615ff7156b76817"},
+    {file = "jaxlib-0.8.0-cp313-cp313t-manylinux_2_27_aarch64.whl", hash = "sha256:7eb3be931de77bfcde27df659ada432719aa1e19a2fa5b835638e7404c74cb63"},
+    {file = "jaxlib-0.8.0-cp313-cp313t-manylinux_2_27_x86_64.whl", hash = "sha256:accebe89a36e28306a4db3f68f527a0f87b8a0fd253b3c1556fbd24f16bec22c"},
+    {file = "jaxlib-0.8.0-cp314-cp314-macosx_11_0_arm64.whl", hash = "sha256:ba7e8a2231e4138ccbd8e096debdbbcd82edc5fc1b13c66f32a51bc240651349"},
+    {file = "jaxlib-0.8.0-cp314-cp314-manylinux_2_27_aarch64.whl", hash = "sha256:a9bfca27ae597804db08694a2bf7e1cf7fc3fac4ac2e65ace83be8effaa927ea"},
+    {file = "jaxlib-0.8.0-cp314-cp314-manylinux_2_27_x86_64.whl", hash = "sha256:bd3219a4d2bfe4b72605900fde395b62126a053c0b99643eb931b7c20e577bf2"},
+    {file = "jaxlib-0.8.0-cp314-cp314-win_amd64.whl", hash = "sha256:3320a72d532713c2a31eb20d02c342540a0dec28603a3ac2be0fc0631f086cf2"},
+    {file = "jaxlib-0.8.0-cp314-cp314t-macosx_11_0_arm64.whl", hash = "sha256:248f1ac3acee1fe2cc81e8a668311f3ccb8f28090404391c276869cae8a95daf"},
+    {file = "jaxlib-0.8.0-cp314-cp314t-manylinux_2_27_aarch64.whl", hash = "sha256:a5f0656bbbb3f135a360ce0fde55bf34faf73fbc62ab887941e85f0014b3f476"},
+    {file = "jaxlib-0.8.0-cp314-cp314t-manylinux_2_27_x86_64.whl", hash = "sha256:61cb2fde154e5a399db2880d560e3443cfa97bda9f074b545c886232ac8fe024"},
+]
+
+[package.dependencies]
+ml_dtypes = ">=0.5.0"
+numpy = ">=2.0"
+scipy = ">=1.13"
 
 [[package]]
 name = "jaxtyping"
@@ -1613,6 +1712,27 @@ docs = ["myst-parser", "setuptools-scm", "six", "sphinx", "sphinx-autodoc-typehi
 test = ["flake8 (==5.0.4)", "flake8-print (==5.0.0)", "pytest", "typeguard (>=2.13.3,<2.14.0)"]
 
 [[package]]
+name = "lineax"
+version = "0.0.8"
+description = "Linear solvers in JAX and Equinox."
+optional = false
+python-versions = "~=3.10"
+groups = ["main"]
+files = [
+    {file = "lineax-0.0.8-py3-none-any.whl", hash = "sha256:1bd21d6c41afda233769d1c1096329ee75181825c9136be65c92b41f6daa1ddb"},
+    {file = "lineax-0.0.8.tar.gz", hash = "sha256:bb2778066b8882acc88ff569d8e415bc5aa387f751b14ae262c9f9607d7f25bb"},
+]
+
+[package.dependencies]
+equinox = ">=0.11.10"
+jax = ">=0.4.38"
+jaxtyping = ">=0.2.24"
+typing-extensions = ">=4.5.0"
+
+[package.extras]
+docs = ["hippogriffe (==0.2.0)", "mkdocs (==1.6.1)", "mkdocs-include-exclude-files (==0.1.0)", "mkdocs-ipynb (==0.1.0)", "mkdocs-material (==9.6.7)", "mkdocstrings[python] (==0.28.3)", "pymdown-extensions (==10.14.3)"]
+
+[[package]]
 name = "markupsafe"
 version = "3.0.3"
 description = "Safely add untrusted strings to HTML/XML markup."
@@ -1819,6 +1939,60 @@ files = [
     {file = "mistune-3.1.4-py3-none-any.whl", hash = "sha256:93691da911e5d9d2e23bc54472892aff676df27a75274962ff9edc210364266d"},
     {file = "mistune-3.1.4.tar.gz", hash = "sha256:b5a7f801d389f724ec702840c11d8fc48f2b33519102fc7ee739e8177b672164"},
 ]
+
+[[package]]
+name = "ml-dtypes"
+version = "0.5.3"
+description = "ml_dtypes is a stand-alone implementation of several NumPy dtype extensions used in machine learning."
+optional = false
+python-versions = ">=3.9"
+groups = ["main"]
+files = [
+    {file = "ml_dtypes-0.5.3-cp310-cp310-macosx_10_9_universal2.whl", hash = "sha256:0a1d68a7cb53e3f640b2b6a34d12c0542da3dd935e560fdf463c0c77f339fc20"},
+    {file = "ml_dtypes-0.5.3-cp310-cp310-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:0cd5a6c711b5350f3cbc2ac28def81cd1c580075ccb7955e61e9d8f4bfd40d24"},
+    {file = "ml_dtypes-0.5.3-cp310-cp310-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:bdcf26c2dbc926b8a35ec8cbfad7eff1a8bd8239e12478caca83a1fc2c400dc2"},
+    {file = "ml_dtypes-0.5.3-cp310-cp310-win_amd64.whl", hash = "sha256:aecbd7c5272c82e54d5b99d8435fd10915d1bc704b7df15e4d9ca8dc3902be61"},
+    {file = "ml_dtypes-0.5.3-cp311-cp311-macosx_10_9_universal2.whl", hash = "sha256:4a177b882667c69422402df6ed5c3428ce07ac2c1f844d8a1314944651439458"},
+    {file = "ml_dtypes-0.5.3-cp311-cp311-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:9849ce7267444c0a717c80c6900997de4f36e2815ce34ac560a3edb2d9a64cd2"},
+    {file = "ml_dtypes-0.5.3-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:c3f5ae0309d9f888fd825c2e9d0241102fadaca81d888f26f845bc8c13c1e4ee"},
+    {file = "ml_dtypes-0.5.3-cp311-cp311-win_amd64.whl", hash = "sha256:58e39349d820b5702bb6f94ea0cb2dc8ec62ee81c0267d9622067d8333596a46"},
+    {file = "ml_dtypes-0.5.3-cp311-cp311-win_arm64.whl", hash = "sha256:66c2756ae6cfd7f5224e355c893cfd617fa2f747b8bbd8996152cbdebad9a184"},
+    {file = "ml_dtypes-0.5.3-cp312-cp312-macosx_10_13_universal2.whl", hash = "sha256:156418abeeda48ea4797db6776db3c5bdab9ac7be197c1233771e0880c304057"},
+    {file = "ml_dtypes-0.5.3-cp312-cp312-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:1db60c154989af253f6c4a34e8a540c2c9dce4d770784d426945e09908fbb177"},
+    {file = "ml_dtypes-0.5.3-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:1b255acada256d1fa8c35ed07b5f6d18bc21d1556f842fbc2d5718aea2cd9e55"},
+    {file = "ml_dtypes-0.5.3-cp312-cp312-win_amd64.whl", hash = "sha256:da65e5fd3eea434ccb8984c3624bc234ddcc0d9f4c81864af611aaebcc08a50e"},
+    {file = "ml_dtypes-0.5.3-cp312-cp312-win_arm64.whl", hash = "sha256:8bb9cd1ce63096567f5f42851f5843b5a0ea11511e50039a7649619abfb4ba6d"},
+    {file = "ml_dtypes-0.5.3-cp313-cp313-macosx_10_13_universal2.whl", hash = "sha256:5103856a225465371fe119f2fef737402b705b810bd95ad5f348e6e1a6ae21af"},
+    {file = "ml_dtypes-0.5.3-cp313-cp313-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:4cae435a68861660af81fa3c5af16b70ca11a17275c5b662d9c6f58294e0f113"},
+    {file = "ml_dtypes-0.5.3-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:6936283b56d74fbec431ca57ce58a90a908fdbd14d4e2d22eea6d72bb208a7b7"},
+    {file = "ml_dtypes-0.5.3-cp313-cp313-win_amd64.whl", hash = "sha256:d0f730a17cf4f343b2c7ad50cee3bd19e969e793d2be6ed911f43086460096e4"},
+    {file = "ml_dtypes-0.5.3-cp313-cp313-win_arm64.whl", hash = "sha256:2db74788fc01914a3c7f7da0763427280adfc9cd377e9604b6b64eb8097284bd"},
+    {file = "ml_dtypes-0.5.3-cp313-cp313t-macosx_10_13_universal2.whl", hash = "sha256:93c36a08a6d158db44f2eb9ce3258e53f24a9a4a695325a689494f0fdbc71770"},
+    {file = "ml_dtypes-0.5.3-cp313-cp313t-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:0e44a3761f64bc009d71ddb6d6c71008ba21b53ab6ee588dadab65e2fa79eafc"},
+    {file = "ml_dtypes-0.5.3-cp313-cp313t-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:bdf40d2aaabd3913dec11840f0d0ebb1b93134f99af6a0a4fd88ffe924928ab4"},
+    {file = "ml_dtypes-0.5.3-cp314-cp314-macosx_10_13_universal2.whl", hash = "sha256:aec640bd94c4c85c0d11e2733bd13cbb10438fb004852996ec0efbc6cacdaf70"},
+    {file = "ml_dtypes-0.5.3-cp314-cp314-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:bda32ce212baa724e03c68771e5c69f39e584ea426bfe1a701cb01508ffc7035"},
+    {file = "ml_dtypes-0.5.3-cp314-cp314-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:c205cac07d24a29840c163d6469f61069ce4b065518519216297fc2f261f8db9"},
+    {file = "ml_dtypes-0.5.3-cp314-cp314-win_amd64.whl", hash = "sha256:cd7c0bb22d4ff86d65ad61b5dd246812e8993fbc95b558553624c33e8b6903ea"},
+    {file = "ml_dtypes-0.5.3-cp314-cp314-win_arm64.whl", hash = "sha256:9d55ea7f7baf2aed61bf1872116cefc9d0c3693b45cae3916897ee27ef4b835e"},
+    {file = "ml_dtypes-0.5.3-cp314-cp314t-macosx_10_13_universal2.whl", hash = "sha256:e12e29764a0e66a7a31e9b8bf1de5cc0423ea72979f45909acd4292de834ccd3"},
+    {file = "ml_dtypes-0.5.3-cp314-cp314t-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:19f6c3a4f635c2fc9e2aa7d91416bd7a3d649b48350c51f7f715a09370a90d93"},
+    {file = "ml_dtypes-0.5.3-cp314-cp314t-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:5ab039ffb40f3dc0aeeeba84fd6c3452781b5e15bef72e2d10bcb33e4bbffc39"},
+    {file = "ml_dtypes-0.5.3-cp39-cp39-macosx_10_9_universal2.whl", hash = "sha256:5ee72568d46b9533ad54f78b1e1f3067c0534c5065120ea8ecc6f210d22748b3"},
+    {file = "ml_dtypes-0.5.3-cp39-cp39-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:01de48de4537dc3c46e684b969a40ec36594e7eeb7c69e9a093e7239f030a28a"},
+    {file = "ml_dtypes-0.5.3-cp39-cp39-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:8b1a6e231b0770f2894910f1dce6d2f31d65884dbf7668f9b08d73623cdca909"},
+    {file = "ml_dtypes-0.5.3-cp39-cp39-win_amd64.whl", hash = "sha256:a4f39b9bf6555fab9bfb536cf5fdd1c1c727e8d22312078702e9ff005354b37f"},
+    {file = "ml_dtypes-0.5.3.tar.gz", hash = "sha256:95ce33057ba4d05df50b1f3cfefab22e351868a843b3b15a46c65836283670c9"},
+]
+
+[package.dependencies]
+numpy = [
+    {version = ">=2.1.0", markers = "python_version >= \"3.13\""},
+    {version = ">=1.26.0", markers = "python_version == \"3.12\""},
+]
+
+[package.extras]
+dev = ["absl-py", "pyink", "pylint (>=2.6.0)", "pytest", "pytest-xdist"]
 
 [[package]]
 name = "mpmath"
@@ -2103,6 +2277,42 @@ files = [
     {file = "numpy-2.3.4-pp311-pypy311_pp73-win_amd64.whl", hash = "sha256:81b3a59793523e552c4a96109dde028aa4448ae06ccac5a76ff6532a85558a7f"},
     {file = "numpy-2.3.4.tar.gz", hash = "sha256:a7d018bfedb375a8d979ac758b120ba846a7fe764911a64465fd87b8729f4a6a"},
 ]
+
+[[package]]
+name = "opt-einsum"
+version = "3.4.0"
+description = "Path optimization of einsum functions."
+optional = false
+python-versions = ">=3.8"
+groups = ["main"]
+files = [
+    {file = "opt_einsum-3.4.0-py3-none-any.whl", hash = "sha256:69bb92469f86a1565195ece4ac0323943e83477171b91d24c35afe028a90d7cd"},
+    {file = "opt_einsum-3.4.0.tar.gz", hash = "sha256:96ca72f1b886d148241348783498194c577fa30a8faac108586b14f1ba4473ac"},
+]
+
+[[package]]
+name = "optimistix"
+version = "0.0.11"
+description = "Nonlinear optimisation in JAX and Equinox."
+optional = false
+python-versions = "~=3.10"
+groups = ["main"]
+files = [
+    {file = "optimistix-0.0.11-py3-none-any.whl", hash = "sha256:acb4fb23b598db03e376900fcb61aee8dd511de41411e849661c0ffe9e4cd1c6"},
+    {file = "optimistix-0.0.11.tar.gz", hash = "sha256:cfce0de98e7e9fdbcc2ce6d49a9f82cd3166fd0eee29c0c7a1983f8aefd37757"},
+]
+
+[package.dependencies]
+equinox = ">=0.11.11"
+jax = ">=0.4.38,<0.7.0 || >0.7.0,<0.7.1 || >0.7.1"
+jaxtyping = ">=0.2.24"
+lineax = ">=0.0.6"
+typing-extensions = ">=4.5.0"
+
+[package.extras]
+dev = ["pre-commit"]
+docs = ["griffe (==1.7.3)", "hippogriffe (==0.2.2)", "mkdocs (==1.6.1)", "mkdocs-include-exclude-files (==0.1.0)", "mkdocs-ipynb (==0.1.1)", "mkdocs-material (==9.6.7)", "mkdocstrings (==0.28.3)", "mkdocstrings-python (==1.16.8)", "pymdown-extensions (==10.14.3)"]
+tests = ["beartype (>=0.20.2)", "diffrax (>=0.7.0)", "jaxlib", "optax (>=0.2.4)", "pytest (>=8.3.5)"]
 
 [[package]]
 name = "packaging"
@@ -3350,6 +3560,28 @@ files = [
 ]
 
 [[package]]
+name = "tqdm"
+version = "4.67.1"
+description = "Fast, Extensible Progress Meter"
+optional = false
+python-versions = ">=3.7"
+groups = ["main"]
+files = [
+    {file = "tqdm-4.67.1-py3-none-any.whl", hash = "sha256:26445eca388f82e72884e0d580d5464cd801a3ea01e63e5601bdff9ba6a48de2"},
+    {file = "tqdm-4.67.1.tar.gz", hash = "sha256:f8aef9c52c08c13a65f30ea34f4e5aac3fd1a34959879d7e59e63027286627f2"},
+]
+
+[package.dependencies]
+colorama = {version = "*", markers = "platform_system == \"Windows\""}
+
+[package.extras]
+dev = ["nbval", "pytest (>=6)", "pytest-asyncio (>=0.24)", "pytest-cov", "pytest-timeout"]
+discord = ["requests"]
+notebook = ["ipywidgets (>=6)"]
+slack = ["slack-sdk"]
+telegram = ["requests"]
+
+[[package]]
 name = "traitlets"
 version = "5.14.3"
 description = "Traitlets Python configuration system"
@@ -3516,5 +3748,5 @@ files = [
 
 [metadata]
 lock-version = "2.1"
-python-versions = ">=3.12"
-content-hash = "c7cbbe083d319681d3bbcedf002fac21ad7ce568dff16ba9cee64be6cb6cc5cf"
+python-versions = ">=3.12,<4.0"
+content-hash = "bcd285c803e401e6570adb67ae5e71ed9e2a1d02b3eb13624715f94aa2e209c8"

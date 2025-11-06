@@ -4,7 +4,7 @@ version = "0.1.0"
 description = ""
 authors = [{ name = "Paul Lemarre", email = "paul.lemarre@novainsilico.ai" }]
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.12,<4.0"
 dependencies = [
     "torch @ https://download.pytorch.org/whl/cpu/torch-2.7.1%2Bcpu-cp312-cp312-manylinux_2_28_x86_64.whl#sha256=8f8b3cfc53010a4b4a3c7ecb88c212e9decc4f5eeb6af75c3c803937d2d60947",
     "gpytorch (>=1.14.2,<2.0.0)",
@@ -14,6 +14,9 @@ dependencies = [
     "plotly (>=6.4.0,<7.0.0)",
     "pandas (>=2.3.3,<3.0.0)",
     "numpy (>=2.3.4,<3.0.0)",
+    "diffrax (>=0.7.0,<0.8.0)",
+    "equinox (>=0.13.2,<0.14.0)",
+    "tqdm (>=4.67.1,<5.0.0)",
 ]
 
 [tool.poetry]
