@@ -85,7 +85,8 @@ class NlmeModel:
                         )
                     if covariate is not None:
                         covariate_set.add(covariate)
-                        pdk_names.remove(covariate)
+                        if covariate in pdk_names:
+                            pdk_names.remove(covariate)
                         coef_name = coef["coef"]
                         coef_val = coef["value"]
                         self.population_betas_names.append(coef_name)
@@ -323,10 +324,12 @@ class NlmeModel:
         log_MI_expanded = self.log_MI.unsqueeze(0).repeat(nb_patients_for_etas, 1)
 
         # List the PDK values for each patient, and assemble them in a tensor
-        patients_pdk = torch.cat(
-            [self.patients_pdk[ind_id] for ind_id in ind_ids_for_etas]
-        )
-
+        if hasattr(self, "patient_pdk"):
+            patients_pdk = torch.cat(
+                [self.patients_pdk[ind_id] for ind_id in ind_ids_for_etas]
+            )
+        else:
+            patients_pdk = torch.Tensor()
         # This step is crucial: we need to ensure the parameters are stored in the correct order
         # PDK, PDU, MI
         thetas = torch.cat(
@@ -350,7 +353,12 @@ class NlmeModel:
         Returns:
             List[torch.Tensor]: a tensor of predictions for each patient
         """
-        pred = []
+        if not hasattr(self, "observations_tensors"):
+            raise ValueError(
+                "Cannot compute patient predictions without an associated observations data frame."
+            )
+        list_X = []
+        list_tasks = []
         for ind_idx, ind in enumerate(ind_ids):
             # Prepare the inputs for the GP
             time_steps = self.observations_tensors[ind]["time_steps"].unsqueeze(-1)
@@ -366,9 +374,9 @@ class NlmeModel:
                 ),
                 dim=1,
             )
-            task_list = self.observations_tensors[ind]["tasks_indices"]
-            patient_pred = self.structural_model.simulate(inputs, task_list)
-            pred.append(patient_pred)
+            list_X.append(inputs)
+            list_tasks.append(self.observations_tensors[ind]["tasks_indices"])
+        pred = self.structural_model.simulate(list_X, list_tasks)
         return pred
 
     def outputs_to_df(

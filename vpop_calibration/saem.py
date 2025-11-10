@@ -7,7 +7,7 @@ from pandas import DataFrame
 import pandas as pd
 import numpy as np
 
-from nlme import NlmeModel
+from .nlme import NlmeModel
 
 
 # Main SAEM Algorithm Class
