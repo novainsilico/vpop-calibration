@@ -267,8 +267,8 @@ class GP:
                 std.loc[self.parameter_names],
             )
             self.normalizing_output_mean, self.normalizing_output_std = (
-                torch.Tensor(mean.loc[self.tasks]),
-                torch.Tensor(std.loc[self.tasks]),
+                torch.Tensor(mean.loc[self.tasks].values),
+                torch.Tensor(std.loc[self.tasks].values),
             )
 
         # Compute the number of patients for training

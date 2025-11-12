@@ -132,7 +132,7 @@ class OdeModel:
         return merged_df
 
 
-def _simulate_patient(args: pd.DataFrame) -> pd.DataFrame:
+def _simulate_patient(args: dict) -> pd.DataFrame:
     """Worker function to simulate a model on a single patient
 
     Args:
@@ -153,17 +153,17 @@ def _simulate_patient(args: pd.DataFrame) -> pd.DataFrame:
     """
 
     # extract args
-    input_df = args["patient_inputs"]
-    ind_id = input_df["id"].drop_duplicates()
+    input_df: pd.DataFrame = args["patient_inputs"]
+    ind_id: pd.Series = input_df["id"].drop_duplicates()
     if ind_id.shape[0] > 1:
         raise ValueError("More than 1 patient was provided to `simulate_patient`")
 
-    time_steps = input_df["time"].drop_duplicates().to_list()
-    initial_conditions = args["initial_conditions"]
-    params = args["params"]
-    equations = args["equations"]
-    output_names = args["output_names"]
-    tol = args["tol"]
+    time_steps: List[float] = input_df["time"].drop_duplicates().to_list()
+    initial_conditions: np.ndarray = args["initial_conditions"]
+    params: np.ndarray = args["params"]
+    equations: Callable = args["equations"]
+    output_names: List[str] = args["output_names"]
+    tol: float = args["tol"]
 
     time_span = (time_steps[0], time_steps[-1])
 
