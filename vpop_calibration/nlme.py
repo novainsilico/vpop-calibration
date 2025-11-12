@@ -107,6 +107,9 @@ class NlmeModel:
                 self.patients_pdk.update(
                     {patient: torch.Tensor(row[self.PDK_names].values)}
                 )
+            self.patients_pdk_full = torch.cat(
+                [self.patients_pdk[ind] for ind in self.patients]
+            )
             print(f"Successfully loaded {self.nb_PDK} known descriptors:")
             print(self.PDK_names)
 
@@ -324,7 +327,7 @@ class NlmeModel:
         log_MI_expanded = self.log_MI.unsqueeze(0).repeat(nb_patients_for_etas, 1)
 
         # List the PDK values for each patient, and assemble them in a tensor
-        if hasattr(self, "patient_pdk"):
+        if hasattr(self, "patients_pdk"):
             patients_pdk = torch.cat(
                 [self.patients_pdk[ind_id] for ind_id in ind_ids_for_etas]
             )

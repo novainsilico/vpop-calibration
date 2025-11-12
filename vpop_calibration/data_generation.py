@@ -168,7 +168,8 @@ def simulate_dataset_from_omega(
         data=theta.numpy(), columns=nlme_model.structural_model.parameter_names
     )
     vpop["id"] = nlme_model.patients
-    vpop = vpop.merge(patient_covariates, on=["id"], how="left")
+    protocol_arms = patient_covariates[["id", "protocol_arm"]]
+    vpop = vpop.merge(protocol_arms, on=["id"], how="left")
     vpop = vpop.merge(
         pd.DataFrame(data=nlme_model.outputs_names, columns=["output_name"]),
         how="cross",

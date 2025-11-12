@@ -221,8 +221,18 @@ class PySAEM:
                         .unsqueeze(0)
                         .repeat((self.model.nb_patients, 1))
                     )
-                    new_thetas = torch.exp(
-                        torch.cat((log_MI_expanded, mean_log_thetas_PDU), dim=1)
+                    if hasattr(self.model, "patients_pdk"):
+                        pdk_full = self.model.patients_pdk_full
+                    else:
+                        pdk_full = torch.Tensor()
+                    new_thetas = torch.cat(
+                        (
+                            pdk_full,
+                            torch.exp(
+                                torch.cat((log_MI_expanded, mean_log_thetas_PDU), dim=1)
+                            ),
+                        ),
+                        dim=1,
                     )
                     predictions = self.model.predict_outputs_from_theta(
                         new_thetas, self.model.patients

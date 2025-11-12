@@ -62,6 +62,8 @@ class StructuralGp(StructuralModel):
             gp_model.task_idx_to_protocol,
         )
         self.gp_model = gp_model
+        # self.compiled_predict = torch.compile(self.gp_model.predict_long_scaled) # not functional for the moment
+        self.compiled_predict = self.gp_model.predict_long_scaled
 
     def simulate(
         self, list_X: list[torch.Tensor], list_tasks: list[torch.LongTensor]
@@ -72,7 +74,7 @@ class StructuralGp(StructuralModel):
         task_cat = torch.LongTensor(torch.cat([torch.Tensor(t) for t in list_tasks]))
         chunk_sizes = [t.shape[0] for t in list_tasks]
         # Simulate the GP
-        out_cat, _ = self.gp_model.predict_long_scaled(X_cat, task_cat)
+        out_cat, _ = self.compiled_predict(X_cat, task_cat)
         # Split into individual chunks
         pred_list = list(torch.split(out_cat, chunk_sizes))
         return pred_list

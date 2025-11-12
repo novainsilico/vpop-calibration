@@ -19,3 +19,7 @@ Show your appreciation to those who have contributed to the project.
 ## License
 
 Todo: define a license
+
+## Roadmap
+
+- Integrate with SBML models (Roadrunner)
