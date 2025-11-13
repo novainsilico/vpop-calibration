@@ -1,0 +1,9 @@
+stages:
+  - test
+
+pytest:
+  stage: test
+  tags: [ nix ]
+  script:
+    - nix develop . --command poetry install
+    - nix develop . --command poetry run pytest
