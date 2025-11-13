@@ -12,9 +12,11 @@
         poetry
         gcc
         openssl
+        python312
       ];
       shellHook = ''
         export LD_LIBRARY_PATH=${pkgs.stdenv.cc.cc.lib}/lib
+        poetry env use 3.12
       '';
     };
   });

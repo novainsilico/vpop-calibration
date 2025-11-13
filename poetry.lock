@@ -15,6 +15,7 @@ files = [
 [package.dependencies]
 idna = ">=2.8"
 sniffio = ">=1.1"
+typing_extensions = {version = ">=4.5", markers = "python_version < \"3.13\""}
 
 [package.extras]
 trio = ["trio (>=0.31.0)"]
@@ -3001,6 +3002,7 @@ files = [
 [package.dependencies]
 attrs = ">=22.2.0"
 rpds-py = ">=0.7.0"
+typing-extensions = {version = ">=4.4.0", markers = "python_version < \"3.13\""}
 
 [[package]]
 name = "requests"
@@ -3554,20 +3556,20 @@ test = ["pytest", "ruff"]
 
 [[package]]
 name = "torch"
-version = "2.9.0+cpu"
+version = "2.7.1+cpu"
 description = "Tensors and Dynamic neural networks in Python with strong GPU acceleration"
 optional = false
-python-versions = ">=3.10"
+python-versions = ">=3.9.0"
 groups = ["main"]
 files = [
-    {file = "torch-2.9.0+cpu-cp313-cp313-manylinux_2_28_x86_64.whl", hash = "sha256:6c9b217584400963d5b4daddb3711ec7a3778eab211e18654fba076cce3b8682"},
+    {file = "torch-2.7.1+cpu-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:8f8b3cfc53010a4b4a3c7ecb88c212e9decc4f5eeb6af75c3c803937d2d60947"},
 ]
 
 [package.dependencies]
 filelock = "*"
-fsspec = ">=0.8.5"
+fsspec = "*"
 jinja2 = "*"
-networkx = ">=2.5.1"
+networkx = "*"
 setuptools = {version = "*", markers = "python_version >= \"3.12\""}
 sympy = ">=1.13.3"
 typing-extensions = ">=4.10.0"
@@ -3575,11 +3577,10 @@ typing-extensions = ">=4.10.0"
 [package.extras]
 opt-einsum = ["opt-einsum (>=3.3)"]
 optree = ["optree (>=0.13.0)"]
-pyyaml = ["pyyaml"]
 
 [package.source]
 type = "url"
-url = "https://download.pytorch.org/whl/cpu/torch-2.9.0%2Bcpu-cp313-cp313-manylinux_2_28_x86_64.whl"
+url = "https://download.pytorch.org/whl/cpu/torch-2.7.1%2Bcpu-cp312-cp312-manylinux_2_28_x86_64.whl"
 
 [[package]]
 name = "tornado"
@@ -3792,5 +3793,5 @@ files = [
 
 [metadata]
 lock-version = "2.1"
-python-versions = ">=3.13,<4.0"
-content-hash = "c5adc999b9676689778be64003be0e85312702b24da784592c00ea25473e666c"
+python-versions = ">=3.12,<4.0"
+content-hash = "a6c71934fae48996c8705091ad1ee009aaffc827971a5f8810e01854f6d2b831"
