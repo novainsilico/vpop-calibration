@@ -9,14 +9,12 @@
   in {
     devShells.default = pkgs.mkShell {
       buildInputs = with pkgs; [
-        poetry
+        (poetry.override { python3 = python312; })
         gcc
         openssl
-        python312
       ];
       shellHook = ''
-        export LD_LIBRARY_PATH=${pkgs.stdenv.cc.cc.lib}/lib
-        poetry env use 3.12
+        export LD_LIBRARY_PATH=${pkgs.stdenv.cc.cc.lib}/lib:${pkgs.libz}/lib
       '';
     };
   });
