@@ -15,6 +15,7 @@ dependencies = [
     "pandas (>=2.3.3,<3.0.0)",
     "numpy (>=2.3.4,<3.0.0)",
     "tqdm (>=4.67.1,<5.0.0)",
+    "pytest-cov (>=7.0.0,<8.0.0)",
 ]
 
 [tool.poetry.group.dev.dependencies]
@@ -29,3 +30,33 @@ pytest = "^9.0.0"
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.pytest]
+minversion = "9.0"
+addopts = ["-ra", "-q", "--cov=vpop_calibration", "--cov-report=markdown"]
+testpaths = ["vpop_calibration/test"]
+
+[tool.coverage.run]
+branch = true
+omit = ["test/*"]
+
+[tool.coverage.report]
+# Regexes for lines to exclude from consideration
+exclude_also = [
+    # Don't complain about missing debug-only code:
+    "def __repr__",
+    "if self\\.debug",
+
+    # Don't complain if tests don't hit defensive assertion code:
+    "raise AssertionError",
+    "raise NotImplementedError",
+
+    # Don't complain if non-runnable code isn't run:
+    "if 0:",
+    "if __name__ == .__main__.:",
+
+    # Don't complain about abstract methods, they aren't run:
+    "@(abc\\.)?abstractmethod",
+]
+show_missing = true
+ignore_errors = true
