@@ -22,6 +22,7 @@ class SVGP(gpytorch.models.ApproximateGP):
         inducing_points: torch.Tensor,
         nb_params: int,
         nb_outputs: int,
+        nb_latents: int,
         var_dist: str = "Chol",
         var_strat: str = "IMV",
         kernel: str = "RBF",
@@ -76,7 +77,7 @@ class SVGP(gpytorch.models.ApproximateGP):
                     jitter_val=jitter,
                 ),
                 num_tasks=nb_outputs,
-                num_latents=nb_outputs,
+                num_latents=nb_latents,
                 latent_dim=-1,
             )
         else:
@@ -128,7 +129,9 @@ class GP:
         nb_training_iter: int = 400,
         training_proportion: float = 0.7,
         nb_inducing_points: int = 200,
+        log_lower_limit: float = 1e-10,
         log_inputs: List[str] = [],
+        log_outputs: List[str] = [],
         nb_latents: Optional[int] = None,
         # by default we will use nb_latents = nb_outputs
         mll: str = "ELBO",  # ELBO or PLL
@@ -152,6 +155,8 @@ class GP:
             training_proportion (float, optional): Proportion of patients to be used as training vs. validation. Defaults to 0.7.
             nb_inducing_points (int, optional): Number of inducing points to be used for variational inference. Defaults to 200.
             log_inputs (List[str]): the list of parameter inputs which should be rescaled to log when fed to the GP. Avoid adding time here, or any parameter that takes 0 as a value.
+            log_outputs (list[str]): list of model outptus which should be rescaled to log
+            log_lower_limit(float): epsilon value that is added to all rescaled value to avoid numerical errors when log-scaling variables
             nb_latents (Optional[int], optional): Number of latents. Defaults to None, implying that nb_latents = nb_tasks will be used
             mll (str, optional): Marginal log likelihood choice. Defaults to "ELBO" (other option "PLL")
             learning_rate (Optional[float]): learning rate initial value. Defaults to 0.001 (in torch.optim.Adam)
@@ -200,10 +205,12 @@ class GP:
         self.nb_protocol_arms = len(self.protocol_arms)
         self.output_names = self.full_df_raw["output_name"].unique().tolist()
         self.nb_outputs = len(self.output_names)
+        self.log_lower_limit = log_lower_limit
         self.log_inputs = log_inputs
         self.log_inputs_indices = [
             self.parameter_names.index(p) for p in self.log_inputs
         ]
+        self.log_outputs = log_outputs
 
         # Ensure input df has a consistent shape (and remove potential extra columns)
         self.full_df_raw = self.full_df_raw[
@@ -242,6 +249,10 @@ class GP:
         self.task_idx_to_protocol = {
             self.tasks.index(k): v for k, v in self.task_to_protocol.items()
         }
+        self.log_tasks = [
+            task for task in self.tasks if self.task_to_output[task] in self.log_outputs
+        ]
+        self.log_tasks_indices = [self.tasks.index(task) for task in self.log_tasks]
 
         if nb_latents:
             self.nb_latents = nb_latents
@@ -255,9 +266,11 @@ class GP:
         if self.data_already_normalized == True:
             self.normalized_df = self.full_df_reshaped
         else:
-            self.full_df_reshaped[self.log_inputs] = self.full_df_reshaped[
-                self.log_inputs
-            ].apply(np.log)
+            self.full_df_reshaped[self.log_inputs + self.log_tasks] = (
+                self.full_df_reshaped[self.log_inputs + self.log_tasks].apply(
+                    lambda val: np.log(np.maximum(val, self.log_lower_limit))
+                )
+            )
 
             self.normalized_df, mean, std = normalize_data(
                 self.full_df_reshaped, ["id"]
@@ -329,6 +342,7 @@ class GP:
             self.inducing_points,
             self.nb_parameters,
             self.nb_tasks,
+            self.nb_latents,
             self.var_dist,
             self.var_strat,
             self.kernel,
@@ -379,6 +393,9 @@ class GP:
     def unnormalize_output_wide(self, data: torch.Tensor) -> torch.Tensor:
         """Unnormalize wide outputs (all tasks included) from the GP."""
         unnormalized = data * self.normalizing_output_std + self.normalizing_output_mean
+        unnormalized[:, self.log_tasks_indices] = torch.exp(
+            unnormalized[:, self.log_tasks_indices]
+        )
 
         return unnormalized
 
@@ -387,12 +404,15 @@ class GP:
     ) -> torch.Tensor:
         """Unnormalize long outputs (one row per task) from the GP."""
         rescaled_data = data
-        for task in range(self.nb_tasks):
-            mask = torch.BoolTensor(task_indices == task)
+        for task_idx in range(self.nb_tasks):
+            log_task = self.tasks[task_idx] in self.log_tasks
+            mask = torch.BoolTensor(task_indices == task_idx)
             rescaled_data[mask] = (
-                rescaled_data[mask] * self.normalizing_output_std[task]
-                + self.normalizing_output_mean[task]
+                rescaled_data[mask] * self.normalizing_output_std[task_idx]
+                + self.normalizing_output_mean[task_idx]
             )
+            if log_task:
+                rescaled_data[mask] = torch.exp(rescaled_data[mask])
         return rescaled_data
 
     def normalize_inputs_df(self, inputs_df: pd.DataFrame) -> torch.Tensor:
@@ -859,7 +879,7 @@ class GP:
             n_rows, n_cols, figsize=(5 * n_cols, 4 * n_rows), squeeze=False
         )
 
-        cmap = plt.cm.get_cmap("Spectral")
+        cmap = plt.get_cmap("Spectral")
         colors = cmap(np.linspace(0, 1, len(patients)))
         for output_index, output_name in enumerate(outputs):
             for protocol_index, protocol_arm in enumerate(protocol_arms):

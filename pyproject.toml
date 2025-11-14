@@ -38,7 +38,7 @@ testpaths = ["vpop_calibration/test"]
 
 [tool.coverage.run]
 branch = true
-omit = ["test/*"]
+omit = ["vpop_calibration/test/*"]
 
 [tool.coverage.report]
 # Regexes for lines to exclude from consideration

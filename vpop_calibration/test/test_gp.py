@@ -6,15 +6,6 @@ import uuid
 from vpop_calibration import *
 
 
-# needs to be at top-level for multiprocessing to work
-def equations_two_comp(t, y, k_12, k_21, k_el):
-    ydot = [  # y[0] is A1, y[1] is A2
-        k_21 * y[1] - k_12 * y[0] - k_el * y[0],
-        k_12 * y[0] - k_21 * y[1],
-    ]
-    return ydot
-
-
 def equations_with_abs(t, y, k_a, k_12, k_21, k_el):
     # y[0] is A_absorption, y[1] is A_central, y[2] is A_peripheral
     A_absorption, A_central, A_peripheral = y[0], y[1], y[2]
@@ -28,27 +19,36 @@ def equations_with_abs(t, y, k_a, k_12, k_21, k_el):
     return ydot
 
 
+variable_names = ["A0", "A1", "A2"]
+parameter_names = ["k_a", "k_12", "k_21", "k_el"]
+
+tmax = 24.0
+initial_conditions = np.array([10.0, 0.0, 0.0])
+
+protocol_design = pd.DataFrame(
+    {"protocol_arm": ["arm-A", "arm-B"], "k_el": [0.5, 10.0]}
+)
+nb_protocols = len(protocol_design)
+
+pk_two_compartments_model = OdeModel(
+    equations_with_abs, variable_names, parameter_names
+)
+
+model_file = "vpop_calibration/test/gp_model_for_tests.pkl"
+
+
 def test_gp_training():
     # Define the ode model
-    variable_names = ["A0", "A1"]
-    parameter_names = ["k_12", "k_21", "k_el"]
-
-    pk_two_compartments_model = OdeModel(
-        equations_two_comp, variable_names, parameter_names
-    )
 
     nb_timesteps = 15
-    tmax = 24.0
-    initial_conditions = np.array([10.0, 0.0])
     time_steps = np.linspace(0.0, tmax, nb_timesteps)
 
     log_nb_patients = 3
     param_ranges = {
         "k_12": {"low": 0.02, "high": 0.07, "log": False},
         "k_21": {"low": 0.1, "high": 0.3, "log": False},
+        "k_a": {"low": -1.0, "high": 0.0, "log": True},
     }
-
-    protocol_design = pd.DataFrame({"protocol_arm": ["A", "B"], "k_el": [0.1, 0.5]})
 
     dataset = simulate_dataset_from_ranges(
         pk_two_compartments_model,
@@ -81,23 +81,15 @@ def test_gp_training():
         log_inputs=learned_ode_params,
     )
     myGP.train()
+    myGP.plot_loss()
+    myGP.plot_obs_vs_predicted("training")
+    myGP.plot_individual_solution(0)
+    myGP.plot_all_solutions("training")
+    with open(model_file, "wb") as file:
+        pickle.dump(myGP, file)
 
 
 def test_gp_saem():
-    variable_names = ["A0", "A1", "A2"]
-    parameter_names = ["k_a", "k_12", "k_21", "k_el"]
-
-    ode_model = OdeModel(equations_with_abs, variable_names, parameter_names)
-    model_file = "./vpop_calibration/test/gp_model_for_tests.pkl"
-    with open(model_file, "rb") as file:
-        myGP = pickle.load(file)
-    protocol_design = pd.DataFrame(
-        {"protocol_arm": ["arm-A", "arm-B"], "k_el": [0.5, 10]}
-    )
-    nb_protocols = len(protocol_design)
-
-    initial_conditions = np.array([10.0, 0.0, 0.0])
-
     time_span_rw = (0, 24)
     nb_steps_rw = 5
 
@@ -125,11 +117,11 @@ def test_gp_saem():
         lambda x: "arm-A" if x == 0 else "arm-B"
     )
     patients_df["k_a"] = rng.lognormal(-1, 0.1, nb_patients)
-    patients_df["foo"] = rng.lognormal(0, 0.1, nb_patients)
+    patients_df["foo"] = rng.lognormal(0.1, 0.1, nb_patients)
 
     print(f"Simulating {nb_patients} patients on {nb_protocols} protocol arms")
     obs_df = simulate_dataset_from_omega(
-        ode_model,
+        pk_two_compartments_model,
         protocol_design,
         time_steps_rw,
         initial_conditions,
@@ -155,6 +147,8 @@ def test_gp_saem():
         "k_21": {},
     }
 
+    with open(model_file, "rb") as file:
+        myGP = pickle.load(file)
     # Create a structural model
     structural_gp = StructuralGp(myGP)
     # Create a NLME moedl
@@ -185,3 +179,6 @@ def test_gp_saem():
     )
 
     optimizer.run()
+    optimizer.continue_iterating(nb_phase2_further_iterations=1)
+    optimizer.plot_convergence_history()
+    optimizer.plot_map_estimates()
