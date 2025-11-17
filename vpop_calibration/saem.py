@@ -561,7 +561,7 @@ class PySAEM:
             n_rows, n_cols, figsize=(5 * n_cols, 4 * n_rows), squeeze=False
         )
 
-        cmap = plt.cm.get_cmap("Spectral")
+        cmap = plt.get_cmap("Spectral")
         colors = cmap(np.linspace(0, 1, self.model.nb_patients))
         for output_index, output_name in enumerate(self.model.outputs_names):
             for protocol_index, protocol_arm in enumerate(
