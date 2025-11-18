@@ -2,9 +2,9 @@ import numpy as np
 import pandas as pd
 from typing import Optional
 
-from .model import OdeModel
+from .ode import OdeModel
 from .vpop import generate_vpop_from_ranges
-from .model import StructuralOdeModel
+from .structural_model import StructuralOdeModel
 from .nlme import NlmeModel
 
 

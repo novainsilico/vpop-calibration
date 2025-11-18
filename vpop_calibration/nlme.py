@@ -2,7 +2,7 @@ import torch
 from typing import List, Dict, Union, Tuple, Optional
 import pandas as pd
 
-from .model.structural_model import StructuralModel
+from .structural_model import StructuralModel
 
 
 class NlmeModel:
