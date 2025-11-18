@@ -28,13 +28,14 @@ class SVGP(gpytorch.models.ApproximateGP):
         self,
         inducing_points: torch.Tensor,
         nb_params: int,
-        nb_outputs: int,
+        nb_tasks: int,
         nb_latents: int,
         var_dist: str = "Chol",
         var_strat: str = "IMV",
         kernel: str = "RBF",
         jitter: float = 1e-6,
         nb_mixtures: int = 4,  # only for the SMK kernel
+        nb_features: int = 10,
     ):
         """_summary_
 
@@ -47,20 +48,27 @@ class SVGP(gpytorch.models.ApproximateGP):
             kernel (str, optional): Kernel choice. Defaults to "RBF".
             jitter (float, optional): Jitter value (for numerical stability). Defaults to 1e-6.
             nb_mixtures (int, optional): Number of mixtures for the SMK kernel. Defaults to 4.
+            nb_features (int, optional): Number of features for the deep kernel. Defaults to 10.
         """
         assert var_dist == "Chol", f"Unsupported variational distribution: {var_dist}"
         assert var_strat in [
             "IMV",
             "LMCV",
         ], f"Unsupported variational strategy {var_strat}"
-        assert kernel in ["RBF", "SMK"], f"Unsupported kernel {kernel}"
+        assert kernel in ["RBF", "SMK", "Deep-RBF"], f"Unsupported kernel {kernel}"
+        if var_strat == "LMCV":
+            self.batch_size = nb_latents
+        elif var_strat == "IMV":
+            self.batch_size = nb_tasks
+        else:
+            self.batch_size = nb_tasks
 
+        self.kernel_type = kernel
         variational_distribution = gpytorch.variational.CholeskyVariationalDistribution(
             inducing_points.shape[0],
-            batch_shape=torch.Size([nb_outputs]),
+            batch_shape=torch.Size([self.batch_size]),
             mean_init_std=1e-3,
         )
-
         if var_strat == "IMV":
             variational_strategy = (
                 gpytorch.variational.IndependentMultitaskVariationalStrategy(
@@ -71,7 +79,7 @@ class SVGP(gpytorch.models.ApproximateGP):
                         learn_inducing_locations=True,
                         jitter_val=jitter,
                     ),
-                    num_tasks=nb_outputs,
+                    num_tasks=nb_tasks,
                 )
             )
         elif var_strat == "LMCV":
@@ -83,7 +91,7 @@ class SVGP(gpytorch.models.ApproximateGP):
                     learn_inducing_locations=True,
                     jitter_val=jitter,
                 ),
-                num_tasks=nb_outputs,
+                num_tasks=nb_tasks,
                 num_latents=nb_latents,
                 latent_dim=-1,
             )
@@ -94,31 +102,62 @@ class SVGP(gpytorch.models.ApproximateGP):
 
         # Todo : allow for different mean choices
         self.mean_module = gpytorch.means.ConstantMean(
-            batch_shape=torch.Size([nb_outputs])
+            batch_shape=torch.Size([self.batch_size])
         )
 
         if kernel == "RBF":
             self.covar_module = gpytorch.kernels.ScaleKernel(
                 gpytorch.kernels.RBFKernel(
-                    batch_shape=torch.Size([nb_outputs]),
+                    batch_shape=torch.Size([self.batch_size]),
                     ard_num_dims=nb_params,
                     jitter=jitter,
                 ),
-                batch_shape=torch.Size([nb_outputs]),
+                batch_shape=torch.Size([self.batch_size]),
             )
         elif kernel == "SMK":
             self.covar_module = gpytorch.kernels.SpectralMixtureKernel(
-                batch_size=nb_outputs,
+                batch_size=nb_tasks,
                 num_mixtures=nb_mixtures,
                 ard_num_dims=nb_params,
                 jitter=jitter,
             )
+        elif kernel == "Deep-RBF":
+
+            class LargeFeatureExtractor(torch.nn.Sequential):
+                def __init__(self, n_params, n_features):
+                    super(LargeFeatureExtractor, self).__init__()
+                    self.add_module("linear1", torch.nn.Linear(n_params, 1000))
+                    self.add_module("relu1", torch.nn.ReLU())
+                    self.add_module("linear2", torch.nn.Linear(1000, 500))
+                    self.add_module("relu2", torch.nn.ReLU())
+                    self.add_module("linear3", torch.nn.Linear(500, 50))
+                    self.add_module("relu3", torch.nn.ReLU())
+                    self.add_module("linear4", torch.nn.Linear(50, n_features))
+
+            self.feature_extractor = LargeFeatureExtractor(nb_params, nb_features)
+            self.scale_to_bounds = gpytorch.utils.grid.ScaleToBounds(-1.0, 1.0)
+
+            self.covar_module = gpytorch.kernels.ScaleKernel(
+                gpytorch.kernels.RBFKernel(
+                    batch_shape=torch.Size([self.batch_size]),
+                    ard_num_dims=nb_features,
+                    jitter=jitter,
+                ),
+                batch_shape=torch.Size([self.batch_size]),
+            )
+
         else:
             raise ValueError(f"Unsupported kernel {kernel}")
 
     def forward(self, x: torch.Tensor):
-        mean_x = cast(torch.Tensor, self.mean_module(x))
-        covar_x = self.covar_module(x)
+        if self.kernel_type == "Deep-RBF":
+            proj_x = self.feature_extractor(x)
+            proj_x = self.scale_to_bounds(proj_x)
+            mean_x = cast(torch.Tensor, self.mean_module(proj_x))
+            covar_x = self.covar_module(proj_x)
+        else:
+            mean_x = cast(torch.Tensor, self.mean_module(x))
+            covar_x = self.covar_module(x)
         return gpytorch.distributions.MultivariateNormal(mean_x, covar_x)
 
 
@@ -145,6 +184,7 @@ class GP:
         learning_rate: Optional[float] = None,  # optional
         lr_decay: Optional[float] = None,
         num_mixtures: int = 4,  # only for the SMK kernel
+        nb_features: int = 10,  # only for the DK kernel
         jitter: float = 1e-6,
     ):
         """Instantiate a GP model on a training data frame
@@ -169,6 +209,7 @@ class GP:
             learning_rate (Optional[float]): learning rate initial value. Defaults to 0.001 (in torch.optim.Adam)
             lr_decay (Optional[float]): learning rate decay rate.
             num_mixtures (int): Number of mixtures used in the SMK kernel. Not used for other kernel choices. Default to 4.
+            nb_features (int): Number of features used in the deep kernel. Not used for other kernel choices. Default to 10.
             jitter: Jitter value for numerical stability
 
         Comments:
@@ -184,6 +225,7 @@ class GP:
         self.learning_rate = learning_rate
         self.mll_name = mll
         self.num_mixtures = num_mixtures
+        self.nb_features = nb_features
         self.jitter = jitter
         if lr_decay is not None:
             self.lr_decay = lr_decay
@@ -199,7 +241,7 @@ class GP:
         )
 
         if nb_latents is None:
-            self.nb_latents = self.data.nb_outputs
+            self.nb_latents = self.data.nb_tasks
         else:
             self.nb_latents = nb_latents
         # Create inducing points
@@ -222,6 +264,7 @@ class GP:
             self.kernel,
             self.jitter,
             self.num_mixtures,
+            self.nb_features,
         )
 
         # set the marginal log likelihood
@@ -267,9 +310,12 @@ class GP:
         if mini_batching:
             # set the mini_batch_size to a power of two of the total size -4
             if mini_batch_size == None:
-                power = math.floor(math.log2(self.data.X_training.shape[0])) - 4
-                mini_batch_size = 2**power
-            self.mini_batch_size = mini_batch_size
+                power = np.maximum(
+                    math.floor(math.log2(self.data.X_training.shape[0])) - 4, 1
+                )
+                self.mini_batch_size: int = math.floor(2**power)
+            else:
+                self.mini_batch_size = mini_batch_size
 
             # prepare mini-batching
             train_dataset = TensorDataset(self.data.X_training, self.data.Y_training)

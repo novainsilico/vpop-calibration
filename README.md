@@ -23,6 +23,7 @@ A set of Python tools to allow for virtual population calibration, using a non-l
   - [Data generation using a reference NLME model](./examples/generate_data_nlme.ipynb)
   - [Training and exporting a GP using synthetic data](./examples/train_gp.ipynb)
   - [Running SAEM on a reference ODE model](./examples/saem_ode_model.ipynb). Note: the current implementation is notably under-optimized for running SAEM directly on an ODE structural model. This is implemented for testing purposes mostly
+  - [Training a GP with a deep kernel](./examples/train_deep_kernel.ipynb)
 
 ## Support
 
