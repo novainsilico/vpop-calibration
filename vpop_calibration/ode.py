@@ -4,8 +4,6 @@ from scipy.integrate import solve_ivp
 from multiprocessing import Pool
 from typing import List, Any, Callable, Optional
 
-from ..vpop import generate_vpop_from_ranges
-
 
 class OdeModel:
     def __init__(

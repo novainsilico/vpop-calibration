@@ -4,7 +4,7 @@ import numpy as np
 from typing import List
 import uuid
 
-from .gp import GP
+from .model.gp import GP
 from .ode import OdeModel
 
 
@@ -52,14 +52,14 @@ class StructuralGp(StructuralModel):
             gp_model (GP): The trained GP
         """
         # list the GP parameters, except time, as it will be handled differently in the NLME model
-        parameter_names = [p for p in gp_model.parameter_names if p != "time"]
+        parameter_names = [p for p in gp_model.data.parameter_names if p != "time"]
         super().__init__(
             parameter_names,
-            gp_model.output_names,
-            gp_model.protocol_arms,
-            gp_model.tasks,
-            gp_model.task_idx_to_output_idx,
-            gp_model.task_idx_to_protocol,
+            gp_model.data.output_names,
+            gp_model.data.protocol_arms,
+            gp_model.data.tasks,
+            gp_model.data.task_idx_to_output_idx,
+            gp_model.data.task_idx_to_protocol,
         )
         self.gp_model = gp_model
         # self.compiled_predict = torch.compile(self.gp_model.predict_long_scaled) # not functional for the moment
