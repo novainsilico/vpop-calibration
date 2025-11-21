@@ -1,6 +1,6 @@
 [project]
 name = "vpop-calibration"
-version = "1.1.0"
+version = "1.1.1"
 description = ""
 authors = [{ name = "Paul Lemarre", email = "paul.lemarre@novainsilico.ai" }]
 readme = "README.md"
@@ -35,6 +35,7 @@ build-backend = "poetry.core.masonry.api"
 minversion = "9.0"
 addopts = ["-ra", "-q", "--cov=vpop_calibration", "--cov-report=markdown"]
 testpaths = ["vpop_calibration/test"]
+filterwarnings = ["ignore::UserWarning", "ignore::DeprecationWarning"]
 
 [tool.coverage.run]
 branch = true

@@ -1,7 +1,7 @@
 import torch
 import matplotlib.pyplot as plt
 from scipy.optimize import minimize
-from tqdm import tqdm
+from tqdm.notebook import tqdm
 from typing import List, Dict, Union, Optional
 from pandas import DataFrame
 import pandas as pd
