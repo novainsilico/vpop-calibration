@@ -163,11 +163,10 @@ def test_gp_saem():
     )
     # Create an optimizer: here we use SAEM
     optimizer = PySaem(
-        nlme_surrogate,
-        obs_df,
-        nb_phase1_iterations=1,
+        nlme_surrogate, obs_df, nb_phase1_iterations=1, nb_phase2_iterations=0
     )
 
     optimizer.run()
+    optimizer.continue_iterating(nb_add_iters_ph1=1, nb_add_iters_ph2=1)
     optimizer.plot_convergence_history()
     optimizer.plot_map_estimates()

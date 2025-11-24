@@ -59,6 +59,8 @@ class PySaem:
             if nb_phase2_iterations is not None
             else nb_phase1_iterations
         )
+        self.current_phase = 1
+
         # convergence parameters
         self.convergence_threshold: float = convergence_threshold
         self.patience: int = patience
@@ -479,12 +481,23 @@ class PySaem:
             )
             print(f"Initial Omega:\n{self.model.omega_pop}")
             print(f"Initial Residual Variance: {self.model.residual_var}")
+        print("Phase 1 (exploration):")
+        for k in tqdm(range(self.nb_phase1_iterations)):
+            # Run iteration, do not check for convergence in the exploration phase
+            _ = self.one_iteration(k)
 
-        for k in tqdm(range(self.nb_phase1_iterations + self.nb_phase2_iterations)):
-            # Run iteration
-            is_converged = self.one_iteration(k)
-            # Check for convergence, and stop if criterion matched
-            if k > 0:
+        if self.nb_phase2_iterations > 0:
+            self.current_phase = 2
+            print("Phase 2 (smoothing):")
+            for k in tqdm(
+                range(
+                    self.nb_phase1_iterations,
+                    self.nb_phase1_iterations + self.nb_phase2_iterations,
+                )
+            ):
+                # Run iteration
+                is_converged = self.one_iteration(k)
+                # Check for convergence, and stop if criterion matched
                 if is_converged:
                     self.consecutive_converged_iters += 1
                     if self.verbose:
@@ -499,6 +512,54 @@ class PySaem:
                 else:
                     self.consecutive_converged_iters = 0
 
+        return None
+
+    def continue_iterating(self, nb_add_iters_ph1=0, nb_add_iters_ph2=0) -> None:
+        """
+        This method is to be used when the run method has already run and the user wants to further iterate.
+        """
+        if self.current_phase == 2:
+            if nb_add_iters_ph1 > 0:
+                print("Smoothing phase has started, cannot add phase 1 iterations.")
+                nb_add_iters_ph1 = 0
+        if self.current_phase == 1:
+            if nb_add_iters_ph1 > 0:
+                print("Continuing phase 1 (exploration):")
+                for k in tqdm(range(self.nb_phase1_iterations + nb_add_iters_ph1)):
+                    # Run iteration, do not check for convergence in the exploration phase
+                    _ = self.one_iteration(k)
+
+            print("Switching to Phase 2 (smoothing)")
+            self.current_phase = 2
+
+        if nb_add_iters_ph2 > 0:
+            for k in tqdm(
+                range(
+                    self.nb_phase1_iterations
+                    + self.nb_phase2_iterations
+                    + nb_add_iters_ph1,
+                    self.nb_phase1_iterations
+                    + self.nb_phase2_iterations
+                    + nb_add_iters_ph1
+                    + nb_add_iters_ph2,
+                )
+            ):
+                # Run iteration
+                is_converged = self.one_iteration(k)
+                # Check for convergence, and stop if criterion matched
+                if is_converged:
+                    self.consecutive_converged_iters += 1
+                    if self.verbose:
+                        print(
+                            f"Convergence met. Consecutive iterations: {self.consecutive_converged_iters}/{self.patience}"
+                        )
+                    if self.consecutive_converged_iters >= self.patience:
+                        print(
+                            f"\nConvergence reached after {k + 1} iterations. Stopping early."
+                        )
+                        break
+                else:
+                    self.consecutive_converged_iters = 0
         return None
 
     def plot_convergence_history(
