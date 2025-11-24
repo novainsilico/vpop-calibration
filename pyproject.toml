@@ -35,7 +35,7 @@ build-backend = "poetry.core.masonry.api"
 minversion = "9.0"
 addopts = ["-ra", "-q", "--cov=vpop_calibration", "--cov-report=markdown"]
 testpaths = ["vpop_calibration/test"]
-filterwarnings = ["ignore::UserWarning", "ignore::DeprecationWarning"]
+filterwarnings = ["error", "ignore::UserWarning", "ignore::DeprecationWarning"]
 
 [tool.coverage.run]
 branch = true

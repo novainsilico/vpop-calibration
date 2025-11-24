@@ -12,14 +12,6 @@ from .nlme import NlmeModel
 
 # Main SAEM Algorithm Class
 class PySaem:
-    """
-    The method run of this class handles the whole SAEM iterations, alternating between the E-step (sampling individual effects) and the M-step (updating the fixed effects).
-    The E-step is mainly performed through the MCMC_Eta_Sampler class, and the M-step directly in this run method.
-    The learning rate is updated though the method update_learning_rate.
-    SAEM needs initial guesses for all fixed effects that are given by the user.
-    They can also set some parameters for the sampling of the etas in the MCMC, and change the simulated annealing factor, applied on omega (covariance of individual effects etas) and the residual error update.
-    """
-
     def __init__(
         self,
         model: NlmeModel,
@@ -33,9 +25,25 @@ class PySaem:
         patience: int = 5,
         learning_rate_power: float = 0.8,
         annealing_factor: float = 0.95,
-        init_step_size: float = 0.1,  # stick to the 0.1 - 1 range
+        init_step_size: float = 0.5,  # stick to the 0.1 - 1 range
         verbose: bool = False,
     ):
+        """Instantiate an SAEM optimizer for an NLME model
+
+        Args:
+            model (NlmeModel): The model to be optimized
+            observations_df (DataFrame): The data set containing observations
+            mcmc_first_burn_in (int, optional): Number of discarded samples in the first iteration. Defaults to 5.
+            mcmc_nb_transitions (int, optional): Number of kernel transitions computed at each iteration. Defaults to 1.
+            nb_phase1_iterations (int, optional): Number of iterations in the exploration phase. Defaults to 100.
+            nb_phase2_iterations (Union[int, None], optional): Number of iterations in the convergence phase. Defaults to None, implying nb_phase_2 = nb_phase_1.
+            convergence_threshold (float, optional): Estimated parameter relative change threshold considered for convergence. Defaults to 1e-4.
+            patience (int, optional): Number of iterations of consecutive low relative change considered for early stopping of the algorithm. Defaults to 5.
+            learning_rate_power (float, optional): Exponential decay exponent for the M-step learning rate (stochastic approximation). Defaults to 0.8.
+            annealing_factor (float, optional): Exploration phase annealing factor for residual and parameter variance. Defaults to 0.95.
+            init_step_size (float, optional): Initial MCMC step size scaling factor. Defaults to 0.5.
+        """
+
         self.model: NlmeModel = model
         self.model.add_observations(observations_df)
         self.observations_df = observations_df
@@ -87,18 +95,28 @@ class PySaem:
             self.current_pred,
         ) = self.model.log_posterior_etas(self.current_etas)
 
+        # Initialize the optimizer history
         self.history: Dict[str, List[torch.Tensor]] = {
             "log_MI": [self.model.log_MI],
             "population_betas": [self.model.population_betas],
             "population_omega": [self.model.omega_pop],
             "residual_error_var": [self.model.residual_var],
         }
+
+        # Initialize the values for convergence checks
+        self.prev_params: Dict[str, torch.Tensor] = {
+            "log_MI": self.model.log_MI,
+            "population_betas": self.model.population_betas,
+            "population_omega": self.model.omega_pop,
+            "residual_error_var": self.model.residual_var,
+        }
+
         # pre-compute full design matrix once
         self.X = torch.stack(
             [self.model.design_matrices[ind] for ind in self.model.patients],
             dim=0,
         )
-
+        # Precompute the gram matrix
         self.sufficient_stat_gram_matrix = torch.matmul(
             self.X.transpose(1, 2), self.X
         ).sum(dim=0)
@@ -108,7 +126,7 @@ class PySaem:
             self.X.transpose(1, 2) @ self.current_log_pdu.unsqueeze(-1)
         ).sum(dim=0)
         self.sufficient_stat_outer_product = torch.matmul(
-            self.current_etas.transpose(0, 1), self.current_etas
+            self.current_log_pdu.transpose(0, 1), self.current_log_pdu
         )
 
     def m_step_update(
@@ -117,42 +135,66 @@ class PySaem:
         s_cross_product: torch.Tensor,
         s_outer_product: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        """Perform the M-step update
+
+        Args:
+            log_pdu (torch.Tensor): Current estimation of the log-scaled parameters
+            s_cross_product (torch.Tensor): Current sufficient statistics 1 - cross product
+            s_outer_product (torch.Tensor): Current sufficient statistics 2 - outer product
+
+        Returns:
+            tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]: Updated value for
+            - sufficient statistics: cross product
+            - sufficient statistics: outer product
+            - beta parameters
+            - omega matrix
+        """
+
         assert log_pdu.shape[0] == self.X.shape[0]
         cross_product = (self.X.transpose(1, 2) @ log_pdu.unsqueeze(-1)).sum(dim=0)
-
-        new_s_cross_product = self.stochastic_approximation(
+        new_s_cross_product = self._stochastic_approximation(
             s_cross_product, cross_product
         )
+        outer_product = torch.matmul(log_pdu.transpose(0, 1), log_pdu)
+        new_s_outer_product = self._stochastic_approximation(
+            s_outer_product, outer_product
+        )
+
         new_beta = torch.linalg.solve(
             self.sufficient_stat_gram_matrix, new_s_cross_product
         )
+
         new_log_pdu = torch.matmul(self.X, new_beta.unsqueeze(0)).squeeze(-1)
-        new_etas = log_pdu - new_log_pdu
-        outer_product = torch.matmul(new_etas.transpose(0, 1), new_etas)
-        new_s_outer_product = self.stochastic_approximation(
-            s_outer_product, outer_product
+        # Propose a new value for omega
+        new_omega = (
+            1
+            / self.model.nb_patients
+            * (
+                new_s_outer_product
+                - torch.matmul(new_log_pdu.transpose(0, 1), new_log_pdu)
+            )
         )
-        new_omega = 1 / self.model.nb_patients * new_s_outer_product
+        new_omega = self._clamp_eigen_values(new_omega)
 
-        return new_s_cross_product, new_s_outer_product, new_beta.squeeze(-1), new_omega
+        return (
+            new_s_cross_product,
+            new_s_outer_product,
+            new_beta.squeeze(-1),
+            new_omega,
+        )
 
-    def _check_convergence(self) -> bool:
+    def _check_convergence(self, new_params: dict[str, torch.Tensor]) -> bool:
         """Checks for convergence based on the relative change in parameters."""
-        current_params = {
-            "log_MI": self.model.log_MI,
-            "population_betas": self.model.population_betas,
-            "population_omega": self.model.omega_pop,
-            "residual_error_var": self.model.residual_var,
-        }
         all_converged = True
-        for name, current_val in current_params.items():
-            prev_val = self.prev_params[name]
-            abs_diff = torch.abs(current_val - prev_val)
-            abs_sum = torch.abs(current_val) + torch.abs(prev_val) + 1e-9
-            relative_change = abs_diff / abs_sum
-            if torch.any(relative_change > self.convergence_threshold):
-                all_converged = False
-                break
+        for name, current_val in new_params.items():
+            if current_val.shape[0] > 0:
+                prev_val = self.prev_params[name]
+                abs_diff = torch.abs(current_val - prev_val)
+                abs_sum = torch.abs(current_val) + torch.abs(prev_val) + 1e-9
+                relative_change = abs_diff / abs_sum
+                if torch.any(relative_change > self.convergence_threshold):
+                    all_converged = False
+                    break
         return all_converged
 
     def _compute_learning_rates(self, iteration: int) -> tuple[float, float]:
@@ -161,7 +203,7 @@ class PySaem:
 
         Phase 1:
           alpha_k = 1 (exploration)
-          gamma_k = c_0 / k^(0.5) , c0 = 2.38 / sqrt(n_PDU)
+          gamma_k = c_0 / k^(0.5) , c0 = init_step_size_adaptation / sqrt(n_PDU)
         Phase 2:
           alpha_k = 1 / (iteration - phase1_iterations + 1) ^ exponent (the iteration index in phase 2)
           gamma_k = 0
@@ -178,14 +220,66 @@ class PySaem:
             learning_rate_e_step = 0
         return learning_rate_m_step, learning_rate_e_step
 
-    def stochastic_approximation(
+    def _stochastic_approximation(
         self, previous: torch.Tensor, new: torch.Tensor
     ) -> torch.Tensor:
+        """Perform stochastic approximation
+
+        Args:
+            previous (torch.Tensor): The current value of the tensor
+            new (torch.Tensor): The target value of the tensor
+
+        Returns:
+            torch.Tensor: (1 - learning_rate) * previous + learning_rate * new
+        """
+        assert (
+            previous.shape == new.shape
+        ), f"Wrong shape in stochastic approximation: {previous.shape}, {new.shape}"
         return (
             1 - self.learning_rate_m_step
         ) * previous + self.learning_rate_m_step * new
 
-    def one_iteration(self, k: int) -> None:
+    def _simulated_annealing(
+        self, current: torch.Tensor, target: torch.Tensor
+    ) -> torch.Tensor:
+        """Perform simulated annealing
+
+        This function allows to constrain the reduction of certain values by a factor stored in self.annealing_factor
+
+        Args:
+            current (torch.Tensor): Current value of the tensor
+            target (torch.Tensor): Target value of the tensor
+
+        Returns:
+            torch.Tensor: maximum(annealing_factor * current, target)
+        """
+        return torch.maximum(self.annealing_factor * current, target)
+
+    def _clamp_eigen_values(self, omega: torch.Tensor, min_eigenvalue: float = 1e-6):
+        """
+        Project a matrix onto the cone of Positive Definite matrices.
+        """
+        # 1. Ensure symmetry (sometimes float error breaks symmetry slightly)
+        omega = 0.5 * (omega + omega.T)
+
+        # 2. Eigen Decomposition
+        L, V = torch.linalg.eigh(omega)
+
+        # 3. Clamp eigenvalues
+        L_clamped = torch.clamp(L, min=min_eigenvalue)
+
+        # 4. Reconstruct
+        matrix_spd = torch.matmul(V, torch.matmul(torch.diag(L_clamped), V.T))
+
+        return matrix_spd
+
+    def one_iteration(self, k: int) -> bool:
+        """Perform one iteration of SAEM
+
+        Args:
+            k (int): the iteration number
+        """
+
         if self.verbose:
             print(f"Running iteration {k}")
             print(self.current_thetas.shape)
@@ -235,24 +329,15 @@ class PySaem:
         target_res_var: torch.Tensor = self.model.sum_sq_residuals(self.current_pred)
         current_res_var: torch.Tensor = self.model.residual_var
         if k < self.nb_phase1_iterations:
-            target_res_var = torch.max(
-                current_res_var * self.annealing_factor, target_res_var
-            )
+            target_res_var = self._simulated_annealing(current_res_var, target_res_var)
 
-        new_residual_error_var = self.stochastic_approximation(
+        new_residual_error_var = self._stochastic_approximation(
             current_res_var, target_res_var
         )
 
         self.model.update_res_var(new_residual_error_var)
 
-        # 2. Update sufficient statistics with stochastic approximation (learning rate)
-        # - 1. cross product X^T @ PDUs
-        # - 2. Second momdent PDU^T @ PDU
-
-        # 3. Update betas: (X^T X)^-1 @ Cross-product
-
-        # 4. Update Omega (covariance matrix of etas)
-        # 1/N_patients (Second moment - Cross-product^T @ beta)
+        # 2. Update sufficient statistics with stochastic approximation
         if self.verbose:
             print("  M-step update:")
         (
@@ -265,7 +350,17 @@ class PySaem:
             self.sufficient_stat_cross_product,
             self.sufficient_stat_outer_product,
         )
+        # Update beta
         self.model.update_betas(new_beta)
+
+        # Update omega with simulated annealing (phase 1)
+        if k < self.nb_phase1_iterations:
+            new_omega_diag = torch.diag(new_omega)
+            current_omega_diag = torch.diag(self.model.omega_pop)
+            annealed_omega_diag = self._simulated_annealing(
+                current_omega_diag, new_omega_diag
+            )
+            new_omega = torch.diag(annealed_omega_diag)
         self.model.update_omega(new_omega)
 
         # 3. Update fixed effects MIs
@@ -278,11 +373,11 @@ class PySaem:
                 options={"maxfun": 50},
             ).x
             target_log_MI = torch.from_numpy(target_log_MI_np)
-            new_log_MI = self.stochastic_approximation(self.model.log_MI, target_log_MI)
+            new_log_MI = self._stochastic_approximation(
+                self.model.log_MI, target_log_MI
+            )
 
             self.model.update_log_mi(new_log_MI)
-
-        # 4. Update fixed effects betas
 
         if self.verbose:
             print(
@@ -298,37 +393,27 @@ class PySaem:
                 f"  Updated Residual Var: {', '.join([f'{res_var:.4f}' for res_var in self.model.residual_var.detach().cpu().numpy().flatten()])}"
             )
 
+        # Convergence check
+        new_params: Dict[str, torch.Tensor] = {
+            "log_MI": self.model.log_MI,
+            "population_betas": self.model.population_betas,
+            "population_omega": self.model.omega_pop,
+            "residual_error_var": self.model.residual_var,
+        }
+        is_converged = self._check_convergence(new_params)
+
         # store history
         self.history["log_MI"].append(self.model.log_MI)
         self.history["population_betas"].append(self.model.population_betas)
         self.history["population_omega"].append(self.model.omega_pop)
         self.history["residual_error_var"].append(self.model.residual_var)
 
-        if k > 0:
-            is_converged = self._check_convergence()
-            if is_converged:
-                self.consecutive_converged_iters += 1
-                if self.verbose:
-                    print(
-                        f"Convergence met. Consecutive iterations: {self.consecutive_converged_iters}/{self.patience}"
-                    )
-                if self.consecutive_converged_iters >= self.patience:
-                    if self.verbose:
-                        print(
-                            f"\nConvergence reached after {k + 1} iterations. Stopping early."
-                        )
-            else:
-                self.consecutive_converged_iters = 0
-
         # update prev_params for the next iteration's convergence check
-        self.prev_params: Dict[str, torch.Tensor] = {
-            "log_MI": self.model.log_MI,
-            "population_betas": self.model.population_betas,
-            "population_omega": self.model.omega_pop,
-            "residual_error_var": self.model.residual_var,
-        }
+        self.prev_params = new_params
+
         if self.verbose:
             print("Iter done")
+        return is_converged
 
     def MI_objective_function(self, log_MI):
         log_MI_expanded = (
@@ -341,12 +426,14 @@ class PySaem:
         new_thetas = torch.cat(
             (
                 pdk_full,
-                torch.cat(
-                    (
-                        torch.exp(log_MI_expanded),
-                        self.current_log_pdu,
+                torch.exp(
+                    torch.cat(
+                        (
+                            log_MI_expanded,
+                            self.current_log_pdu,
+                        ),
+                        dim=1,
                     ),
-                    dim=1,
                 ),
             ),
             dim=1,
@@ -393,20 +480,24 @@ class PySaem:
             print(f"Initial Omega:\n{self.model.omega_pop}")
             print(f"Initial Residual Variance: {self.model.residual_var}")
 
-        self.history["log_MI"].append(self.model.log_MI)
-        self.history["population_betas"].append(self.model.population_betas)
-        self.history["population_omega"].append(self.model.omega_pop)
-        self.history["residual_error_var"].append(self.model.residual_var)
-
-        self.prev_params: Dict[str, torch.Tensor] = {
-            "log_MI": self.model.log_MI,
-            "population_betas": self.model.population_betas,
-            "population_omega": self.model.omega_pop,
-            "residual_error_var": self.model.residual_var,
-        }
-
         for k in tqdm(range(self.nb_phase1_iterations + self.nb_phase2_iterations)):
-            self.one_iteration(k)
+            # Run iteration
+            is_converged = self.one_iteration(k)
+            # Check for convergence, and stop if criterion matched
+            if k > 0:
+                if is_converged:
+                    self.consecutive_converged_iters += 1
+                    if self.verbose:
+                        print(
+                            f"Convergence met. Consecutive iterations: {self.consecutive_converged_iters}/{self.patience}"
+                        )
+                    if self.consecutive_converged_iters >= self.patience:
+                        print(
+                            f"\nConvergence reached after {k + 1} iterations. Stopping early."
+                        )
+                        break
+                else:
+                    self.consecutive_converged_iters = 0
 
         return None
 

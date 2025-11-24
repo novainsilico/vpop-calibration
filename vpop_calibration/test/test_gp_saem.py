@@ -46,7 +46,7 @@ def test_gp_training():
     log_nb_patients = 3
     param_ranges = {
         "k_12": {"low": -2.0, "high": 0.0, "log": True},
-        "k_21": {"low": 0.1, "high": 0.3, "log": False},
+        "k_21": {"low": -1.0, "high": 0.3, "log": True},
         "k_a": {"low": -1.0, "high": 0.0, "log": True},
     }
 
