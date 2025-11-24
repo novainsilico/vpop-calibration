@@ -125,12 +125,15 @@ class SVGP(gpytorch.models.ApproximateGP):
                 jitter=jitter,
             )
         elif kernel == "Matern":
-            self.covar_module = gpytorch.kernels.MaternKernel(
-                nu=2.5,
-                batch_size=nb_tasks,
-                num_mixtures=nb_mixtures,
-                ard_num_dims=self.kernel_size,
-                jitter=jitter,
+            self.covar_module = gpytorch.kernels.ScaleKernel(
+                gpytorch.kernels.MaternKernel(
+                    nu=2.5,
+                    batch_size=nb_tasks,
+                    num_mixtures=nb_mixtures,
+                    ard_num_dims=self.kernel_size,
+                    jitter=jitter,
+                ),
+                batch_shape=torch.Size([self.batch_size]),
             )
         else:
             raise ValueError(f"Unsupported kernel {kernel}")
