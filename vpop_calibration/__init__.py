@@ -1,5 +1,5 @@
 from .nlme import NlmeModel
-from .saem import PySAEM
+from .saem import PySaem
 from .structural_model import StructuralGp, StructuralOdeModel
 from .model import *
 from .ode import OdeModel
@@ -12,7 +12,7 @@ __all__ = [
     "StructuralGp",
     "StructuralOdeModel",
     "NlmeModel",
-    "PySAEM",
+    "PySaem",
     "simulate_dataset_from_omega",
     "simulate_dataset_from_ranges",
     "generate_vpop_from_ranges",

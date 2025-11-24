@@ -45,7 +45,7 @@ def test_gp_training():
 
     log_nb_patients = 3
     param_ranges = {
-        "k_12": {"low": 0.02, "high": 0.07, "log": False},
+        "k_12": {"low": -2.0, "high": 0.0, "log": True},
         "k_21": {"low": 0.1, "high": 0.3, "log": False},
         "k_a": {"low": -1.0, "high": 0.0, "log": True},
     }
@@ -135,7 +135,7 @@ def test_gp_saem():
 
     # Initial pop estimates
     # Parameter definitions
-    init_log_MI = {}  # {"k_21": -1.0}
+    init_log_MI = {"k_21": -1.0}
     init_log_PDU = {
         "k_21": {"mean": -1.0, "sd": 0.2},
         "k_12": {"mean": -0.1, "sd": 0.1},
@@ -162,23 +162,12 @@ def test_gp_saem():
         error_model_type,
     )
     # Create an optimizer: here we use SAEM
-    optimizer = PySAEM(
+    optimizer = PySaem(
         nlme_surrogate,
         obs_df,
-        mcmc_burn_in=0,
-        mcmc_first_burn_in=0,
-        mcmc_nb_samples=1,
-        mcmc_proposal_var_scaling_factor=0.5,
         nb_phase1_iterations=1,
-        nb_phase2_iterations=None,
-        convergence_threshold=1e-4,
-        patience=5,
-        learning_rate_power=0.8,
-        annealing_factor=0.95,
-        verbose=False,
     )
 
     optimizer.run()
-    optimizer.continue_iterating(nb_phase2_further_iterations=1)
     optimizer.plot_convergence_history()
     optimizer.plot_map_estimates()
