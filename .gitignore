@@ -1,3 +1,4 @@
 .vscode
 *.pyc
-vpop_calibration/test/*.pkl
+*.pkl
+.Rhistory

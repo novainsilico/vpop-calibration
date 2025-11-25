@@ -1,6 +1,7 @@
 import torch
 from typing import List, Dict, Union, Tuple, Optional
 import pandas as pd
+import numpy as np
 
 from .structural_model import StructuralModel
 
@@ -263,6 +264,7 @@ class NlmeModel:
 
     def update_omega(self, omega: torch.Tensor) -> None:
         """Update the covariance matrix of the NLME model."""
+        assert self.omega_pop.shape == omega.shape, "Wrong omega shape"
         self.omega_pop = omega
         self.omega_pop_lower_chol = torch.linalg.cholesky(self.omega_pop)
         self.eta_distribution = torch.distributions.MultivariateNormal(
@@ -272,14 +274,17 @@ class NlmeModel:
 
     def update_res_var(self, residual_var: torch.Tensor) -> None:
         """Update the residual variance of the NLME model."""
+        assert self.residual_var.shape == residual_var.shape, "Wrong res var shape"
         self.residual_var = residual_var
 
     def update_betas(self, betas: torch.Tensor) -> None:
         """Update the betas of the NLME model."""
+        assert self.population_betas.shape == betas.shape, "Wrong beta shape"
         self.population_betas = betas
 
     def update_log_mi(self, log_MI: torch.Tensor) -> None:
         """Update the model intrinsic parameter values of the NLME model."""
+        assert self.log_MI.shape == log_MI.shape, "Wrong MI shape"
         self.log_MI = log_MI
 
     def sample_individual_etas(self, nb_patients=None) -> torch.Tensor:
@@ -301,7 +306,7 @@ class NlmeModel:
     def individual_parameters(
         self,
         individual_etas: torch.Tensor,
-        ind_ids_for_etas: List[Union[str, int]],
+        ind_ids_for_etas: Optional[List[Union[str, int]]] = None,
     ) -> torch.Tensor:
         """Compute individual patient parameters
 
@@ -314,6 +319,9 @@ class NlmeModel:
         Returns:
             torch.Tensor [nb_patients x nb_parameters]: One parameter set for each patient. Dim 0 corresponds to the patients, dim 1 is the parameters
         """
+        if ind_ids_for_etas is None:
+            ind_ids_for_etas = self.patients
+
         nb_patients_for_etas = len(ind_ids_for_etas)
         # Gather the necessary design matrices
         list_design_matrices = [
@@ -441,22 +449,29 @@ class NlmeModel:
         log_priors: torch.Tensor = self.eta_distribution.log_prob(etas)
         return log_priors
 
-    def _log_posterior_etas(
-        self, etas: torch.Tensor, ind_ids_for_etas: List[Union[str, int]]
-    ) -> Tuple[torch.Tensor, torch.Tensor, List[torch.Tensor]]:
+    def log_posterior_etas(
+        self,
+        etas: torch.Tensor,
+        ind_ids_for_etas: Optional[List[Union[str, int]]] = None,
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, dict[int | str, torch.Tensor]]:
         """Compute the log-posterior of a list of random effects
 
         Args:
             etas (torch.Tensor): Random effects samples
-            ind_ids_for_etas (List[Union[str, int]]): Patient ids corresponding to each eta
+            ind_ids_for_etas (List[Union[str, int]], optional): Patient ids corresponding to each eta. By default, all patients from the observation data set
 
         Returns:
             Tuple[torch.Tensor, List[torch.Tensor], DataFrame]:
             - log-posterior likelihood of etas
-            - tensor of individual parameters for each patient
+            - current thetas
+            - log values of current pdu estimation (useful for SAEM)
             - list of simulated values for each patient
 
         """
+        if ind_ids_for_etas is None:
+            ind_ids_for_etas = self.patients
+            assert etas.shape[0] == self.nb_patients
+
         if not hasattr(self, "observations_tensors"):
             raise ValueError(
                 "Cannot compute log-posterior without an associated observations data frame."
@@ -489,8 +504,13 @@ class NlmeModel:
 
         log_lik_obs = torch.tensor(list_log_lik_obs)
         log_posterior = log_lik_obs + log_priors
-
-        return log_posterior, individual_params, full_pred
+        pred_dict = {
+            ind_ids_for_etas[i]: full_pred[i] for i in range(len(ind_ids_for_etas))
+        }
+        current_log_pdu = torch.log(
+            individual_params[:, self.nb_PDK : self.nb_PDK + self.nb_PDU]
+        )
+        return log_posterior, individual_params, current_log_pdu, pred_dict
 
     def calculate_residuals(
         self, observed_data: torch.Tensor, predictions: torch.Tensor
@@ -511,9 +531,7 @@ class NlmeModel:
         else:
             raise ValueError("Unsupported error model type.")
 
-    def sum_sq_residuals_per_output(
-        self, pred: Dict[str | int, torch.Tensor]
-    ) -> torch.Tensor:
+    def sum_sq_residuals(self, pred: Dict[str | int, torch.Tensor]) -> torch.Tensor:
         sum_residuals = torch.zeros(self.nb_outputs)
         for output_ind in range(self.nb_outputs):
             for patient in self.patients:
@@ -562,111 +580,82 @@ class NlmeModel:
             raise ValueError("Non supported error type.")
         return log_lik
 
-    def init_mcmc_sampler(
+    def mh_step(
         self,
-        observations_df: pd.DataFrame,
-        verbose: bool,
-    ) -> None:
-        self.add_observations(observations_df)
-        self.verbose = verbose
-
-    def mcmc_sample(
-        self,
-        init_eta_for_all_ind: torch.Tensor,
-        proposal_var_eta: torch.Tensor,
-        nb_samples: int,
-        nb_burn_in: int,
-    ) -> Tuple[torch.Tensor, torch.Tensor, Dict[str | int, torch.Tensor]]:
-        """Metropolis-Hastings sampling of individual MCMC
-
-        Performs Metropolis-Hastings sampling for the individuals' etas. The MCMC chains (one per individual) advance in parallel.
-        The acceptance criterion for each sample is
-                log(random_uniform) < proposed_log_posterior - current_log_posterior
-
-        Returns the mean of sampled etas per individual, the mean of the log_thetas_PDU (individual PDU parameters associated with the sampled etas) and the mean predictions associated with these individual parameters/etas.
+        current_etas: torch.Tensor,
+        current_log_prob: torch.Tensor,
+        current_pred: dict[str | int, torch.Tensor],
+        current_pdu: torch.Tensor,
+        current_thetas: torch.Tensor,
+        step_size: float,
+        learning_rate: float,
+        target_acceptance_rate: float = 0.234,
+        verbose: bool = False,
+    ) -> tuple[
+        torch.Tensor,
+        torch.Tensor,
+        dict[str | int, torch.Tensor],
+        torch.Tensor,
+        torch.Tensor,
+        float,
+    ]:
+        """Perform one step of a Metropolis-Hastings transition kernel
 
         Args:
-            init_eta_for_all_ind: torch.Tensor of dim [nb_individuals x nb_PDUs]: the current samples, i.e. starting points for each chain
-            nb_samples: int, how many samples will be kept from each chain
-            nb_burn_in: int, how many accepted samples are disgarded before we consider that the chain has converged enough
+            current_etas (torch.Tensor): values of the individual random effects for all patients
+            current_log_prob (torch.Tensor): log posterior likelihood of current random effects
+            current_pred (List[torch.Tensor]): associated model predictions with current random effects
+            step_size (torch.Tensor): current value of MH step size,
+            learning_rate (float): current learning rate (defined by the optimization algorithm)
+            target_acceptance_rate (float, optional): Target for the MCMC acceptance rate. Defaults to 0.234 [1].
+
+            [1] Sherlock C. Optimal Scaling of the Random Walk Metropolis: General Criteria for the 0.234 Acceptance Rule. Journal of Applied Probability. 2013;50(1):1-15. doi:10.1239/jap/1363784420
 
         Returns:
-
+            tuple[torch.Tensor, torch.Tensor, dict[int | str, torch.Tensor], torch.Tensor, float]:
+            - updated individual random effects
+            - updated log posterior likelihood
+            - updated predictions, for each patient of the observation data set
+            - updated thetas
+            - updated values of log PDUs
+            - updated step size
         """
-        if not hasattr(self, "observations_tensors"):
-            raise ValueError("Please run `init_mcmc_sampler` first.")
 
-        sum_etas = torch.zeros_like(init_eta_for_all_ind)
-        sum_log_thetas_PDU = torch.zeros(self.nb_patients, self.nb_PDU)
-
-        predictions_history = {ind: [] for ind in self.patients}
-        current_eta_for_all_ind = init_eta_for_all_ind
-        current_log_posteriors, _, _ = self._log_posterior_etas(
-            init_eta_for_all_ind, self.patients
+        proposal_noise = torch.randn_like(current_etas) @ self.omega_pop_lower_chol
+        proposal_etas = current_etas + step_size * proposal_noise
+        proposal_log_prob, proposal_theta, proposal_log_pdus, proposal_pred = (
+            self.log_posterior_etas(proposal_etas)
+        )
+        deltas: torch.Tensor = proposal_log_prob - current_log_prob
+        log_u: torch.Tensor = torch.log(torch.rand_like(deltas))
+        accept_mask: torch.Tensor = log_u < deltas
+        accept_mask_extended = accept_mask.unsqueeze(1).expand(
+            -1, current_etas.shape[1]
         )
 
-        sample_counts = torch.zeros(self.nb_patients)
-        accepted_counts = torch.zeros(self.nb_patients)
-        total_proposals = torch.zeros(self.nb_patients)
-        done = torch.full((self.nb_patients, 1), False)
-
-        while not torch.all(done).item():
-            active_indices = torch.where(~done)[0]
-            active_ind_ids = [self.patients[i] for i in active_indices]
-
-            total_proposals[active_indices] += 1
-            proposal_dist = torch.distributions.MultivariateNormal(
-                current_eta_for_all_ind[active_indices], proposal_var_eta
-            )
-            proposed_etas: torch.Tensor = proposal_dist.sample()
-
-            proposed_log_posteriors, patient_parameters, predictions = (
-                self._log_posterior_etas(proposed_etas, active_ind_ids)
-            )
-
-            deltas: torch.Tensor = (
-                proposed_log_posteriors - current_log_posteriors[active_indices]
-            )
-            accept_mask: torch.Tensor = (
-                torch.log(torch.rand(len(active_indices))) < deltas
-            )
-
-            # update only the accepted etas and log-posteriors
-            current_eta_for_all_ind[active_indices[accept_mask]] = proposed_etas[
-                accept_mask
-            ]
-            current_log_posteriors[active_indices[accept_mask]] = (
-                proposed_log_posteriors[accept_mask]
-            )
-            accepted_counts[active_indices] += accept_mask.int()
-            for j, idx in enumerate(active_indices):
-                if accept_mask[j] and accepted_counts[idx] >= nb_burn_in:
-                    sum_etas[idx] += current_eta_for_all_ind[idx]
-                    theta = patient_parameters[j, :]
-                    PDUs = theta[self.nb_PDK : self.nb_PDK + self.nb_PDU]
-                    sum_log_thetas_PDU[idx] += torch.log(PDUs)
-
-                    # store predictions for averaging later and then use in the M-step
-                    accepted_preds_for_ind = predictions[j]
-                    predictions_history[self.patients[idx]].append(
-                        accepted_preds_for_ind
-                    )
-
-                    sample_counts[idx] += 1
-                    if sample_counts[idx] == nb_samples:
-                        done[idx] = True
-
-        # calculate mean etas and log of individual parameters PDU
-        mean_etas = sum_etas / nb_samples
-        mean_log_thetas_PDU = sum_log_thetas_PDU / nb_samples
-
-        # calculate mean predictions from the collected history
-        mean_predictions = {}
-        for id in self.patients:
-            patient_preds = torch.stack(predictions_history[id])
-            mean_predictions.update({id: patient_preds.mean(dim=0)})
-
-        if self.verbose:
-            acceptance_rate = accepted_counts / total_proposals
-            print(f"Average acceptance: {acceptance_rate.mean():.2f}")
-        return (mean_etas, mean_log_thetas_PDU, mean_predictions)
+        new_etas = torch.where(accept_mask_extended, proposal_etas, current_etas)
+        new_log_pdus = torch.where(accept_mask_extended, proposal_log_pdus, current_pdu)
+        new_log_prob = torch.where(accept_mask, proposal_log_prob, current_log_prob)
+        new_pred = {
+            patient: proposal_pred[patient] if accept_mask[i] else current_pred[patient]
+            for i, patient in enumerate(self.patients)
+        }
+        new_acceptance_rate: float = accept_mask.float().mean().item()
+        if verbose:
+            print(f"Acceptance rate: {new_acceptance_rate}")
+        new_step_size: float = np.exp(
+            learning_rate * (new_acceptance_rate - target_acceptance_rate)
+        )
+        new_theta = torch.where(
+            accept_mask.unsqueeze(1).expand(-1, current_thetas.shape[1]),
+            proposal_theta,
+            current_thetas,
+        )
+        return (
+            new_etas,
+            new_log_prob,
+            new_pred,
+            new_theta,
+            new_log_pdus,
+            new_step_size,
+        )

@@ -2,7 +2,7 @@ from matplotlib import pyplot as plt
 import math
 import torch
 import gpytorch
-from tqdm import tqdm
+from tqdm.notebook import tqdm
 from gpytorch.mlls import VariationalELBO, PredictiveLogLikelihood
 from torch.utils.data import TensorDataset, DataLoader
 import numpy as np
@@ -33,6 +33,7 @@ class SVGP(gpytorch.models.ApproximateGP):
         var_dist: str = "Chol",
         var_strat: str = "IMV",
         kernel: str = "RBF",
+        deep_kernel: bool = False,
         jitter: float = 1e-6,
         nb_mixtures: int = 4,  # only for the SMK kernel
         nb_features: int = 10,
@@ -46,16 +47,12 @@ class SVGP(gpytorch.models.ApproximateGP):
             var_dist (str, optional): Variational distribution choice. Defaults to "Chol".
             var_strat (str, optional): Variational strategy choice. Defaults to "IMV".
             kernel (str, optional): Kernel choice. Defaults to "RBF".
+            deep_kernel (bool, optional): Add a neural network feature extractor in the kernel
             jitter (float, optional): Jitter value (for numerical stability). Defaults to 1e-6.
             nb_mixtures (int, optional): Number of mixtures for the SMK kernel. Defaults to 4.
             nb_features (int, optional): Number of features for the deep kernel. Defaults to 10.
         """
         assert var_dist == "Chol", f"Unsupported variational distribution: {var_dist}"
-        assert var_strat in [
-            "IMV",
-            "LMCV",
-        ], f"Unsupported variational strategy {var_strat}"
-        assert kernel in ["RBF", "SMK", "Deep-RBF"], f"Unsupported kernel {kernel}"
         if var_strat == "LMCV":
             self.batch_size = nb_latents
         elif var_strat == "IMV":
@@ -64,6 +61,12 @@ class SVGP(gpytorch.models.ApproximateGP):
             self.batch_size = nb_tasks
 
         self.kernel_type = kernel
+        self.deep_kernel = deep_kernel
+        if deep_kernel:
+            self.kernel_size = nb_features
+        else:
+            self.kernel_size = nb_params
+
         variational_distribution = gpytorch.variational.CholeskyVariationalDistribution(
             inducing_points.shape[0],
             batch_shape=torch.Size([self.batch_size]),
@@ -109,7 +112,7 @@ class SVGP(gpytorch.models.ApproximateGP):
             self.covar_module = gpytorch.kernels.ScaleKernel(
                 gpytorch.kernels.RBFKernel(
                     batch_shape=torch.Size([self.batch_size]),
-                    ard_num_dims=nb_params,
+                    ard_num_dims=self.kernel_size,
                     jitter=jitter,
                 ),
                 batch_shape=torch.Size([self.batch_size]),
@@ -118,39 +121,28 @@ class SVGP(gpytorch.models.ApproximateGP):
             self.covar_module = gpytorch.kernels.SpectralMixtureKernel(
                 batch_size=nb_tasks,
                 num_mixtures=nb_mixtures,
-                ard_num_dims=nb_params,
+                ard_num_dims=self.kernel_size,
                 jitter=jitter,
             )
-        elif kernel == "Deep-RBF":
-
-            class LargeFeatureExtractor(torch.nn.Sequential):
-                def __init__(self, n_params, n_features):
-                    super(LargeFeatureExtractor, self).__init__()
-                    self.add_module("linear1", torch.nn.Linear(n_params, 1000))
-                    self.add_module("relu1", torch.nn.ReLU())
-                    self.add_module("linear2", torch.nn.Linear(1000, 500))
-                    self.add_module("relu2", torch.nn.ReLU())
-                    self.add_module("linear3", torch.nn.Linear(500, 50))
-                    self.add_module("relu3", torch.nn.ReLU())
-                    self.add_module("linear4", torch.nn.Linear(50, n_features))
-
-            self.feature_extractor = LargeFeatureExtractor(nb_params, nb_features)
-            self.scale_to_bounds = gpytorch.utils.grid.ScaleToBounds(-1.0, 1.0)
-
+        elif kernel == "Matern":
             self.covar_module = gpytorch.kernels.ScaleKernel(
-                gpytorch.kernels.RBFKernel(
-                    batch_shape=torch.Size([self.batch_size]),
-                    ard_num_dims=nb_features,
+                gpytorch.kernels.MaternKernel(
+                    nu=2.5,
+                    batch_size=nb_tasks,
+                    num_mixtures=nb_mixtures,
+                    ard_num_dims=self.kernel_size,
                     jitter=jitter,
                 ),
                 batch_shape=torch.Size([self.batch_size]),
             )
-
         else:
             raise ValueError(f"Unsupported kernel {kernel}")
+        if deep_kernel:
+            self.feature_extractor = LargeFeatureExtractor(nb_params, nb_features)
+            self.scale_to_bounds = gpytorch.utils.grid.ScaleToBounds(-1.0, 1.0)
 
     def forward(self, x: torch.Tensor):
-        if self.kernel_type == "Deep-RBF":
+        if self.deep_kernel:
             proj_x = self.feature_extractor(x)
             proj_x = self.scale_to_bounds(proj_x)
             mean_x = cast(torch.Tensor, self.mean_module(proj_x))
@@ -171,6 +163,7 @@ class GP:
         var_dist: str = "Chol",  # only Cholesky currently supported
         var_strat: str = "IMV",  # either IMV (Independent Multitask Variational) or LMCV (Linear Model of Coregionalization Variational)
         kernel: str = "RBF",  # RBF or SMK
+        deep_kernel: bool = True,
         nb_training_iter: int = 400,
         training_proportion: float = 0.7,
         nb_inducing_points: int = 200,
@@ -220,6 +213,7 @@ class GP:
         self.var_dist = var_dist
         self.var_strat = var_strat
         self.kernel = kernel
+        self.deep_kernel = deep_kernel
         self.nb_training_iter = nb_training_iter
         self.nb_inducing_points = nb_inducing_points
         self.learning_rate = learning_rate
@@ -255,16 +249,16 @@ class GP:
             num_tasks=self.data.nb_tasks, has_global_noise=True, has_task_noise=True
         )
         self.model = SVGP(
-            self.inducing_points,
-            self.data.nb_parameters,
-            self.data.nb_tasks,
-            self.nb_latents,
-            self.var_dist,
-            self.var_strat,
-            self.kernel,
-            self.jitter,
-            self.num_mixtures,
-            self.nb_features,
+            inducing_points=self.inducing_points,
+            nb_params=self.data.nb_parameters,
+            nb_tasks=self.data.nb_tasks,
+            nb_latents=self.nb_latents,
+            var_dist=self.var_dist,
+            var_strat=self.var_strat,
+            kernel=self.kernel,
+            jitter=self.jitter,
+            nb_mixtures=self.num_mixtures,
+            nb_features=self.nb_features,
         )
 
         # set the marginal log likelihood
@@ -304,7 +298,7 @@ class GP:
 
         # keep track of the loss
         losses_list = []
-        epochs = tqdm(range(self.nb_training_iter))
+        epochs = tqdm(range(self.nb_training_iter), desc="Epochs", position=0)
 
         # Batch training loop
         if mini_batching:
@@ -327,17 +321,15 @@ class GP:
 
             # main training loop
             for _ in epochs:
-                epoch_losses = []
-                for batch_params, batch_outputs in train_loader:
+                for batch_params, batch_outputs in tqdm(
+                    train_loader, desc="Batch progress", position=1, leave=False
+                ):
                     optimizer.zero_grad()  # zero gradients from previous iteration
                     output = self.model(batch_params)  # recalculate the prediction
                     loss = -cast(torch.Tensor, self.mll(output, batch_outputs))
                     loss.backward()  # compute the gradients of the parameters that can be changed
-                    epoch_losses.append(loss.item())
+                    epochs.set_postfix({"loss": loss.item()})
                     optimizer.step()
-                epoch_loss = sum(epoch_losses) / len(epoch_losses)
-                epochs.set_postfix({"loss": epoch_loss})
-                losses_list.append(epoch_loss)
                 if scheduler is not None:
                     scheduler.step()
 
@@ -491,3 +483,15 @@ class GP:
 
         obs_vs_pred = self.predict_new_data(data_set)
         plot_all_solutions(obs_vs_pred)
+
+
+class LargeFeatureExtractor(torch.nn.Sequential):
+    def __init__(self, n_params, n_features):
+        super(LargeFeatureExtractor, self).__init__()
+        self.add_module("linear1", torch.nn.Linear(n_params, 1000))
+        self.add_module("relu1", torch.nn.ReLU())
+        self.add_module("linear2", torch.nn.Linear(1000, 500))
+        self.add_module("relu2", torch.nn.ReLU())
+        self.add_module("linear3", torch.nn.Linear(500, 50))
+        self.add_module("relu3", torch.nn.ReLU())
+        self.add_module("linear4", torch.nn.Linear(50, n_features))
