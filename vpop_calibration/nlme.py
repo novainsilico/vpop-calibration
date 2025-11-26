@@ -250,12 +250,17 @@ class NlmeModel:
             outputs = torch.Tensor(this_patient["value"].values)
 
             time_steps = torch.Tensor(this_patient["time"].values)
+            unique_time_steps, time_step_indices = torch.unique_consecutive(
+                time_steps, return_inverse=True
+            )
 
             self.observations_tensors.update(
                 {
                     patient: {
                         "observations": outputs,
                         "time_steps": time_steps,
+                        "unique_time_steps": unique_time_steps,
+                        "time_step_indices": time_step_indices,
                         "tasks_indices": torch.LongTensor(tasks_indices),
                         "outputs_indices": torch.LongTensor(outputs_indices),
                     }
@@ -352,27 +357,37 @@ class NlmeModel:
         )
         return thetas
 
-    def predict_outputs_from_theta(
-        self, thetas: torch.Tensor, ind_ids: List[str | int]
-    ) -> List[torch.Tensor]:
-        """Return model predictions for all patients
+    def struc_model_inputs_from_theta(
+        self, thetas: torch.Tensor, ind_ids: Optional[List[str | int]] = None
+    ) -> tuple[List[torch.Tensor], List[torch.LongTensor], List[torch.LongTensor]]:
+        """Return model inputs for all patients
 
         Args:
             thetas (torch.Tensor): Parameter values per patient (one by row)
             ind_ids(List[str | int]): the ids of the patients to be simulated
 
         Returns:
-            List[torch.Tensor]: a tensor of predictions for each patient
+            tuple[List[torch.Tensor], List[torch.LongTensor], List[torch.LongTensor]]:
+            - the inputs required to simulate this patient
+            - the requested rows in the long data frame
+            - the requested tasks in the long data frame (same length as requested rows)
         """
+
+        if ind_ids is None:
+            ind_ids = self.patients
+
         if not hasattr(self, "observations_tensors"):
             raise ValueError(
                 "Cannot compute patient predictions without an associated observations data frame."
             )
         list_X = []
         list_tasks = []
+        list_rows = []
         for ind_idx, ind in enumerate(ind_ids):
             # Prepare the inputs for the GP
-            time_steps = self.observations_tensors[ind]["time_steps"].unsqueeze(-1)
+            time_steps = self.observations_tensors[ind]["unique_time_steps"].unsqueeze(
+                -1
+            )
             this_patient_theta_ordered = thetas[ind_idx, self.model_input_to_descriptor]
             thetas_repeated = this_patient_theta_ordered.unsqueeze(0).repeat(
                 (time_steps.shape[0], 1)
@@ -387,7 +402,25 @@ class NlmeModel:
             )
             list_X.append(inputs)
             list_tasks.append(self.observations_tensors[ind]["tasks_indices"])
-        pred = self.structural_model.simulate(list_X, list_tasks)
+            list_rows.append(self.observations_tensors[ind]["time_step_indices"])
+        return list_X, list_rows, list_tasks
+
+    def predict_outputs_from_theta(
+        self, thetas: torch.Tensor, ind_ids: List[str | int]
+    ) -> List[torch.Tensor]:
+        """Return model predictions for all patients
+
+        Args:
+            thetas (torch.Tensor): Parameter values per patient (one by row)
+            ind_ids(List[str | int]): the ids of the patients to be simulated
+
+        Returns:
+            List[torch.Tensor]: a tensor of predictions for each patient
+        """
+        list_X, list_rows, list_tasks = self.struc_model_inputs_from_theta(
+            thetas, ind_ids
+        )
+        pred = self.structural_model.simulate(list_X, list_rows, list_tasks)
         return pred
 
     def outputs_to_df(

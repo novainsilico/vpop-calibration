@@ -39,7 +39,10 @@ class StructuralModel:
         self.task_idx_to_protocol: dict[int, str] = task_idx_to_protocol
 
     def simulate(
-        self, list_X: list[torch.Tensor], list_tasks: list[torch.LongTensor]
+        self,
+        list_X: list[torch.Tensor],
+        list_rows: list[torch.LongTensor],
+        list_tasks: list[torch.LongTensor],
     ) -> list[torch.Tensor]:
         raise ValueError("Not implemented")
 
@@ -64,17 +67,23 @@ class StructuralGp(StructuralModel):
         self.gp_model = gp_model
 
     def simulate(
-        self, list_X: list[torch.Tensor], list_tasks: list[torch.LongTensor]
+        self,
+        list_X: list[torch.Tensor],
+        list_rows: list[torch.LongTensor],
+        list_tasks: list[torch.LongTensor],
     ) -> list[torch.Tensor]:
         # X must be ordered like parameter names from the GP
         # Concatenate all the inputs
         X_cat = torch.cat(list_X)
-        task_cat = torch.LongTensor(torch.cat([torch.Tensor(t) for t in list_tasks]))
-        chunk_sizes = [t.shape[0] for t in list_tasks]
+        chunk_sizes = [X.shape[0] for X in list_X]
         # Simulate the GP
-        out_cat, _ = self.gp_model.predict_long_scaled(X_cat, task_cat)
+        out_cat, _, _ = self.gp_model.predict_wide_scaled(X_cat)
         # Split into individual chunks
-        pred_list = list(torch.split(out_cat, chunk_sizes))
+        pred_wide_list = torch.split(out_cat, chunk_sizes)
+        pred_list = []
+        for pred, rows, cols in zip(pred_wide_list, list_rows, list_tasks):
+            y = pred.index_select(0, rows).gather(1, cols.view(-1, 1)).squeeze(1)
+            pred_list.append(y)
         return pred_list
 
 
@@ -136,18 +145,21 @@ class StructuralOdeModel(StructuralModel):
         )
 
     def simulate(
-        self, list_X: list[torch.Tensor], list_tasks: list[torch.LongTensor]
+        self,
+        list_X: list[torch.Tensor],
+        list_rows: list[torch.LongTensor],
+        list_tasks: list[torch.LongTensor],
     ) -> list[torch.Tensor]:
         # each X must be ordered like parameter names from the ode model
 
         input_df_list = []
         chunks_list = []
-        for X, tasks in zip(list_X, list_tasks):
+        for X, rows, tasks in zip(list_X, list_rows, list_tasks):
             temp_id = str(uuid.uuid4())
             # store the size of X for proper splitting
             chunks_list.append(X.shape[0])
             # Extract the parameters and time values
-            params = X.detach().numpy()
+            params = X.index_select(0, rows).detach().numpy()
             # Extract the task order
             task_index = tasks.detach().numpy()
             # Format the data inputs
