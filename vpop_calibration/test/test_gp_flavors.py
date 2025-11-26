@@ -22,6 +22,7 @@ training_df = training_df.merge(
 training_df = training_df.merge(pd.DataFrame({"time": time_steps}), how="cross")
 training_df = training_df.merge(pd.DataFrame({"output_name": obsIds}), how="cross")
 training_df["value"] = rng.normal(0, 1, training_df.shape[0])
+training_df_bootstrapped = training_df.sample(frac=0.1)
 
 implemented_kernels = ["RBF", "SMK", "Matern"]
 implemented_var_strat = ["IMV", "LMCV"]
@@ -75,3 +76,9 @@ def test_eval_with_valid():
 def test_eval_no_valid():
     gp = GP(training_df, gp_params, nb_training_iter=2, training_proportion=1)
     gp.eval_perf()
+
+
+def test_gp_incomplete_data():
+    gp = GP(training_df_bootstrapped, gp_params, nb_training_iter=2)
+    gp.train()
+    gp.train(mini_batching=True, mini_batch_size=8)

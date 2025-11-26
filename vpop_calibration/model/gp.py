@@ -299,55 +299,57 @@ class GP:
         # keep track of the loss
         losses_list = []
         epochs = tqdm(range(self.nb_training_iter), desc="Epochs", position=0)
+        with gpytorch.settings.observation_nan_policy("fill"):
+            # Batch training loop
+            if mini_batching:
+                # set the mini_batch_size to a power of two of the total size -4
+                if mini_batch_size == None:
+                    power = np.maximum(
+                        math.floor(math.log2(self.data.X_training.shape[0])) - 4, 1
+                    )
+                    self.mini_batch_size: int = math.floor(2**power)
+                else:
+                    self.mini_batch_size = mini_batch_size
 
-        # Batch training loop
-        if mini_batching:
-            # set the mini_batch_size to a power of two of the total size -4
-            if mini_batch_size == None:
-                power = np.maximum(
-                    math.floor(math.log2(self.data.X_training.shape[0])) - 4, 1
+                # prepare mini-batching
+                train_dataset = TensorDataset(
+                    self.data.X_training, self.data.Y_training
                 )
-                self.mini_batch_size: int = math.floor(2**power)
+                train_loader = DataLoader(
+                    train_dataset,
+                    batch_size=self.mini_batch_size,
+                    shuffle=True,
+                )
+
+                # main training loop
+                for _ in epochs:
+                    for batch_params, batch_outputs in tqdm(
+                        train_loader, desc="Batch progress", position=1, leave=False
+                    ):
+                        optimizer.zero_grad()  # zero gradients from previous iteration
+                        output = self.model(batch_params)  # recalculate the prediction
+                        loss = -cast(torch.Tensor, self.mll(output, batch_outputs))
+                        loss.backward()  # compute the gradients of the parameters that can be changed
+                        epochs.set_postfix({"loss": loss.item()})
+                        optimizer.step()
+                    if scheduler is not None:
+                        scheduler.step()
+
+            # Full data set training loop
             else:
-                self.mini_batch_size = mini_batch_size
-
-            # prepare mini-batching
-            train_dataset = TensorDataset(self.data.X_training, self.data.Y_training)
-            train_loader = DataLoader(
-                train_dataset,
-                batch_size=self.mini_batch_size,
-                shuffle=True,
-            )
-
-            # main training loop
-            for _ in epochs:
-                for batch_params, batch_outputs in tqdm(
-                    train_loader, desc="Batch progress", position=1, leave=False
-                ):
+                for _ in epochs:
                     optimizer.zero_grad()  # zero gradients from previous iteration
-                    output = self.model(batch_params)  # recalculate the prediction
-                    loss = -cast(torch.Tensor, self.mll(output, batch_outputs))
+                    output = self.model(
+                        self.data.X_training
+                    )  # calculate the prediction with current parameters
+                    loss = -cast(torch.Tensor, self.mll(output, self.data.Y_training))
                     loss.backward()  # compute the gradients of the parameters that can be changed
-                    epochs.set_postfix({"loss": loss.item()})
+                    losses_list.append(loss.item())
                     optimizer.step()
-                if scheduler is not None:
-                    scheduler.step()
-
-        # Full data set training loop
-        else:
-            for _ in epochs:
-                optimizer.zero_grad()  # zero gradients from previous iteration
-                output = self.model(
-                    self.data.X_training
-                )  # calculate the prediction with current parameters
-                loss = -cast(torch.Tensor, self.mll(output, self.data.Y_training))
-                loss.backward()  # compute the gradients of the parameters that can be changed
-                losses_list.append(loss.item())
-                optimizer.step()
-                epochs.set_postfix({"loss": loss.item()})
-                if scheduler is not None:
-                    scheduler.step()
-        self.losses = losses_list
+                    epochs.set_postfix({"loss": loss.item()})
+                    if scheduler is not None:
+                        scheduler.step()
+            self.losses = losses_list
 
     def predict_wide(
         self, X: torch.Tensor
