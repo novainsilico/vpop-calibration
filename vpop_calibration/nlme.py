@@ -44,7 +44,7 @@ class NlmeModel:
         self.PDU_names: List[str] = list(init_PDU.keys())
         self.nb_PDU: int = len(self.PDU_names)
 
-        self.patients_df: pd.DataFrame = patients_df
+        self.patients_df: pd.DataFrame = patients_df.drop_duplicates()
         self.patients: List[str | int] = self.patients_df["id"].unique().tolist()
         self.nb_patients: int = len(self.patients)
         covariate_columns = self.patients_df.columns.to_list()
