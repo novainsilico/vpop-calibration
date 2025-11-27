@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Modified
 
 - Structural model: Simulate GP in wide format and use tensor manipulation to recover task values, runtime improvement for SAEM estimation
+- Vpop: use natural log to define parameter ranges, aligned with implementation choice in the rest of the module
 
 ## [2.0.1] - 2025-11-25
 

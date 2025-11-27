@@ -38,7 +38,7 @@ def generate_vpop_from_ranges(
         # Handle log-scaled parameters
         for j, param_name in enumerate(params_to_explore):
             if param_ranges[param_name]["log"] == True:
-                samples[:, j] = np.exp(np.log(10) * samples[:, j])
+                samples[:, j] = np.exp(samples[:, j])
         # Create the full data frame of patient descriptors
         patients_df = pd.DataFrame(data=samples, columns=params_to_explore)
     else:
