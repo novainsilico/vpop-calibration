@@ -1,9 +1,9 @@
 import numpy as np
 import pandas as pd
-import pickle
 import uuid
 
 from vpop_calibration import *
+from vpop_calibration.test import *
 
 
 def equations_with_abs(t, y, k_a, k_12, k_21, k_el):
@@ -59,13 +59,12 @@ def test_ode_saem():
     # It should contain at the very minimum one `id` per patient
     nb_patients = 5
     patients_df = pd.DataFrame({"id": [str(uuid.uuid4()) for _ in range(nb_patients)]})
-    rng = np.random.default_rng()
-    patients_df["protocol_arm"] = rng.binomial(1, 0.5, nb_patients)
+    patients_df["protocol_arm"] = np_rng.binomial(1, 0.5, nb_patients)
     patients_df["protocol_arm"] = patients_df["protocol_arm"].apply(
         lambda x: "arm-A" if x == 0 else "arm-B"
     )
-    patients_df["k_a"] = rng.lognormal(-1, 0.1, nb_patients)
-    patients_df["foo"] = rng.lognormal(0.1, 0.1, nb_patients)
+    patients_df["k_a"] = np_rng.lognormal(-1, 0.1, nb_patients)
+    patients_df["foo"] = np_rng.lognormal(0.1, 0.1, nb_patients)
 
     print(f"Simulating {nb_patients} patients on {nb_protocols} protocol arms")
     obs_df = simulate_dataset_from_omega(

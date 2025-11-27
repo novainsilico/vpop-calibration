@@ -3,6 +3,7 @@ import numpy as np
 import pickle
 
 from vpop_calibration import *
+from vpop_calibration.test import *
 
 # Create a dummy training data frame
 patients = ["patient-01", "patient-02"]
@@ -12,17 +13,16 @@ protocol_arms = ["arm-A", "arm-B"]
 time_steps = np.arange(0, 10.0, 1.0)
 patient_descriptors = ["k1", "k2", "k3"]
 gp_params = [*patient_descriptors, "time"]
-rng = np.random.default_rng()
 training_df = pd.DataFrame({"id": patients})
 for descriptor in patient_descriptors:
-    training_df[descriptor] = rng.normal(0, 1, nb_patients)
+    training_df[descriptor] = np_rng.normal(0, 1, nb_patients)
 training_df = training_df.merge(
     pd.DataFrame({"protocol_arm": protocol_arms}), how="cross"
 )
 training_df = training_df.merge(pd.DataFrame({"time": time_steps}), how="cross")
 training_df = training_df.merge(pd.DataFrame({"output_name": obsIds}), how="cross")
-training_df["value"] = rng.normal(0, 1, training_df.shape[0])
-training_df_bootstrapped = training_df.sample(frac=0.9)
+training_df["value"] = np_rng.normal(0, 1, training_df.shape[0])
+training_df_bootstrapped = training_df.sample(frac=0.5, random_state=np_rng)
 
 implemented_kernels = ["RBF", "SMK", "Matern"]
 implemented_var_strat = ["IMV", "LMCV"]
@@ -82,3 +82,4 @@ def test_gp_incomplete_data():
     gp = GP(training_df_bootstrapped, gp_params, nb_training_iter=2)
     gp.train()
     gp.train(mini_batching=True, mini_batch_size=8)
+    gp.eval_perf()
