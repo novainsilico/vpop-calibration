@@ -539,12 +539,15 @@ class NlmeModel:
                     self.observations_tensors[patient]["outputs_indices"] == output_ind
                 )
                 n_obs = mask.sum()
-                observed = self.observations_tensors[patient]["observations"][mask]
-                predicted = pred[patient][mask]
-                sum_residuals[output_ind] += (
-                    torch.square(self.calculate_residuals(observed, predicted)).sum()
-                    / n_obs
-                )
+                if n_obs > 0:
+                    observed = self.observations_tensors[patient]["observations"][mask]
+                    predicted = pred[patient][mask]
+                    sum_residuals[output_ind] += (
+                        torch.square(
+                            self.calculate_residuals(observed, predicted)
+                        ).sum()
+                        / n_obs
+                    )
         return sum_residuals / self.nb_patients
 
     def log_likelihood_observation(

@@ -22,7 +22,7 @@ training_df = training_df.merge(
 training_df = training_df.merge(pd.DataFrame({"time": time_steps}), how="cross")
 training_df = training_df.merge(pd.DataFrame({"output_name": obsIds}), how="cross")
 training_df["value"] = rng.normal(0, 1, training_df.shape[0])
-training_df_bootstrapped = training_df.sample(frac=0.1)
+training_df_bootstrapped = training_df.sample(frac=0.9)
 
 implemented_kernels = ["RBF", "SMK", "Matern"]
 implemented_var_strat = ["IMV", "LMCV"]

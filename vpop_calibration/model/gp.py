@@ -405,10 +405,21 @@ class GP:
 
     def RMSE(self, y1: torch.Tensor, y2: torch.Tensor) -> torch.Tensor:
         """Given two tensors of same shape, compute the Root Mean Squared Error on each column (outputs)."""
-        return torch.sqrt(torch.pow(y1 - y2, 2).sum(dim=0) / y1.shape[0])
+        assert y1.shape == y2.shape
+        # Ignore potential NaN values in the RMSE computation
+        mask = (~torch.isnan(y1)) * (~torch.isnan(y2))
+        return torch.sqrt(
+            torch.pow(y1[mask] - y2[mask], 2).sum(dim=0) / mask.sum(dim=0)
+        )
 
     def eval_perf(self):
         """Evaluate the model performance on its training data set and validation data set (normalized inputs and ouptuts)."""
+
+        def print_task_rmse(index, val):
+            print(
+                f"    Output: {self.data.output_names[self.data.task_idx_to_output_idx[index]]}, protocol: {self.data.task_idx_to_protocol[index]}, RMSE: {val:.4f}"
+            )
+
         (
             self.Y_training_predicted_mean,
             _,
@@ -417,10 +428,11 @@ class GP:
         self.RMSE_training = self.RMSE(
             self.Y_training_predicted_mean, self.data.Y_training
         )
-        print(
-            "Root mean squared error on training data set (for each output x scenario):"
-        )
-        print(self.RMSE_training.tolist())
+        print("Training data set:")
+
+        for i, err in enumerate(self.RMSE_training):
+            print_task_rmse(i, err.item())
+
         if not (self.data.X_validation is None) and not (
             self.data.Y_validation is None
         ):
@@ -432,10 +444,9 @@ class GP:
             self.RMSE_validation = self.RMSE(
                 self.Y_validation_predicted_mean, self.data.Y_validation
             )
-            print(
-                "Root mean squared error on validation data set (for each output x scenario):"
-            )
-            print(self.RMSE_validation.tolist())
+            print("Validation data set:")
+            for i, err in enumerate(self.RMSE_validation):
+                print_task_rmse(i, err.item())
 
     def predict_new_data(self, data_set: str | pd.DataFrame) -> pd.DataFrame:
         """Process a new data set of inputs and predict using the GP
