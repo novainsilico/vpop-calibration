@@ -77,7 +77,7 @@ class StructuralGp(StructuralModel):
         X_cat = torch.cat(list_X)
         chunk_sizes = [X.shape[0] for X in list_X]
         # Simulate the GP
-        out_cat, _, _ = self.gp_model.predict_wide_scaled(X_cat)
+        out_cat, _ = self.gp_model.predict_wide_scaled(X_cat)
         # Split into individual chunks
         pred_wide_list = torch.split(out_cat, chunk_sizes)
         pred_list = []
@@ -157,7 +157,7 @@ class StructuralOdeModel(StructuralModel):
         for X, rows, tasks in zip(list_X, list_rows, list_tasks):
             temp_id = str(uuid.uuid4())
             # store the size of X for proper splitting
-            chunks_list.append(X.shape[0])
+            chunks_list.append(rows.shape[0])
             # Extract the parameters and time values
             params = X.index_select(0, rows).detach().numpy()
             # Extract the task order
@@ -167,6 +167,9 @@ class StructuralOdeModel(StructuralModel):
             input_df_temp = pd.DataFrame(
                 data=params, columns=self.parameter_names + ["time"]
             )
+            # The passed params include the _global_ time steps
+            # Filter the time steps that we actually want for this patient
+            input_df_temp = input_df_temp.iloc[rows.numpy()]
             # Add the task index as a temporary column
             input_df_temp["task_index"] = task_index
             # Deduce protocol arm and output name from task index

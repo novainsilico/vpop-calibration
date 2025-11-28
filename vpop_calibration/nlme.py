@@ -236,7 +236,13 @@ class NlmeModel:
         processed_df["task_index"] = processed_df["task"].apply(
             lambda t: self.structural_model.tasks.index(t)
         )
-
+        global_time_steps = (
+            processed_df["time"].drop_duplicates().sort_values().to_list()
+        )
+        processed_df["time_step_index"] = processed_df["time"].apply(
+            lambda t: global_time_steps.index(t)
+        )
+        self.global_time_steps = torch.Tensor(global_time_steps).unsqueeze(-1)
         self.observations_tensors: Dict = {}
         for patient in self.patients:
             this_patient = processed_df.loc[processed_df["id"] == patient]
@@ -250,17 +256,14 @@ class NlmeModel:
             outputs = torch.Tensor(this_patient["value"].values)
 
             time_steps = torch.Tensor(this_patient["time"].values)
-            unique_time_steps, time_step_indices = torch.unique_consecutive(
-                time_steps, return_inverse=True
-            )
+            time_step_indices = this_patient["time_step_index"].values
 
             self.observations_tensors.update(
                 {
                     patient: {
                         "observations": outputs,
                         "time_steps": time_steps,
-                        "unique_time_steps": unique_time_steps,
-                        "time_step_indices": time_step_indices,
+                        "time_step_indices": torch.LongTensor(time_step_indices),
                         "tasks_indices": torch.LongTensor(tasks_indices),
                         "outputs_indices": torch.LongTensor(outputs_indices),
                     }
@@ -384,19 +387,15 @@ class NlmeModel:
         list_tasks = []
         list_rows = []
         for ind_idx, ind in enumerate(ind_ids):
-            # Prepare the inputs for the GP
-            time_steps = self.observations_tensors[ind]["unique_time_steps"].unsqueeze(
-                -1
-            )
             this_patient_theta_ordered = thetas[ind_idx, self.model_input_to_descriptor]
             thetas_repeated = this_patient_theta_ordered.unsqueeze(0).repeat(
-                (time_steps.shape[0], 1)
+                (self.global_time_steps.shape[0], 1)
             )
             # This steps requires that the `time` is passed as the last input column to the structural model
             inputs = torch.cat(
                 (
                     thetas_repeated,
-                    time_steps,
+                    self.global_time_steps,
                 ),
                 dim=1,
             )
@@ -406,7 +405,7 @@ class NlmeModel:
         return list_X, list_rows, list_tasks
 
     def predict_outputs_from_theta(
-        self, thetas: torch.Tensor, ind_ids: List[str | int]
+        self, thetas: torch.Tensor, ind_ids: Optional[List[str | int]] = None
     ) -> List[torch.Tensor]:
         """Return model predictions for all patients
 
@@ -420,7 +419,9 @@ class NlmeModel:
         list_X, list_rows, list_tasks = self.struc_model_inputs_from_theta(
             thetas, ind_ids
         )
-        pred = self.structural_model.simulate(list_X, list_rows, list_tasks)
+        pred = self.structural_model.simulate(
+            list_X=list_X, list_rows=list_rows, list_tasks=list_tasks
+        )
         return pred
 
     def outputs_to_df(

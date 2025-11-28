@@ -256,18 +256,6 @@ class TrainingDataSet:
                 rescaled_data[mask] = torch.exp(rescaled_data[mask])
         return rescaled_data
 
-    def normalize_inputs_df(self, inputs_df: pd.DataFrame) -> torch.Tensor:
-        """Normalize new inputs provided to the model as a data frame, and convert them to a tensor."""
-        selected_cols = self.normalizing_input_mean.index.tolist()
-        norm_data = inputs_df[selected_cols]
-        norm_data.loc[:, self.log_inputs] = norm_data.loc[:, self.log_inputs].transform(
-            "log"
-        )
-        norm_data = (
-            norm_data - self.normalizing_input_mean
-        ) / self.normalizing_input_std
-        return torch.Tensor(norm_data.values)
-
     def normalize_inputs_tensor(self, inputs: torch.Tensor) -> torch.Tensor:
         """Normalize new inputs provided to the model as a tensor. The columns of the input tensor should be the same as [self.descriptors]"""
         X = inputs
@@ -378,13 +366,13 @@ class TrainingDataSet:
             new_data["value"] = 1.0
 
         wide_df = self.pivot_input_data(new_data)
-        tensor_inputs_wide = self.normalize_inputs_df(wide_df)
+        tensor_inputs_wide = torch.Tensor(wide_df[self.parameter_names].values)
 
         return tensor_inputs_wide, wide_df, new_data, remove_value
 
     def merge_predictions_long(
         self,
-        pred: tuple[torch.Tensor, torch.Tensor, torch.Tensor],
+        pred: tuple[torch.Tensor, torch.Tensor],
         wide_df: pd.DataFrame,
         long_df: pd.DataFrame,
         remove_value: bool,
@@ -398,13 +386,12 @@ class TrainingDataSet:
             remove_value (bool): True if the value column should be ignored
 
         Returns:
-            pd.DataFrame: A merged data frame in a long format, identical to the initial data, with additional columns [`pred_mean`, `pred_low`, `pred_high`]
+            pd.DataFrame: A merged data frame in a long format, identical to the initial data, with additional columns [`pred_mean`, `pred_var`, `pred_low`, `pred_high`]
         """
-        pred_mean, pred_low, pred_high = pred
+        pred_mean, pred_variance = pred
         # Reshape these outputs into a long format
         mean_df = self.pivot_outputs_longer(wide_df, pred_mean, "pred_mean")
-        low_df = self.pivot_outputs_longer(wide_df, pred_low, "pred_low")
-        high_df = self.pivot_outputs_longer(wide_df, pred_high, "pred_high")
+        var_df = self.pivot_outputs_longer(wide_df, pred_variance, "pred_var")
         # Merge the model results with the long format data frame
         out_df = reduce(
             lambda left, right: pd.merge(
@@ -413,7 +400,13 @@ class TrainingDataSet:
                 on=["id"] + self.parameter_names + ["protocol_arm", "output_name"],
                 how="left",
             ),
-            [long_df, mean_df, low_df, high_df],
+            [long_df, mean_df, var_df],
+        )
+        out_df["pred_low"] = out_df.apply(
+            lambda r: r["pred_mean"] - 2 * r["pred_var"], axis=1
+        )
+        out_df["pred_high"] = out_df.apply(
+            lambda r: r["pred_mean"] + 2 * r["pred_var"], axis=1
         )
         # Remove the dummy value column if it was added during the data processing
         if remove_value:

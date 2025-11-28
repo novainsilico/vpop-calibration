@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Modified
 
 - Tests: set random state / seed for tests
+- GP: plot of individual solutions now uses ±2 \* pred variance for confidence interval
 
 ## [2.1.0] - 2025-11-26
 
