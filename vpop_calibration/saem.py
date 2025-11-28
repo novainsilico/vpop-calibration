@@ -1,8 +1,9 @@
 import torch
 import matplotlib.pyplot as plt
+from matplotlib.figure import Figure
 from scipy.optimize import minimize
 from tqdm.notebook import tqdm
-from typing import List, Dict, Union, Optional
+from typing import List, Dict, Union, Optional, Any
 from pandas import DataFrame
 import pandas as pd
 import numpy as np
@@ -109,12 +110,13 @@ class PySaem:
         ) = self.model.log_posterior_etas(self.current_etas)
 
         # Initialize the optimizer history
-        self.history: Dict[str, List[torch.Tensor]] = {
-            "log_MI": [self.model.log_MI],
-            "population_betas": [self.model.population_betas],
-            "population_omega": [self.model.omega_pop],
-            "residual_error_var": [self.model.residual_var],
-        }
+        self._init_history(
+            self.model.population_betas,
+            self.model.omega_pop,
+            self.model.log_MI,
+            self.model.residual_var,
+        )
+        self.current_iteration: int = 0
 
         # Initialize the values for convergence checks
         self.prev_params: Dict[str, torch.Tensor] = {
@@ -286,6 +288,64 @@ class PySaem:
 
         return matrix_spd
 
+    def _init_history(
+        self,
+        beta: torch.Tensor,
+        omega: torch.Tensor,
+        log_mi: torch.Tensor,
+        res_var: torch.Tensor,
+    ) -> None:
+        # Initialize the history
+        self.history = {}
+        # Add the pdus (mean, variance)
+        for i, pdu in enumerate(self.model.PDU_names):
+            beta_index = self.model.population_betas_names.index(pdu)
+            self.history.update(
+                {
+                    pdu: {
+                        "mu": [beta[beta_index]],
+                        "sigma_sq": [omega[beta_index, beta_index]],
+                    }
+                }
+            )
+        # Add the covariates
+        for i, cov in enumerate(self.model.covariate_coeffs_names):
+            beta_index = self.model.population_betas_names.index(cov)
+            self.history.update({cov: [beta[beta_index]]})
+        # Add Omega
+        self.history.update({"omega": [omega]})
+        # Add the model intrinsic params
+        for i, mi in enumerate(self.model.MI_names):
+            self.history.update({mi: [log_mi[i]]})
+        # Add the residual variance
+        for i, output in enumerate(self.model.outputs_names):
+            self.history.update({output: [res_var[i]]})
+
+    def _append_history(
+        self,
+        beta: torch.Tensor,
+        omega: torch.Tensor,
+        log_mi: torch.Tensor,
+        res_var: torch.Tensor,
+    ) -> None:
+        # Update the history
+        for i, pdu in enumerate(self.model.PDU_names):
+            beta_index = self.model.population_betas_names.index(pdu)
+            self.history[pdu]["mu"].append(beta[beta_index])
+            self.history[pdu]["sigma_sq"].append(omega[beta_index, beta_index])
+
+        for i, cov in enumerate(self.model.covariate_coeffs_names):
+            beta_index = self.model.population_betas_names.index(cov)
+            self.history[cov].append(beta[beta_index])
+
+        self.history["omega"].append(omega)
+
+        for i, mi in enumerate(self.model.MI_names):
+            self.history[mi].append(log_mi[i])
+
+        for i, output in enumerate(self.model.outputs_names):
+            self.history[output].append(res_var[i])
+
     def one_iteration(self, k: int) -> bool:
         """Perform one iteration of SAEM
 
@@ -416,10 +476,12 @@ class PySaem:
         is_converged = self._check_convergence(new_params)
 
         # store history
-        self.history["log_MI"].append(self.model.log_MI)
-        self.history["population_betas"].append(self.model.population_betas)
-        self.history["population_omega"].append(self.model.omega_pop)
-        self.history["residual_error_var"].append(self.model.residual_var)
+        self._append_history(
+            self.model.population_betas,
+            self.model.omega_pop,
+            self.model.log_MI,
+            self.model.residual_var,
+        )
 
         # update prev_params for the next iteration's convergence check
         self.prev_params = new_params
@@ -493,10 +555,18 @@ class PySaem:
             )
             print(f"Initial Omega:\n{self.model.omega_pop}")
             print(f"Initial Residual Variance: {self.model.residual_var}")
+
         print("Phase 1 (exploration):")
-        for k in tqdm(range(self.nb_phase1_iterations)):
+        plt.ion()
+        self.plot_convergence_history()
+        for k in tqdm(range(1, self.nb_phase1_iterations)):
             # Run iteration, do not check for convergence in the exploration phase
+            # Iteration 0 is in fact already done (initialization)
             _ = self.one_iteration(k)
+            self.current_iteration = k
+            if k % 20 == 0:
+                self.update_convergence_plot()
+                self.convergence_plot_fig.canvas.draw()
 
         if self.nb_phase2_iterations > 0:
             self.current_phase = 2
@@ -509,6 +579,7 @@ class PySaem:
             ):
                 # Run iteration
                 is_converged = self.one_iteration(k)
+                self.current_iteration = k
                 # Check for convergence, and stop if criterion matched
                 if is_converged:
                     self.consecutive_converged_iters += 1
@@ -576,6 +647,8 @@ class PySaem:
 
     def plot_convergence_history(
         self,
+        nb_cols: int = 3,
+        indiv_figsize: tuple[float, float] = (2.0, 1.2),
         true_MI: Optional[Dict[str, float]] = None,
         true_betas: Optional[Dict[str, float]] = None,
         true_sd: Optional[Dict[str, float]] = None,
@@ -584,98 +657,152 @@ class PySaem:
         """
         This method plots the evolution of the estimated parameters (MI, betas, omega, residual error variances) across iterations
         """
-        history: Dict[str, List[torch.Tensor]] = self.history
+        history = self.history
         nb_MI: int = self.model.nb_MI
         nb_betas: int = self.model.nb_betas
         nb_omega_diag_params: int = self.model.nb_PDU
         nb_var_res_params: int = self.model.nb_outputs
-        fig, axs = plt.subplots(
-            nb_MI + nb_betas + nb_omega_diag_params + nb_var_res_params,
-            1,
+        nb_plots = nb_MI + nb_betas + nb_omega_diag_params + nb_var_res_params
+        nb_rows = int(np.ceil(nb_plots / nb_cols))
+        plt.ion()
+        self.convergence_plot_fig, self.convergence_plot_axes = plt.subplots(
+            nrows=nb_rows,
+            ncols=nb_cols,
             figsize=(
-                5,
-                2 * (nb_betas + nb_omega_diag_params + nb_var_res_params),
+                nb_cols * indiv_figsize[0],
+                nb_rows * indiv_figsize[1],
             ),
+            squeeze=False,
+            sharex="all",
         )
+
+        self.traces = {}
         plot_idx: int = 0
-        for j, MI_name in enumerate(self.model.MI_names):
-            MI_history = [torch.exp(h[j]).item() for h in history["log_MI"]]
-            axs[plot_idx].plot(
+        # Plot the MI parameters
+        for mi_name in self.model.MI_names:
+            row, col = plot_idx // nb_cols, plot_idx % nb_cols
+            ax = self.convergence_plot_axes[row, col]
+            MI_history = [h.item() for h in history[mi_name]]
+            (tr,) = ax.plot(
                 MI_history,
-                label=f"Estimated MI for {MI_name} ",
             )
             if true_MI is not None:
-                axs[plot_idx].axhline(
-                    y=true_MI[MI_name],
+                ax.axhline(
+                    y=true_MI[mi_name],
                     linestyle="--",
-                    label=f"True MI for {MI_name}",
                 )
-            axs[plot_idx].set_title(f"Convergence of MI ${{{MI_name}}}$")
-            axs[plot_idx].set_xlabel("SAEM Iteration")
-            axs[plot_idx].set_ylabel("Parameter Value")
-            axs[plot_idx].legend()
-            axs[plot_idx].grid(True)
+            ax.set_title("Model intrinsic {MI_name}")
+            ax.grid(True)
+            self.traces.update({mi_name: tr})
             plot_idx += 1
-        for j, beta_name in enumerate(self.model.population_betas_names):
-            beta_history = [h[j].item() for h in history["population_betas"]]
-            axs[plot_idx].plot(
+        # Plot the PDUs means
+        for pdu in self.model.PDU_names:
+            row, col = plot_idx // nb_cols, plot_idx % nb_cols
+            ax = self.convergence_plot_axes[row, col]
+            beta_history = [h.item() for h in history[pdu]["mu"]]
+            (tr,) = ax.plot(
                 beta_history,
-                label=f"Estimated beta for {beta_name} ",
             )
             if true_betas is not None:
-                axs[plot_idx].axhline(
-                    y=true_betas[beta_name],
+                ax.axhline(
+                    y=true_betas[pdu],
                     linestyle="--",
-                    label=f"True beta for {beta_name}",
                 )
-            axs[plot_idx].set_title(f"Convergence of beta_{beta_name}")
-            axs[plot_idx].set_xlabel("SAEM Iteration")
-            axs[plot_idx].set_ylabel("Parameter Value")
-            axs[plot_idx].legend()
-            axs[plot_idx].grid(True)
+            ax.set_title(rf"{pdu}: $\mu$ (log)")
+            ax.set_xlabel("")
+            ax.grid(True)
+            self.traces.update({pdu: {"mu": tr}})
             plot_idx += 1
-        for j, PDU_name in enumerate(self.model.PDU_names):
-            omega_diag_history = [
-                torch.sqrt(h[j, j]).item() for h in history["population_omega"]
-            ]
-            axs[plot_idx].plot(
-                omega_diag_history,
-                label=f"Estimated Omega for {PDU_name}",
+        # Plot the PDUs sigma
+        for pdu in self.model.PDU_names:
+            row, col = plot_idx // nb_cols, plot_idx % nb_cols
+            ax = self.convergence_plot_axes[row, col]
+            beta_history = [h.item() for h in history[pdu]["sigma_sq"]]
+            (tr,) = ax.plot(
+                beta_history,
             )
             if true_sd is not None:
-                axs[plot_idx].axhline(
-                    y=true_sd[PDU_name],
+                ax.axhline(
+                    y=true_sd[pdu],
                     linestyle="--",
-                    label=f"True Omega for {PDU_name}",
                 )
-            axs[plot_idx].set_title(f"Convergence of Omega for {PDU_name}")
-            axs[plot_idx].set_xlabel("SAEM Iteration")
-            axs[plot_idx].set_ylabel("Variance")
-            axs[plot_idx].legend()
-            axs[plot_idx].grid(True)
+            ax.set_title(rf"{pdu}: $\sigma^2$")
+            ax.set_xlabel("")
+            ax.grid(True)
+            self.traces[pdu].update({"sigma_sq": tr})
             plot_idx += 1
-        for j, res_name in enumerate(self.model.outputs_names):
-            var_res_history = [h[j].item() for h in history["residual_error_var"]]
-            axs[plot_idx].plot(
+        # Plot the coefficients of covariation
+        for beta_name in self.model.covariate_coeffs_names:
+            row, col = plot_idx // nb_cols, plot_idx % nb_cols
+            ax = self.convergence_plot_axes[row, col]
+            beta_history = [h.item() for h in history[beta_name]]
+            (tr,) = ax.plot(
+                beta_history,
+            )
+            if true_betas is not None:
+                ax.axhline(
+                    y=true_betas[beta_name],
+                    linestyle="--",
+                )
+            ax.set_title(rf"{beta_name}")
+            ax.set_xlabel("")
+            ax.grid(True)
+            self.traces.update({beta_name: tr})
+            plot_idx += 1
+        # Plot the residual variance
+        for res_name in self.model.outputs_names:
+            row, col = plot_idx // nb_cols, plot_idx % nb_cols
+            ax = self.convergence_plot_axes[row, col]
+            var_res_history = [h.item() for h in history[res_name]]
+            (tr,) = ax.plot(
                 var_res_history,
-                label=f"Estimated residual error variance for {res_name}",
             )
             if true_residual_var is not None:
-                axs[plot_idx].axhline(
+                ax.axhline(
                     y=true_residual_var[res_name],
                     linestyle="--",
-                    label=f"True residual variance for {res_name}",
                 )
-            axs[plot_idx].set_title("Residual Error var Convergence")
-            axs[plot_idx].set_xlabel("SAEM Iteration")
-            axs[plot_idx].set_ylabel("var Value")
-            axs[plot_idx].legend()
-            axs[plot_idx].grid(True)
+            ax.set_title(rf"{res_name}: $\sigma^2$")
+            ax.grid(True)
+            self.traces.update({res_name: tr})
+            plot_idx += 1
+        # Turn off extra subplots
+        while plot_idx < nb_rows * nb_cols:
+            row, col = plot_idx // nb_cols, plot_idx % nb_cols
+            ax = self.convergence_plot_axes[row, col]
+            ax.set_visible(False)
             plot_idx += 1
 
         if not smoke_test:
             plt.tight_layout()
             plt.show()
+
+    def update_convergence_plot(self):
+        history = self.history
+        new_xaxis = np.arange(self.current_iteration + 1)
+        self.convergence_plot_axes[0, 0].clear()
+        # Plot the MI parameters
+        for mi_name in self.model.MI_names:
+            MI_history = [h.item() for h in history[mi_name]]
+            self.traces[mi_name].set_data(new_xaxis, MI_history)
+        # Plot the PDUs means
+        for pdu in self.model.PDU_names:
+            beta_history = [h.item() for h in history[pdu]["mu"]]
+            self.traces[pdu]["mu"].set_data(new_xaxis, beta_history)
+        # Plot the PDUs sigma
+        for pdu in self.model.PDU_names:
+            beta_history = [h.item() for h in history[pdu]["sigma_sq"]]
+            self.traces[pdu]["sigma_sq"].set_data(new_xaxis, beta_history)
+        # Plot the coefficients of covariation
+        for beta_name in self.model.covariate_coeffs_names:
+            beta_history = [h.item() for h in history[beta_name]]
+            self.traces[beta_name].set_data(new_xaxis, beta_history)
+        # Plot the residual variance
+        for res_name in self.model.outputs_names:
+            var_res_history = [h.item() for h in history[res_name]]
+            self.traces[res_name].set_data(new_xaxis, var_res_history)
+        self.convergence_plot_fig.canvas.draw()
+        self.convergence_plot_fig.canvas.flush_events()
 
     def map_estimates_descriptors(self) -> pd.DataFrame:
         theta = self.current_thetas

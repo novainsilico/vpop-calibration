@@ -67,6 +67,7 @@ class NlmeModel:
             )
             self.covariate_map = None
             self.covariate_names = []
+            self.covariate_coeffs_names = []
             self.nb_covariates = 0
             self.population_betas_names = self.PDU_names
             init_betas_list = [val["mean"] for _, val in init_PDU.items()]
@@ -76,6 +77,7 @@ class NlmeModel:
             self.covariate_map = covariate_map
             self.population_betas_names: List = []
             covariate_set = set()
+            covariate_coeffs_set = set()
             pdk_names = set(additional_columns)
             for PDU_name in self.PDU_names:
                 self.population_betas_names.append(PDU_name)
@@ -94,10 +96,12 @@ class NlmeModel:
                         if covariate in pdk_names:
                             pdk_names.remove(covariate)
                         coef_name = coef["coef"]
+                        covariate_coeffs_set.add(coef_name)
                         coef_val = coef["value"]
                         self.population_betas_names.append(coef_name)
                         init_betas_list.append(coef_val)
             self.covariate_names = list(covariate_set)
+            self.covariate_coeffs_names = list(covariate_coeffs_set)
             self.nb_covariates = len(self.covariate_names)
             self.PDK_names = list(pdk_names)
             self.nb_PDK = len(self.PDK_names)
