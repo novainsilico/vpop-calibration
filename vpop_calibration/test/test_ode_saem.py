@@ -82,16 +82,14 @@ def test_ode_saem():
 
     # Initial pop estimates
     # Parameter definitions
-    init_log_MI = {"k_21": -1.0}
+    init_log_MI = {"k_12": -1.0}
     init_log_PDU = {
         "k_21": {"mean": -1.0, "sd": 0.2},
-        "k_12": {"mean": -0.1, "sd": 0.1},
     }
     error_model_type = "additive"
     init_res_var = [0.1, 0.05, 0.5]
     init_covariate_map = {
-        "k_12": {"foo": {"coef": "cov_foo_k12", "value": -0.1}},
-        "k_21": {},
+        "k_21": {"foo": {"coef": "cov_foo_k12", "value": -0.1}},
     }
 
     # Create a structural model
