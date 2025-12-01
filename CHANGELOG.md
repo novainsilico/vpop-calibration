@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.1] - 2025-11-27
+
+### Fix
+
+- GP: Handle NaN values in GP RMSE output
+
+### Modified
+
+- Tests: set random state / seed for tests
+- GP: plot of individual solutions now uses ±2 \* pred variance for confidence interval
+
+## [2.1.0] - 2025-11-26
+
+### Modified
+
+- Structural model: Simulate GP in wide format and use tensor manipulation to recover task values, runtime improvement for SAEM estimation
+- Vpop: use natural log to define parameter ranges, aligned with implementation choice in the rest of the module
+
 ## [2.0.1] - 2025-11-25
 
 ### Modified

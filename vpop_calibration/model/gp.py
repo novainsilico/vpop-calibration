@@ -351,38 +351,33 @@ class GP:
                         scheduler.step()
             self.losses = losses_list
 
-    def predict_wide(
-        self, X: torch.Tensor
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        """Predict mean and interval confidence values for a given input tensor (expects normalized inputs). This function outputs normalized values of tasks in a wide format."""
-        # set model and likelihood in evaluation mode
+    def _predict_training(self, X: torch.Tensor):
+        """Internal method used to predict normalized outputs on normalized inputs."""
         self.model.eval()
         self.likelihood.eval()
 
         with torch.no_grad():
-            prediction = cast(
+            pred = cast(
                 gpytorch.distributions.MultitaskMultivariateNormal,
                 self.likelihood(self.model(X)),
             )
-            return (
-                prediction.mean,
-                prediction.confidence_region()[0],
-                prediction.confidence_region()[1],
-            )
 
-    def predict_wide_scaled(
-        self, X: torch.Tensor
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        return pred.mean, pred.confidence_region
+
+    def predict_wide_scaled(self, X: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """Predict mean and interval confidence values for a given input tensor (normalized inputs). This function outputs rescaled values."""
-        pred = self.predict_wide(X)
+        self.model.eval()
+        self.likelihood.eval()
+        inputs = self.data.normalize_inputs_tensor(X)
+
+        with torch.no_grad():
+            pred = self.model(inputs)
+
         if self.data.data_already_normalized:
-            return pred
+            out_mean = pred.mean
         else:
-            return (
-                self.data.unnormalize_output_wide(pred[0]),
-                self.data.unnormalize_output_wide(pred[1]),
-                self.data.unnormalize_output_wide(pred[2]),
-            )
+            out_mean = self.data.unnormalize_output_wide(pred.mean)
+        return out_mean, pred.variance
 
     def predict_long_scaled(
         self, X: torch.Tensor, tasks: torch.LongTensor
@@ -394,7 +389,10 @@ class GP:
         inputs = self.data.normalize_inputs_tensor(X)
         with torch.no_grad():
             pred = self.model(inputs, task_indices=tasks)
-        out_mean = self.data.unnormalize_output_long(pred.mean, task_indices=tasks)
+        if self.data.data_already_normalized:
+            out_mean = pred.mean
+        else:
+            out_mean = self.data.unnormalize_output_long(pred.mean, task_indices=tasks)
         return out_mean, pred.variance
 
     def plot_loss(self) -> None:
@@ -423,8 +421,7 @@ class GP:
         (
             self.Y_training_predicted_mean,
             _,
-            _,
-        ) = self.predict_wide(self.data.X_training)
+        ) = self._predict_training(self.data.X_training)
         self.RMSE_training = self.RMSE(
             self.Y_training_predicted_mean, self.data.Y_training
         )
@@ -439,8 +436,7 @@ class GP:
             (
                 self.Y_validation_predicted_mean,
                 _,
-                _,
-            ) = self.predict_wide(self.data.X_validation)
+            ) = self._predict_training(self.data.X_validation)
             self.RMSE_validation = self.RMSE(
                 self.Y_validation_predicted_mean, self.data.Y_validation
             )

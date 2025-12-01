@@ -1,6 +1,5 @@
 import numpy as np
 import pandas as pd
-import pickle
 import uuid
 
 from vpop_calibration import *
@@ -38,59 +37,7 @@ pk_two_compartments_model = OdeModel(
 model_file = "vpop_calibration/test/gp_model_for_tests.pkl"
 
 
-def test_gp_training():
-    # Define the ode model
-
-    nb_timesteps = 15
-    time_steps = np.linspace(0.0, tmax, nb_timesteps)
-
-    log_nb_patients = 3
-    param_ranges = {
-        "k_12": {"low": -2.0, "high": 0.0, "log": True},
-        "k_21": {"low": -1.0, "high": 0.3, "log": True},
-        "k_a": {"low": -1.0, "high": 0.0, "log": True},
-    }
-
-    dataset = simulate_dataset_from_ranges(
-        pk_two_compartments_model,
-        log_nb_patients,
-        param_ranges,
-        initial_conditions,
-        protocol_design,
-        None,
-        None,
-        time_steps,
-    )
-
-    learned_ode_params = list(param_ranges.keys())
-    descriptors = learned_ode_params + ["time"]
-
-    # initiate our GP class
-    myGP = GP(
-        dataset,
-        descriptors,
-        var_strat="IMV",  # either IMV (Independent Multitask Variational) or LMCV (Linear Model of Coregionalization Variational)
-        kernel="RBF",  # Either RBF or SMK
-        data_already_normalized=False,  # default
-        nb_inducing_points=10,
-        mll="ELBO",  # default, otherwise PLL
-        nb_training_iter=10,
-        training_proportion=0.7,
-        learning_rate=0.1,
-        lr_decay=0.99,
-        jitter=1e-6,
-        log_inputs=learned_ode_params,
-    )
-    myGP.train()
-    myGP.plot_loss()
-    myGP.plot_obs_vs_predicted("training")
-    myGP.plot_individual_solution(0)
-    myGP.plot_all_solutions("training")
-    with open(model_file, "wb") as file:
-        pickle.dump(myGP, file)
-
-
-def test_gp_saem():
+def test_ode_saem():
     time_span_rw = (0, 24)
     nb_steps_rw = 5
 
@@ -147,13 +94,13 @@ def test_gp_saem():
         "k_21": {},
     }
 
-    with open(model_file, "rb") as file:
-        myGP = pickle.load(file)
     # Create a structural model
-    structural_gp = StructuralGp(myGP)
+    structural_ode = StructuralOdeModel(
+        pk_two_compartments_model, protocol_design, initial_conditions
+    )
     # Create a NLME moedl
     nlme_surrogate = NlmeModel(
-        structural_gp,
+        structural_ode,
         patients_df,
         init_log_MI,
         init_log_PDU,

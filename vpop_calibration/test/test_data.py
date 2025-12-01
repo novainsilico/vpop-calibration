@@ -1,6 +1,7 @@
 import pandas as pd
 
 from vpop_calibration.model.data import TrainingDataSet
+from vpop_calibration.test import *
 
 training_df = pd.DataFrame(
     {
