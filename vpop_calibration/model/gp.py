@@ -406,8 +406,8 @@ class GP:
         assert y1.shape == y2.shape
         # Ignore potential NaN values in the RMSE computation
         mask = (~torch.isnan(y1)) * (~torch.isnan(y2))
-        rmse = torch.where(mask, torch.sqrt(torch.pow(y1 - y2, 2)), 0)
-        return torch.sqrt(rmse.sum(dim=0) / mask.sum(dim=0))
+        squared_residuals = torch.where(mask, torch.pow(y1 - y2, 2), 0)
+        return torch.sqrt(squared_residuals.sum(dim=0) / mask.sum(dim=0))
 
     def eval_perf(self):
         """Evaluate the model performance on its training data set and validation data set (normalized inputs and ouptuts)."""
