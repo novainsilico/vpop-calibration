@@ -1,15 +1,16 @@
 import torch
 import matplotlib.pyplot as plt
-from matplotlib.figure import Figure
 from scipy.optimize import minimize
 from tqdm.notebook import tqdm
-from typing import List, Dict, Union, Optional, Any
+from typing import Union, Optional
 from pandas import DataFrame
 import pandas as pd
 import numpy as np
+from IPython.display import display
 
 from .utils import smoke_test
 from .nlme import NlmeModel
+from .structural_model import StructuralGp
 
 
 # Main SAEM Algorithm Class
@@ -30,6 +31,14 @@ class PySaem:
         init_step_size: float = 0.5,  # stick to the 0.1 - 1 range
         verbose: bool = False,
         optim_max_fun: int = 50,
+        live_plot: bool = True,
+        plot_frames: int = 20,
+        plot_columns: int = 3,
+        plot_indiv_figsize: tuple[float, float] = (1.2, 3.0),
+        true_log_MI: Optional[dict[str, float]] = None,
+        true_log_PDU: Optional[dict[str, dict[str, float | bool]]] = None,
+        true_res_var: Optional[list[float]] = None,
+        true_covariates: Optional[dict[str, dict[str, dict[str, str | float]]]] = None,
     ):
         """Instantiate an SAEM optimizer for an NLME model
 
@@ -46,6 +55,11 @@ class PySaem:
             annealing_factor (float, optional): Exploration phase annealing factor for residual and parameter variance. Defaults to 0.95.
             init_step_size (float, optional): Initial MCMC step size scaling factor. Defaults to 0.5.
             optim_max_fun(int): Maximum number of function calls in the scipy.optimize (used for model intrinsic parameters calibration). Defaults to 50.
+            verbose (bool): Print various info during iterations. Defaults to False.
+            live_plot (bool): Print and update a plot of parameters during iterations. Defaults to True.
+            plot_frames (int): Frequency at which the live plot should be updated (number of iterations). The lower the slower. Defaults to 20.
+            plot_columns (int): Number of columns to display the convergence plot. Defaults to 3.
+            plot_indiv_figsize (tuple[float,float]): individual figure size in the convergence plot (width, height).
         """
 
         self.model: NlmeModel = model
@@ -95,6 +109,10 @@ class PySaem:
             self.optim_max_fun = 1
         else:
             self.optim_max_fun = optim_max_fun
+        self.live_plot = live_plot
+        self.plot_frames = plot_frames
+        self.plot_columns = plot_columns
+        self.plot_indiv_figsize = plot_indiv_figsize
 
         # Initialize the random effects to 0
         self.current_etas: torch.Tensor = torch.zeros(
@@ -119,7 +137,7 @@ class PySaem:
         self.current_iteration: int = 0
 
         # Initialize the values for convergence checks
-        self.prev_params: Dict[str, torch.Tensor] = {
+        self.prev_params: dict[str, torch.Tensor] = {
             "log_MI": self.model.log_MI,
             "population_betas": self.model.population_betas,
             "population_omega": self.model.omega_pop,
@@ -143,6 +161,33 @@ class PySaem:
         self.sufficient_stat_outer_product = torch.matmul(
             self.current_log_pdu.transpose(0, 1), self.current_log_pdu
         )
+
+        self.true_log_MI = true_log_MI
+        self.true_log_PDUs = true_log_PDU
+        if true_covariates is not None:
+            self.true_cov = {
+                str(cov["coef"]): float(cov["value"])
+                for item in true_covariates.values()
+                for cov in item.values()
+            }
+        if true_res_var is not None:
+            self.true_res_var = {
+                self.model.outputs_names[k]: val for k, val in enumerate(true_res_var)
+            }
+
+        if isinstance(self.model.structural_model, StructuralGp):
+            self.training_ranges = {}
+            training_samples = np.log(
+                self.model.structural_model.gp_model.data.full_df_raw[
+                    self.model.PDU_names + self.model.MI_names
+                ]
+            )
+            train_min = training_samples.min(axis=0)
+            train_max = training_samples.max(axis=0)
+            for param in self.model.PDU_names + self.model.MI_names:
+                self.training_ranges.update(
+                    {param: {"low": train_min[param], "high": train_max[param]}}
+                )
 
     def m_step_update(
         self,
@@ -467,7 +512,7 @@ class PySaem:
             )
 
         # Convergence check
-        new_params: Dict[str, torch.Tensor] = {
+        new_params: dict[str, torch.Tensor] = {
             "log_MI": self.model.log_MI,
             "population_betas": self.model.population_betas,
             "population_omega": self.model.omega_pop,
@@ -557,16 +602,20 @@ class PySaem:
             print(f"Initial Residual Variance: {self.model.residual_var}")
 
         print("Phase 1 (exploration):")
-        plt.ion()
-        self.plot_convergence_history()
+        (
+            self.convergence_plot_handle,
+            self.convergence_plot_fig,
+            self.convergence_plot_axes,
+        ) = self._build_convergence_plot(
+            indiv_figsize=self.plot_indiv_figsize, n_cols=self.plot_columns
+        )
         for k in tqdm(range(1, self.nb_phase1_iterations)):
             # Run iteration, do not check for convergence in the exploration phase
             # Iteration 0 is in fact already done (initialization)
             _ = self.one_iteration(k)
             self.current_iteration = k
-            if k % 20 == 0:
-                self.update_convergence_plot()
-                self.convergence_plot_fig.canvas.draw()
+            if (self.live_plot) & (k % self.plot_frames == 0):
+                self._update_convergence_plot()
 
         if self.nb_phase2_iterations > 0:
             self.current_phase = 2
@@ -580,6 +629,9 @@ class PySaem:
                 # Run iteration
                 is_converged = self.one_iteration(k)
                 self.current_iteration = k
+
+                if (self.live_plot) & (k % self.plot_frames == 0):
+                    self._update_convergence_plot()
                 # Check for convergence, and stop if criterion matched
                 if is_converged:
                     self.consecutive_converged_iters += 1
@@ -591,10 +643,12 @@ class PySaem:
                         print(
                             f"\nConvergence reached after {k + 1} iterations. Stopping early."
                         )
+                        self._update_convergence_plot()
                         break
                 else:
                     self.consecutive_converged_iters = 0
-
+        self._update_convergence_plot()
+        plt.close(self.convergence_plot_fig)
         return None
 
     def continue_iterating(self, nb_add_iters_ph1=0, nb_add_iters_ph2=0) -> None:
@@ -645,14 +699,10 @@ class PySaem:
                     self.consecutive_converged_iters = 0
         return None
 
-    def plot_convergence_history(
+    def _build_convergence_plot(
         self,
-        nb_cols: int = 3,
         indiv_figsize: tuple[float, float] = (2.0, 1.2),
-        true_MI: Optional[Dict[str, float]] = None,
-        true_betas: Optional[Dict[str, float]] = None,
-        true_sd: Optional[Dict[str, float]] = None,
-        true_residual_var: Optional[Dict[str, float]] = None,
+        n_cols: int = 3,
     ):
         """
         This method plots the evolution of the estimated parameters (MI, betas, omega, residual error variances) across iterations
@@ -663,9 +713,10 @@ class PySaem:
         nb_omega_diag_params: int = self.model.nb_PDU
         nb_var_res_params: int = self.model.nb_outputs
         nb_plots = nb_MI + nb_betas + nb_omega_diag_params + nb_var_res_params
+        nb_cols = n_cols
         nb_rows = int(np.ceil(nb_plots / nb_cols))
-        plt.ion()
-        self.convergence_plot_fig, self.convergence_plot_axes = plt.subplots(
+        maxiter = self.nb_phase1_iterations + self.nb_phase2_iterations
+        fig, axes = plt.subplots(
             nrows=nb_rows,
             ncols=nb_cols,
             figsize=(
@@ -681,16 +732,26 @@ class PySaem:
         # Plot the MI parameters
         for mi_name in self.model.MI_names:
             row, col = plot_idx // nb_cols, plot_idx % nb_cols
-            ax = self.convergence_plot_axes[row, col]
+            ax = axes[row, col]
+            ax.set_xlim(0, maxiter)
             MI_history = [h.item() for h in history[mi_name]]
             (tr,) = ax.plot(
                 MI_history,
             )
-            if true_MI is not None:
-                ax.axhline(
-                    y=true_MI[mi_name],
-                    linestyle="--",
-                )
+            if hasattr(self, "true_log_MI"):
+                if self.true_log_MI is not None:
+                    ax.axhline(
+                        y=self.true_log_MI[mi_name],
+                        linestyle="--",
+                    )
+            if hasattr(self, "training_ranges"):
+                if self.training_ranges is not None:
+                    ax.fill_between(
+                        [0, maxiter],
+                        self.training_ranges[mi_name]["low"],
+                        self.training_ranges[mi_name]["high"],
+                        alpha=0.25,
+                    )
             ax.set_title("Model intrinsic {MI_name}")
             ax.grid(True)
             self.traces.update({mi_name: tr})
@@ -698,16 +759,26 @@ class PySaem:
         # Plot the PDUs means
         for pdu in self.model.PDU_names:
             row, col = plot_idx // nb_cols, plot_idx % nb_cols
-            ax = self.convergence_plot_axes[row, col]
+            ax = axes[row, col]
+            ax.set_xlim(0, maxiter)
             beta_history = [h.item() for h in history[pdu]["mu"]]
             (tr,) = ax.plot(
                 beta_history,
             )
-            if true_betas is not None:
-                ax.axhline(
-                    y=true_betas[pdu],
-                    linestyle="--",
-                )
+            if hasattr(self, "true_log_PDUs"):
+                if self.true_log_PDUs is not None:
+                    ax.axhline(
+                        y=self.true_log_PDUs[pdu]["mean"],
+                        linestyle="--",
+                    )
+            if hasattr(self, "training_ranges"):
+                if self.training_ranges is not None:
+                    ax.fill_between(
+                        [0, maxiter],
+                        self.training_ranges[pdu]["low"],
+                        self.training_ranges[pdu]["high"],
+                        alpha=0.25,
+                    )
             ax.set_title(rf"{pdu}: $\mu$ (log)")
             ax.set_xlabel("")
             ax.grid(True)
@@ -716,16 +787,18 @@ class PySaem:
         # Plot the PDUs sigma
         for pdu in self.model.PDU_names:
             row, col = plot_idx // nb_cols, plot_idx % nb_cols
-            ax = self.convergence_plot_axes[row, col]
+            ax = axes[row, col]
+            ax.set_xlim(0, maxiter)
             beta_history = [h.item() for h in history[pdu]["sigma_sq"]]
             (tr,) = ax.plot(
                 beta_history,
             )
-            if true_sd is not None:
-                ax.axhline(
-                    y=true_sd[pdu],
-                    linestyle="--",
-                )
+            if hasattr(self, "true_log_PDUs"):
+                if self.true_log_PDUs is not None:
+                    ax.axhline(
+                        y=self.true_log_PDUs[pdu]["sd"],
+                        linestyle="--",
+                    )
             ax.set_title(rf"{pdu}: $\sigma^2$")
             ax.set_xlabel("")
             ax.grid(True)
@@ -734,16 +807,18 @@ class PySaem:
         # Plot the coefficients of covariation
         for beta_name in self.model.covariate_coeffs_names:
             row, col = plot_idx // nb_cols, plot_idx % nb_cols
-            ax = self.convergence_plot_axes[row, col]
+            ax = axes[row, col]
+            ax.set_xlim(0, maxiter)
             beta_history = [h.item() for h in history[beta_name]]
             (tr,) = ax.plot(
                 beta_history,
             )
-            if true_betas is not None:
-                ax.axhline(
-                    y=true_betas[beta_name],
-                    linestyle="--",
-                )
+            if hasattr(self, "true_cov"):
+                if self.true_cov is not None:
+                    ax.axhline(
+                        y=self.true_cov[beta_name],
+                        linestyle="--",
+                    )
             ax.set_title(rf"{beta_name}")
             ax.set_xlabel("")
             ax.grid(True)
@@ -752,16 +827,18 @@ class PySaem:
         # Plot the residual variance
         for res_name in self.model.outputs_names:
             row, col = plot_idx // nb_cols, plot_idx % nb_cols
-            ax = self.convergence_plot_axes[row, col]
+            ax = axes[row, col]
+            ax.set_xlim(0, maxiter)
             var_res_history = [h.item() for h in history[res_name]]
             (tr,) = ax.plot(
                 var_res_history,
             )
-            if true_residual_var is not None:
-                ax.axhline(
-                    y=true_residual_var[res_name],
-                    linestyle="--",
-                )
+            if hasattr(self, "true_res_var"):
+                if self.true_res_var is not None:
+                    ax.axhline(
+                        y=self.true_res_var[res_name],
+                        linestyle="--",
+                    )
             ax.set_title(rf"{res_name}: $\sigma^2$")
             ax.grid(True)
             self.traces.update({res_name: tr})
@@ -769,18 +846,19 @@ class PySaem:
         # Turn off extra subplots
         while plot_idx < nb_rows * nb_cols:
             row, col = plot_idx // nb_cols, plot_idx % nb_cols
-            ax = self.convergence_plot_axes[row, col]
+            ax = axes[row, col]
             ax.set_visible(False)
             plot_idx += 1
-
         if not smoke_test:
             plt.tight_layout()
-            plt.show()
+            handle = display(fig, display_id=True)
+        else:
+            handle = None
+        return (handle, fig, axes)
 
-    def update_convergence_plot(self):
+    def _update_convergence_plot(self):
         history = self.history
         new_xaxis = np.arange(self.current_iteration + 1)
-        self.convergence_plot_axes[0, 0].clear()
         # Plot the MI parameters
         for mi_name in self.model.MI_names:
             MI_history = [h.item() for h in history[mi_name]]
@@ -801,8 +879,22 @@ class PySaem:
         for res_name in self.model.outputs_names:
             var_res_history = [h.item() for h in history[res_name]]
             self.traces[res_name].set_data(new_xaxis, var_res_history)
-        self.convergence_plot_fig.canvas.draw()
-        self.convergence_plot_fig.canvas.flush_events()
+
+        for ax in self.convergence_plot_axes.flatten():
+            ax.autoscale_view(scaley=True, scalex=False)
+            ax.relim()
+        if self.convergence_plot_handle is not None:
+            self.convergence_plot_handle.update(self.convergence_plot_fig)
+
+    def plot_convergence_history(
+        self,
+        indiv_figsize: tuple[float, float] = (2.0, 1.2),
+        n_cols: int = 3,
+    ):
+        handle, fig, axes = self._build_convergence_plot(
+            indiv_figsize=indiv_figsize, n_cols=n_cols
+        )
+        plt.close(fig)
 
     def map_estimates_descriptors(self) -> pd.DataFrame:
         theta = self.current_thetas

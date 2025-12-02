@@ -403,10 +403,10 @@ class TrainingDataSet:
             [long_df, mean_df, var_df],
         )
         out_df["pred_low"] = out_df.apply(
-            lambda r: r["pred_mean"] - 2 * r["pred_var"], axis=1
+            lambda r: r["pred_mean"] - 2 * np.sqrt(r["pred_var"]), axis=1
         )
         out_df["pred_high"] = out_df.apply(
-            lambda r: r["pred_mean"] + 2 * r["pred_var"], axis=1
+            lambda r: r["pred_mean"] + 2 * np.sqrt(r["pred_var"]), axis=1
         )
         # Remove the dummy value column if it was added during the data processing
         if remove_value:
