@@ -1,5 +1,6 @@
 stages:
   - test
+  - deploy
 
 pytest:
   stage: test
@@ -7,3 +8,21 @@ pytest:
   script:
     - nix develop . --command poetry install
     - nix develop . --command poetry run pytest
+
+pypi_deploy:
+  stage: deploy
+  image: $PYTHON_IMAGE
+  before_script:
+    - poetry install
+  script:
+    - poetry config pypi-token.pypi "$PYPI_TOKEN"
+    # Extract the version number from pyproject.toml
+    - VERSION=$(poetry version -s)
+    # Check if the version already exists on PyPI for jinko-sdk using the HTTP status code
+    - response=$(curl -s -o /dev/null -w "%{http_code}" https://pypi.org/pypi/jinko-sdk/$VERSION/json)
+    - if [ "$response" -eq 200 ]; then echo "Version $VERSION already exists on PyPI. Skipping deployment."; exit 0; fi
+    - poetry publish --build
+  environment:
+    name: production
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
