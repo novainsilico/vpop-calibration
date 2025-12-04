@@ -7,6 +7,7 @@ from pandas import DataFrame
 import pandas as pd
 import numpy as np
 
+from .utils import smoke_test
 from .nlme import NlmeModel
 
 
@@ -27,6 +28,7 @@ class PySaem:
         annealing_factor: float = 0.95,
         init_step_size: float = 0.5,  # stick to the 0.1 - 1 range
         verbose: bool = False,
+        optim_max_fun: int = 50,
     ):
         """Instantiate an SAEM optimizer for an NLME model
 
@@ -42,6 +44,7 @@ class PySaem:
             learning_rate_power (float, optional): Exponential decay exponent for the M-step learning rate (stochastic approximation). Defaults to 0.8.
             annealing_factor (float, optional): Exploration phase annealing factor for residual and parameter variance. Defaults to 0.95.
             init_step_size (float, optional): Initial MCMC step size scaling factor. Defaults to 0.5.
+            optim_max_fun(int): Maximum number of function calls in the scipy.optimize (used for model intrinsic parameters calibration). Defaults to 50.
         """
 
         self.model: NlmeModel = model
@@ -53,12 +56,16 @@ class PySaem:
         # SAEM iteration parameters
         # phase 1 = exploratory: learning rate = 0 and simulated annealing on
         # phase 2 = smoothing: learning rate 1/phase2_iter^factor
-        self.nb_phase1_iterations: int = nb_phase1_iterations
-        self.nb_phase2_iterations: int = (
-            nb_phase2_iterations
-            if nb_phase2_iterations is not None
-            else nb_phase1_iterations
-        )
+        if smoke_test:
+            self.nb_phase1_iterations = 1
+            self.nb_phase2_iterations = 2
+        else:
+            self.nb_phase1_iterations: int = nb_phase1_iterations
+            self.nb_phase2_iterations: int = (
+                nb_phase2_iterations
+                if nb_phase2_iterations is not None
+                else nb_phase1_iterations
+            )
         self.current_phase = 1
 
         # convergence parameters
@@ -83,6 +90,10 @@ class PySaem:
         )
 
         self.verbose = verbose
+        if smoke_test:
+            self.optim_max_fun = 1
+        else:
+            self.optim_max_fun = optim_max_fun
 
         # Initialize the random effects to 0
         self.current_etas: torch.Tensor = torch.zeros(
@@ -372,7 +383,7 @@ class PySaem:
                 fun=self.MI_objective_function,
                 x0=self.model.log_MI.squeeze().numpy(),
                 method="L-BFGS-B",
-                options={"maxfun": 50},
+                options={"maxfun": self.optim_max_fun},
             ).x
             target_log_MI = torch.from_numpy(target_log_MI_np)
             new_log_MI = self._stochastic_approximation(
@@ -425,14 +436,15 @@ class PySaem:
             pdk_full = self.model.patients_pdk_full
         else:
             pdk_full = torch.Tensor()
+        # Assemble the patient parameters in the right order: PDK, PDU, MI
         new_thetas = torch.cat(
             (
                 pdk_full,
                 torch.exp(
                     torch.cat(
                         (
-                            log_MI_expanded,
                             self.current_log_pdu,
+                            log_MI_expanded,
                         ),
                         dim=1,
                     ),
@@ -660,8 +672,10 @@ class PySaem:
             axs[plot_idx].legend()
             axs[plot_idx].grid(True)
             plot_idx += 1
-        plt.tight_layout()
-        plt.show()
+
+        if not smoke_test:
+            plt.tight_layout()
+            plt.show()
 
     def map_estimates_descriptors(self) -> pd.DataFrame:
         theta = self.current_thetas
@@ -743,5 +757,7 @@ class PySaem:
 
                 title = f"{output_name} in {protocol_arm}"  # More descriptive title
                 ax.set_title(title)
-        plt.tight_layout()
-        plt.show()
+
+        if not smoke_test:
+            plt.tight_layout()
+            plt.show()

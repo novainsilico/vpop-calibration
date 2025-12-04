@@ -1,6 +1,6 @@
 [project]
 name = "vpop-calibration"
-version = "2.1.1"
+version = "2.1.2"
 description = ""
 authors = [{ name = "Paul Lemarre", email = "paul.lemarre@novainsilico.ai" }]
 readme = "README.md"
@@ -27,6 +27,10 @@ jupytext = "^1.18.1"
 plotnine = "^0.15.1"
 pytest = "^9.0.1"
 pytest-cov = "^7.0.0"
+nbmake = "^1.5.5"
+pytest-env = "^1.2.0"
+pytest-profiling = "^1.8.1"
+pre-commit = "^4.5.0"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
@@ -34,13 +38,23 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.pytest]
 minversion = "9.0"
-addopts = ["-ra", "-q", "--cov=vpop_calibration", "--cov-report=markdown"]
-testpaths = ["vpop_calibration/test"]
+addopts = [
+    "-ra",
+    "-q",
+    "--cov=vpop_calibration",
+    "--cov-report=markdown",
+    "--nbmake",
+    "--nbmake-timeout=100",
+    "--profile",
+    "--durations=5",
+]
+testpaths = ["vpop_calibration/test", "examples"]
 filterwarnings = ["error", "ignore::UserWarning", "ignore::DeprecationWarning"]
+env = ["IS_PYTEST_RUNNING=True", "CUDA_VISIBLE_DEVICES=", "MPLBACKEND=agg"]
 
 [tool.coverage.run]
 branch = true
-omit = ["vpop_calibration/test/*"]
+omit = ["vpop_calibration/test/*", "examples"]
 
 [tool.coverage.report]
 # Regexes for lines to exclude from consideration

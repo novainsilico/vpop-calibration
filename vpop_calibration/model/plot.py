@@ -3,6 +3,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from typing import Optional
 
+from ..utils import smoke_test
+
 
 def plot_all_solutions(obs_vs_pred: pd.DataFrame) -> None:
     """Plot the overlapped observations and model predictions for all patients, facetted by output and protocol.
@@ -64,8 +66,9 @@ def plot_all_solutions(obs_vs_pred: pd.DataFrame) -> None:
 
             title = f"{output_name} in {protocol_arm}"
             ax.set_title(title)
-    plt.tight_layout()
-    plt.show()
+    if not smoke_test:
+        plt.tight_layout()
+        plt.show()
 
 
 def plot_individual_solution(obs_vs_pred: pd.DataFrame) -> None:
@@ -153,8 +156,9 @@ def plot_individual_solution(obs_vs_pred: pd.DataFrame) -> None:
                 bbox=dict(boxstyle="round,pad=0.5", fc="wheat", alpha=0.5, ec="k"),
             )
 
-    plt.tight_layout()
-    plt.show()
+    if not smoke_test:
+        plt.tight_layout()
+        plt.show()
 
 
 def plot_obs_vs_predicted(
@@ -222,8 +226,10 @@ def plot_obs_vs_predicted(
             if log_viz:
                 ax.set_xscale("log")
                 ax.set_yscale("log")
-    plt.tight_layout()
-    plt.show()
+
+    if not smoke_test:
+        plt.tight_layout()
+        plt.show()
 
 
 def plot_loss(iterations: np.ndarray, losses: np.ndarray) -> None:
@@ -232,4 +238,6 @@ def plot_loss(iterations: np.ndarray, losses: np.ndarray) -> None:
     plt.xlabel("Iteration")
     plt.ylabel("Loss")
     plt.title("Training Loss over Iterations")
-    plt.show()
+
+    if not smoke_test:
+        plt.show()

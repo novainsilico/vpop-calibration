@@ -16,6 +16,7 @@ from .plot import (
     plot_obs_vs_predicted,
     plot_loss,
 )
+from ..utils import smoke_test
 
 torch.set_default_dtype(torch.float64)
 gpytorch.settings.cholesky_jitter(1e-6)
@@ -214,8 +215,12 @@ class GP:
         self.var_strat = var_strat
         self.kernel = kernel
         self.deep_kernel = deep_kernel
-        self.nb_training_iter = nb_training_iter
-        self.nb_inducing_points = nb_inducing_points
+        if smoke_test:
+            self.nb_training_iter = 1
+            self.nb_inducing_points = 10
+        else:
+            self.nb_training_iter = nb_training_iter
+            self.nb_inducing_points = nb_inducing_points
         self.learning_rate = learning_rate
         self.mll_name = mll
         self.num_mixtures = num_mixtures
@@ -396,6 +401,8 @@ class GP:
         return out_mean, pred.variance
 
     def plot_loss(self) -> None:
+        if not hasattr(self, "losses"):
+            raise ValueError("Cannot plot loss before training the model.")
         # plot the loss over iterations
         iterations = np.arange(1, self.nb_training_iter + 1)
         losses = np.array(self.losses)
