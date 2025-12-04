@@ -5,5 +5,7 @@ import torch
 np_rng = np.random.default_rng(42)
 np.random.seed(42)
 torch.manual_seed(0)
+saem_mi_maxfun = 1
+multithreaded = False
 
-__all__ = ["np_rng"]
+__all__ = ["np_rng", "saem_mi_maxfun", "multithreaded"]

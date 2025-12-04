@@ -1,8 +1,10 @@
 import pandas as pd
 import numpy as np
 from scipy.integrate import solve_ivp
-from multiprocessing import Pool
+import multiprocessing as mp
 from typing import List, Any, Callable, Optional
+
+from .utils import smoke_test
 
 
 class OdeModel:
@@ -12,6 +14,7 @@ class OdeModel:
         variable_names: List[str],
         param_names: List[str],
         tol: Optional[float] = 1e-6,
+        multithreaded: Optional[bool] = True,
     ):
         """OdeModel
 
@@ -32,6 +35,10 @@ class OdeModel:
         self.initial_cond_names = [v + "_0" for v in self.variable_names]
 
         self.tol = tol
+        if smoke_test:
+            self.use_multiprocessing = False
+        else:
+            self.use_multiprocessing = multithreaded
 
     def simulate_model(
         self,
@@ -62,8 +69,11 @@ class OdeModel:
                     "tol": self.tol,
                 }
                 tasks.append(indiv_task)
-        with Pool() as pool:
-            all_solutions: list[pd.DataFrame] = pool.map(_simulate_patient, tasks)
+        if self.use_multiprocessing:
+            with mp.Pool() as pool:
+                all_solutions: list[pd.DataFrame] = pool.map(_simulate_patient, tasks)
+        else:
+            all_solutions: list[pd.DataFrame] = list(map(_simulate_patient, tasks))
         output_data = pd.concat(all_solutions)
         return output_data
 

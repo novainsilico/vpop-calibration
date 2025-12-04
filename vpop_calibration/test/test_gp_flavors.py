@@ -46,8 +46,6 @@ def gp_init_flavor(var_strat, kernel, deep_kernel, mll):
         nb_training_iter=2,
     )
     gp.train()
-    with open(model_file, "wb") as file:
-        pickle.dump(gp, file)
 
 
 def test_all_gp_flavors():
@@ -83,3 +81,9 @@ def test_gp_incomplete_data():
     gp.train()
     gp.train(mini_batching=True, mini_batch_size=8)
     gp.eval_perf()
+
+
+def test_gp_pickle():
+    gp = GP(training_df, gp_params)
+    with open(model_file, "wb") as file:
+        pickle.dump(gp, file)

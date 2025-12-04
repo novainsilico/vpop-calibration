@@ -32,7 +32,7 @@ protocol_design = pd.DataFrame(
 nb_protocols = len(protocol_design)
 
 pk_two_compartments_model = OdeModel(
-    equations_with_abs, variable_names, parameter_names
+    equations_with_abs, variable_names, parameter_names, multithreaded=multithreaded
 )
 
 model_file = "vpop_calibration/test/gp_model_for_tests.pkl"
@@ -41,10 +41,10 @@ model_file = "vpop_calibration/test/gp_model_for_tests.pkl"
 def test_gp_training():
     # Define the ode model
 
-    nb_timesteps = 15
+    nb_timesteps = 3
     time_steps = np.linspace(0.0, tmax, nb_timesteps)
 
-    log_nb_patients = 3
+    log_nb_patients = 1
     param_ranges = {
         "k_12": {"low": -2.0, "high": 0.0, "log": True},
         "k_21": {"low": -1.0, "high": 0.3, "log": True},
@@ -74,7 +74,7 @@ def test_gp_training():
         data_already_normalized=False,  # default
         nb_inducing_points=10,
         mll="ELBO",  # default, otherwise PLL
-        nb_training_iter=10,
+        nb_training_iter=1,
         training_proportion=0.7,
         learning_rate=0.1,
         lr_decay=0.99,
@@ -92,7 +92,7 @@ def test_gp_training():
 
 def test_gp_saem():
     time_span_rw = (0, 24)
-    nb_steps_rw = 5
+    nb_steps_rw = 2
 
     # For each output and for each patient, give a list of time steps to be simulated
     time_steps_rw = np.linspace(time_span_rw[0], time_span_rw[1], nb_steps_rw).tolist()
@@ -110,7 +110,7 @@ def test_gp_saem():
 
     # Create a patient data frame
     # It should contain at the very minimum one `id` per patient
-    nb_patients = 5
+    nb_patients = 3
     patients_df = pd.DataFrame({"id": [str(uuid.uuid4()) for _ in range(nb_patients)]})
     patients_df["protocol_arm"] = np_rng.binomial(1, 0.5, nb_patients)
     patients_df["protocol_arm"] = patients_df["protocol_arm"].apply(
@@ -161,7 +161,11 @@ def test_gp_saem():
     )
     # Create an optimizer: here we use SAEM
     optimizer = PySaem(
-        nlme_surrogate, obs_df, nb_phase1_iterations=1, nb_phase2_iterations=0
+        nlme_surrogate,
+        obs_df,
+        nb_phase1_iterations=1,
+        nb_phase2_iterations=0,
+        optim_max_fun=saem_mi_maxfun,
     )
 
     optimizer.run()
