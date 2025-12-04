@@ -13,9 +13,8 @@ pypi_deploy:
   stage: deploy
   tags: [ nix ]
   image: $PYTHON_IMAGE
-  before_script:
-    - nix develop . --command poetry install
   script:
+    - nix develop . --command poetry install
     - nix develop . --command poetry config pypi-token.pypi "$PYPI_TOKEN"
     # Extract the version number from pyproject.toml
     - VERSION=$(nix develop . --command poetry version -s)
