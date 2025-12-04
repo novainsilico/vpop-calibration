@@ -383,7 +383,7 @@ class PySaem:
                 fun=self.MI_objective_function,
                 x0=self.model.log_MI.squeeze().numpy(),
                 method="L-BFGS-B",
-                options={"maxfun": 50},
+                options={"maxfun": self.optim_max_fun},
             ).x
             target_log_MI = torch.from_numpy(target_log_MI_np)
             new_log_MI = self._stochastic_approximation(
