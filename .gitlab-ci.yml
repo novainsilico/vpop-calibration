@@ -11,6 +11,7 @@ pytest:
 
 pypi_deploy:
   stage: deploy
+  tags: [ nix ]
   image: $PYTHON_IMAGE
   before_script:
     - nix develop . --command poetry install
