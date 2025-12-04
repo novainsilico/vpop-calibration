@@ -19,7 +19,7 @@ pypi_deploy:
     # Extract the version number from pyproject.toml
     - VERSION=$(nix develop . --command poetry version -s)
     # Check if the version already exists on PyPI for jinko-sdk using the HTTP status code
-    - response=$(curl -s -o /dev/null -w "%{http_code}" https://pypi.org/pypi/jinko-sdk/$VERSION/json)
+    - response=$(curl -s -o /dev/null -w "%{http_code}" https://pypi.org/pypi/vpop-calibration/$VERSION/json)
     - if [ "$response" -eq 200 ]; then echo "Version $VERSION already exists on PyPI. Skipping deployment."; exit 0; fi
     - nix develop . --command poetry publish --build
   environment:
