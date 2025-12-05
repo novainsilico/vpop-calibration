@@ -34,7 +34,7 @@ class PySaem:
         live_plot: bool = True,
         plot_frames: int = 20,
         plot_columns: int = 3,
-        plot_indiv_figsize: tuple[float, float] = (1.2, 3.0),
+        plot_indiv_figsize: tuple[float, float] = (3.0, 1.2),
         true_log_MI: Optional[dict[str, float]] = None,
         true_log_PDU: Optional[dict[str, dict[str, float | bool]]] = None,
         true_res_var: Optional[list[float]] = None,
@@ -559,7 +559,7 @@ class PySaem:
             ),
             dim=1,
         )
-        predictions = self.model.predict_outputs_from_theta(
+        predictions, _ = self.model.predict_outputs_from_theta(
             new_thetas, self.model.patients
         )
         total_log_lik = 0
@@ -912,7 +912,7 @@ class PySaem:
             raise ValueError(
                 "No estimation available yet. Run the optimization algorithm first."
             )
-        simulated_tensor = self.model.predict_outputs_from_theta(
+        simulated_tensor, _ = self.model.predict_outputs_from_theta(
             theta, self.model.patients
         )
         simulated_df = self.model.outputs_to_df(simulated_tensor, self.model.patients)

@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 from scipy.integrate import solve_ivp
 import multiprocessing as mp
-from typing import List, Any, Callable, Optional
+from typing import Any, Callable, Optional
 
 from .utils import smoke_test
 
@@ -11,8 +11,8 @@ class OdeModel:
     def __init__(
         self,
         equations: Callable,
-        variable_names: List[str],
-        param_names: List[str],
+        variable_names: list[str],
+        param_names: list[str],
         tol: Optional[float] = 1e-6,
         multithreaded: Optional[bool] = True,
     ):
@@ -22,8 +22,8 @@ class OdeModel:
 
         Args:
             equations (callable): A function describing the right hand side of the ODE system
-            variable_names (List[str]): The names of the outputs of the system
-            param_names (List[str]): The name of the parameters of the system
+            variable_names (list[str]): The names of the outputs of the system
+            param_names (list[str]): The name of the parameters of the system
         """
         self.equations = equations
         self.variable_names = variable_names
@@ -108,7 +108,7 @@ class OdeModel:
             Each patient will be run on each protocol arm, and all outputs will be included
         """
 
-        # List the requested time steps for each output (here we use same solving times for all outputs)
+        # list the requested time steps for each output (here we use same solving times for all outputs)
         time_steps_df = pd.DataFrame({"time": time_steps})
         # Assemble the initial conditions in a dataframe
         init_cond_df = pd.DataFrame(
@@ -157,7 +157,7 @@ def _simulate_patient(args: dict) -> pd.DataFrame:
             tol (float): solver tolerance
 
     Returns:
-        List(dict): A list of model result entries
+        list(dict): A list of model result entries
     """
 
     # extract args
@@ -166,11 +166,11 @@ def _simulate_patient(args: dict) -> pd.DataFrame:
     if ind_id.shape[0] > 1:
         raise ValueError("More than 1 patient was provided to `simulate_patient`")
 
-    time_steps: List[float] = input_df["time"].drop_duplicates().to_list()
+    time_steps: list[float] = input_df["time"].drop_duplicates().to_list()
     initial_conditions: np.ndarray = args["initial_conditions"]
     params: np.ndarray = args["params"]
     equations: Callable = args["equations"]
-    output_names: List[str] = args["output_names"]
+    output_names: list[str] = args["output_names"]
     tol: float = args["tol"]
 
     time_span = (time_steps[0], time_steps[-1])

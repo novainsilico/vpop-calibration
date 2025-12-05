@@ -7,7 +7,7 @@ from gpytorch.mlls import VariationalELBO, PredictiveLogLikelihood
 from torch.utils.data import TensorDataset, DataLoader
 import numpy as np
 import pandas as pd
-from typing import List, Optional, cast
+from typing import Optional, cast
 
 from .data import TrainingDataSet
 from .plot import (
@@ -160,7 +160,7 @@ class GP:
     def __init__(
         self,
         training_df: pd.DataFrame,
-        descriptors: List[str],
+        descriptors: list[str],
         var_dist: str = "Chol",  # only Cholesky currently supported
         var_strat: str = "IMV",  # either IMV (Independent Multitask Variational) or LMCV (Linear Model of Coregionalization Variational)
         kernel: str = "RBF",  # RBF or SMK
@@ -170,8 +170,8 @@ class GP:
         nb_inducing_points: int = 200,
         data_already_normalized: bool = False,
         log_lower_limit: float = 1e-10,
-        log_inputs: List[str] = [],
-        log_outputs: List[str] = [],
+        log_inputs: list[str] = [],
+        log_outputs: list[str] = [],
         nb_latents: Optional[int] = None,
         # by default we will use nb_latents = nb_outputs
         mll: str = "ELBO",  # ELBO or PLL
@@ -190,12 +190,12 @@ class GP:
               - `output_name`: the name of simulated model output
               - `value`: the simulated value (for a given patient, protocol arm and output name)
               - `protocol_arm` (optional): the protocol arm on which this patient was simulated. If not provided, `identity` will be used
-            descriptors (List[str]): the names of the columns of `training_df` which correspond to descriptors on which to train the GP
+            descriptors (list[str]): the names of the columns of `training_df` which correspond to descriptors on which to train the GP
             var_dist (str, optional): Variational distribution choice. Defaults to "Chol".
             nb_training_iter (int, optional): Number of iterations for training. Defaults to 400.
             training_proportion (float, optional): Proportion of patients to be used as training vs. validation. Defaults to 0.7.
             nb_inducing_points (int, optional): Number of inducing points to be used for variational inference. Defaults to 200.
-            log_inputs (List[str]): the list of parameter inputs which should be rescaled to log when fed to the GP. Avoid adding time here, or any parameter that takes 0 as a value.
+            log_inputs (list[str]): the list of parameter inputs which should be rescaled to log when fed to the GP. Avoid adding time here, or any parameter that takes 0 as a value.
             log_outputs (list[str]): list of model outptus which should be rescaled to log
             log_lower_limit(float): epsilon value that is added to all rescaled value to avoid numerical errors when log-scaling variables
             nb_latents (Optional[int], optional): Number of latents. Defaults to None, implying that nb_latents = nb_tasks will be used

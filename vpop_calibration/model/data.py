@@ -2,7 +2,6 @@ import math
 import torch
 import numpy as np
 import pandas as pd
-from typing import List
 from functools import reduce
 
 
@@ -10,11 +9,11 @@ class TrainingDataSet:
     def __init__(
         self,
         training_df: pd.DataFrame,
-        descriptors: List[str],
+        descriptors: list[str],
         training_proportion: float = 0.7,
         log_lower_limit: float = 1e-10,
-        log_inputs: List[str] = [],
-        log_outputs: List[str] = [],
+        log_inputs: list[str] = [],
+        log_outputs: list[str] = [],
         data_already_normalized: bool = False,
     ):
         """Instantiate a TrainingDataSet container
@@ -23,10 +22,10 @@ class TrainingDataSet:
 
         Args:
             training_df (pd.DataFrame): the training data. Should contain the columns [`id`, `output_name`, `protocol_arm`, *descriptors, `value`]
-            descriptors (List[str]): the names of the columns of `training_df` which correspond to descriptors on which to train the model
+            descriptors (list[str]): the names of the columns of `training_df` which correspond to descriptors on which to train the model
             training_proportion (float, optional): Proportion of patients to be used as training vs. validation. Defaults to 0.7.
             log_lower_limit(float): epsilon value that is added to all rescaled value to avoid numerical errors when log-scaling variables
-            log_inputs (List[str]): the list of parameter inputs which should be rescaled to log when fed to the GP. Avoid adding time here, or any parameter that takes 0 as a value.
+            log_inputs (list[str]): the list of parameter inputs which should be rescaled to log when fed to the GP. Avoid adding time here, or any parameter that takes 0 as a value.
             log_outputs (list[str]): list of model outptus which should be rescaled to log
             data_already_normalized(bool): set to True if the data set is preprocessed and no normalization / scaling is required
         """
@@ -77,7 +76,7 @@ class TrainingDataSet:
             f"Successfully loaded a training data set with {self.nb_patients} patients. The following outputs are available:\n{self.output_names}\n and the following protocol arms:\n{self.protocol_arms}"
         )
         # Construct the list of tasks, mapping from output name and protocol arm to task number
-        self.tasks: List[str] = [
+        self.tasks: list[str] = [
             output + "_" + protocol
             for protocol in self.protocol_arms
             for output in self.output_names
@@ -104,7 +103,7 @@ class TrainingDataSet:
         self.task_idx_to_protocol = {
             self.tasks.index(k): v for k, v in self.task_to_protocol.items()
         }
-        # List tasks that should be rescaled to log
+        # list tasks that should be rescaled to log
         self.log_tasks = [
             task for task in self.tasks if self.task_to_output[task] in self.log_outputs
         ]
@@ -198,7 +197,7 @@ class TrainingDataSet:
         """
 
         # util function to rename columns as `output_protocol`
-        def join_if_two(tup: List[str]) -> str:
+        def join_if_two(tup: list[str]) -> str:
             if tup[0] == "":
                 return tup[1]
             elif tup[1] == "":
@@ -221,7 +220,7 @@ class TrainingDataSet:
         return reshaped_df
 
     def normalize_data(
-        self, data_in: pd.DataFrame, ignore: List[str]
+        self, data_in: pd.DataFrame, ignore: list[str]
     ) -> tuple[pd.DataFrame, pd.Series, pd.Series]:
         """Normalize a data frame with respect to its mean and std, ignoring certain columns."""
         selected_columns = data_in.columns.difference(ignore)
