@@ -64,7 +64,6 @@ class PySaem:
 
         self.model: NlmeModel = model
         self.model.add_observations(observations_df)
-        self.observations_df = observations_df
         # MCMC sampling in the E-step parameters
         self.mcmc_first_burn_in: int = mcmc_first_burn_in
         self.mcmc_nb_transitions: int = mcmc_nb_transitions
@@ -115,9 +114,7 @@ class PySaem:
         self.plot_indiv_figsize = plot_indiv_figsize
 
         # Initialize the random effects to 0
-        self.current_etas: torch.Tensor = torch.zeros(
-            (self.model.nb_patients, self.model.nb_PDU)
-        )
+        self.current_etas = self.model.current_eta_samples
 
         # Initialize current estimation of patient parameters from the 0 random effects
         (
@@ -125,7 +122,9 @@ class PySaem:
             self.current_thetas,
             self.current_log_pdu,
             self.current_pred,
+            flagged_patients,
         ) = self.model.log_posterior_etas(self.current_etas)
+        self.current_complete_likelihood = torch.exp(self.current_log_prob.sum(dim=0))
 
         # Initialize the optimizer history
         self._init_history(
@@ -133,6 +132,8 @@ class PySaem:
             self.model.omega_pop,
             self.model.log_MI,
             self.model.residual_var,
+            self.current_complete_likelihood,
+            flagged_patients,
         )
         self.current_iteration: int = 0
 
@@ -339,6 +340,8 @@ class PySaem:
         omega: torch.Tensor,
         log_mi: torch.Tensor,
         res_var: torch.Tensor,
+        likelihood: torch.Tensor,
+        flagged_patients: list,
     ) -> None:
         # Initialize the history
         self.history = {}
@@ -365,6 +368,8 @@ class PySaem:
         # Add the residual variance
         for i, output in enumerate(self.model.outputs_names):
             self.history.update({output: [res_var[i]]})
+        self.history.update({"complete_likelihood": [likelihood]})
+        self.history.update({"flagged_patients": [flagged_patients]})
 
     def _append_history(
         self,
@@ -372,6 +377,8 @@ class PySaem:
         omega: torch.Tensor,
         log_mi: torch.Tensor,
         res_var: torch.Tensor,
+        complete_likelihood: torch.Tensor,
+        flagged_patients: list,
     ) -> None:
         # Update the history
         for i, pdu in enumerate(self.model.PDU_names):
@@ -390,6 +397,8 @@ class PySaem:
 
         for i, output in enumerate(self.model.outputs_names):
             self.history[output].append(res_var[i])
+        self.history["complete_likelihood"].append(complete_likelihood)
+        self.history["flagged_patients"].append(flagged_patients)
 
     def one_iteration(self, k: int) -> bool:
         """Perform one iteration of SAEM
@@ -400,7 +409,6 @@ class PySaem:
 
         if self.verbose:
             print(f"Running iteration {k}")
-            print(self.current_thetas.shape)
         # If first iteration, consider burn in
         if k == 0:
             current_iter_burn_in = self.mcmc_first_burn_in
@@ -413,19 +421,22 @@ class PySaem:
 
         # --- E-step: perform MCMC kernel transitions
         if self.verbose:
-            print(f"Current learning rate: {self.learning_rate_m_step: .2f}")
             print("  MCMC sampling")
+            print(
+                f"  Current MCMC parameters: step-size={self.step_size:.2f}, adaptation rate={self.step_size_adaptation:.2f}"
+            )
 
+        flagged_patients_iter = []
         for _ in range(current_iter_burn_in + self.mcmc_nb_transitions):
-            if self.verbose:
-                print(f"  Current MCMC step-size: {self.step_size: .2f}")
             (
                 self.current_etas,
                 self.current_log_prob,
+                self.current_complete_likelihood,
                 self.current_pred,
                 self.current_thetas,
                 self.current_log_pdu,
                 self.step_size,
+                flagged_patients,
             ) = self.model.mh_step(
                 current_etas=self.current_etas,
                 current_log_prob=self.current_log_prob,
@@ -436,15 +447,17 @@ class PySaem:
                 learning_rate=self.step_size_adaptation,
                 verbose=self.verbose,
             )
+            flagged_patients_iter += flagged_patients
+
+        # Update the model's eta and thetas
+        self.model.update_eta_samples(self.current_etas)
+        self.model.update_map_estimates(self.current_thetas)
 
         # --- M-Step: Update Population Means, Omega and Residual variance ---
 
         # 1. Update residual error variances
-
-        if self.verbose:
-            print("  Res var update")
-
-        target_res_var: torch.Tensor = self.model.sum_sq_residuals(self.current_pred)
+        sum_sq_res = self.model.sum_sq_residuals(self.current_pred)
+        target_res_var: torch.Tensor = sum_sq_res / self.model.n_tot_observations
         current_res_var: torch.Tensor = self.model.residual_var
         if k < self.nb_phase1_iterations:
             target_res_var = self._simulated_annealing(current_res_var, target_res_var)
@@ -456,8 +469,6 @@ class PySaem:
         self.model.update_res_var(new_residual_error_var)
 
         # 2. Update sufficient statistics with stochastic approximation
-        if self.verbose:
-            print("  M-step update:")
         (
             self.sufficient_stat_cross_product,
             self.sufficient_stat_outer_product,
@@ -468,11 +479,13 @@ class PySaem:
             self.sufficient_stat_cross_product,
             self.sufficient_stat_outer_product,
         )
+
         # Update beta
         self.model.update_betas(new_beta)
 
-        # Update omega with simulated annealing (phase 1)
+        # Update omega
         if k < self.nb_phase1_iterations:
+            # Simulated annealing during phase 1
             new_omega_diag = torch.diag(new_omega)
             current_omega_diag = torch.diag(self.model.omega_pop)
             annealed_omega_diag = self._simulated_annealing(
@@ -526,6 +539,8 @@ class PySaem:
             self.model.omega_pop,
             self.model.log_MI,
             self.model.residual_var,
+            self.current_complete_likelihood,
+            flagged_patients_iter,
         )
 
         # update prev_params for the next iteration's convergence check
@@ -712,7 +727,7 @@ class PySaem:
         nb_betas: int = self.model.nb_betas
         nb_omega_diag_params: int = self.model.nb_PDU
         nb_var_res_params: int = self.model.nb_outputs
-        nb_plots = nb_MI + nb_betas + nb_omega_diag_params + nb_var_res_params
+        nb_plots = nb_MI + nb_betas + nb_omega_diag_params + nb_var_res_params + 2
         nb_cols = n_cols
         nb_rows = int(np.ceil(nb_plots / nb_cols))
         maxiter = self.nb_phase1_iterations + self.nb_phase2_iterations
@@ -843,6 +858,32 @@ class PySaem:
             ax.grid(True)
             self.traces.update({res_name: tr})
             plot_idx += 1
+        # Plot the convergence indicator (total log prob)
+        row, col = plot_idx // nb_cols, plot_idx % nb_cols
+        ax = axes[row, col]
+        ax.set_xlim(0, maxiter)
+        convergence_ind = [h.item() for h in history["complete_likelihood"]]
+        (tr,) = ax.plot(
+            convergence_ind,
+        )
+        ax.set_title(rf"Convergence indicator")
+        ax.grid(True)
+        self.traces.update({"convergence_ind": tr})
+        plot_idx += 1
+        # Plot the number of out of bounds patients
+        row, col = plot_idx // nb_cols, plot_idx % nb_cols
+        ax = axes[row, col]
+        ax.set_xlim(0, maxiter)
+        ax.set_ylim(0, self.model.nb_patients)
+        oob_patients = [len(h) for h in history["flagged_patients"]]
+        (tr,) = ax.plot(
+            oob_patients,
+        )
+        ax.set_title(rf"Out-of-bounds patients")
+        ax.grid(True)
+        self.traces.update({"oob_patients": tr})
+        plot_idx += 1
+
         # Turn off extra subplots
         while plot_idx < nb_rows * nb_cols:
             row, col = plot_idx // nb_cols, plot_idx % nb_cols
@@ -879,12 +920,16 @@ class PySaem:
         for res_name in self.model.outputs_names:
             var_res_history = [h.item() for h in history[res_name]]
             self.traces[res_name].set_data(new_xaxis, var_res_history)
-
-        for ax in self.convergence_plot_axes.flatten():
-            ax.autoscale_view(scaley=True, scalex=False)
-            ax.relim()
-        if self.convergence_plot_handle is not None:
-            self.convergence_plot_handle.update(self.convergence_plot_fig)
+        conv_ind = [h.item() for h in history["complete_likelihood"]]
+        self.traces["convergence_ind"].set_data(new_xaxis, conv_ind)
+        oob_patients = [len(h) for h in history["flagged_patients"]]
+        self.traces["oob_patients"].set_data(new_xaxis, oob_patients)
+        if not smoke_test:
+            for ax in self.convergence_plot_axes.flatten():
+                ax.autoscale_view(scaley=True, scalex=False)
+                ax.relim()
+            if self.convergence_plot_handle is not None:
+                self.convergence_plot_handle.update(self.convergence_plot_fig)
 
     def plot_convergence_history(
         self,
@@ -895,88 +940,3 @@ class PySaem:
             indiv_figsize=indiv_figsize, n_cols=n_cols
         )
         plt.close(fig)
-
-    def map_estimates_descriptors(self) -> pd.DataFrame:
-        theta = self.current_thetas
-        if theta is None:
-            raise ValueError("No estimation available yet. Run the algorithm first.")
-
-        map_per_patient = pd.DataFrame(
-            data=theta.numpy(), columns=self.model.descriptors
-        )
-        return map_per_patient
-
-    def map_estimates_predictions(self) -> pd.DataFrame:
-        theta = self.current_thetas
-        if theta is None:
-            raise ValueError(
-                "No estimation available yet. Run the optimization algorithm first."
-            )
-        simulated_tensor, _ = self.model.predict_outputs_from_theta(
-            theta, self.model.patients
-        )
-        simulated_df = self.model.outputs_to_df(simulated_tensor, self.model.patients)
-        return simulated_df
-
-    def plot_map_estimates(self) -> None:
-        observed = self.observations_df
-        simulated_df = self.map_estimates_predictions()
-
-        n_cols = self.model.nb_outputs
-        n_rows = self.model.structural_model.nb_protocols
-        _, axes = plt.subplots(
-            n_rows, n_cols, figsize=(5 * n_cols, 4 * n_rows), squeeze=False
-        )
-
-        cmap = plt.get_cmap("Spectral")
-        colors = cmap(np.linspace(0, 1, self.model.nb_patients))
-        for output_index, output_name in enumerate(self.model.outputs_names):
-            for protocol_index, protocol_arm in enumerate(
-                self.model.structural_model.protocols
-            ):
-                obs_loop = observed.loc[
-                    (observed["output_name"] == output_name)
-                    & (observed["protocol_arm"] == protocol_arm)
-                ]
-                pred_loop = simulated_df.loc[
-                    (simulated_df["output_name"] == output_name)
-                    & (simulated_df["protocol_arm"] == protocol_arm)
-                ]
-                ax = axes[protocol_index, output_index]
-                ax.set_xlabel("Time")
-                patients_protocol = obs_loop["id"].drop_duplicates().to_list()
-                for patient_ind in patients_protocol:
-                    patient_num = self.model.patients.index(patient_ind)
-                    patient_obs = obs_loop.loc[obs_loop["id"] == patient_ind]
-                    patient_pred = pred_loop.loc[pred_loop["id"] == patient_ind]
-                    time_vec = patient_obs["time"].values
-                    sorted_indices = np.argsort(time_vec)
-                    sorted_times = time_vec[sorted_indices]
-                    obs_vec = patient_obs["value"].values[sorted_indices]
-                    ax.plot(
-                        sorted_times,
-                        obs_vec,
-                        "+",
-                        color=colors[patient_num],
-                        linewidth=2,
-                        alpha=0.6,
-                    )
-                    if patient_pred.shape[0] > 0:
-                        pred_vec = patient_pred["predicted_value"].values[
-                            sorted_indices
-                        ]
-                        ax.plot(
-                            sorted_times,
-                            pred_vec,
-                            "-",
-                            color=colors[patient_num],
-                            linewidth=2,
-                            alpha=0.5,
-                        )
-
-                title = f"{output_name} in {protocol_arm}"  # More descriptive title
-                ax.set_title(title)
-
-        if not smoke_test:
-            plt.tight_layout()
-            plt.show()

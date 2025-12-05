@@ -120,7 +120,7 @@ class SVGP(gpytorch.models.ApproximateGP):
             )
         elif kernel == "SMK":
             self.covar_module = gpytorch.kernels.SpectralMixtureKernel(
-                batch_size=nb_tasks,
+                batch_size=self.batch_size,
                 num_mixtures=nb_mixtures,
                 ard_num_dims=self.kernel_size,
                 jitter=jitter,

@@ -97,7 +97,7 @@ def test_ode_saem():
         pk_two_compartments_model, protocol_design, initial_conditions
     )
     # Create a NLME moedl
-    nlme_surrogate = NlmeModel(
+    nlme = NlmeModel(
         structural_ode,
         patients_df,
         init_log_MI,
@@ -108,7 +108,7 @@ def test_ode_saem():
     )
     # Create an optimizer: here we use SAEM
     optimizer = PySaem(
-        nlme_surrogate,
+        nlme,
         obs_df,
         nb_phase1_iterations=1,
         nb_phase2_iterations=0,
@@ -118,4 +118,4 @@ def test_ode_saem():
     optimizer.run()
     optimizer.continue_iterating(nb_add_iters_ph1=0, nb_add_iters_ph2=1)
     optimizer.plot_convergence_history()
-    optimizer.plot_map_estimates()
+    plot_map_estimates(nlme)

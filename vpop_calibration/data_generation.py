@@ -172,7 +172,15 @@ def simulate_dataset_from_omega(
         pd.DataFrame(data=nlme_model.outputs_names, columns=["output_name"]),
         how="cross",
     )
-    out = ode_model.run_trial(
-        vpop, init_conditions, protocol_design, time_steps
-    ).rename({"predicted_value": "value"}, axis=1)
-    return out
+    time_df = pd.DataFrame(data=time_steps, columns=["time"])
+    vpop = vpop.merge(time_df, how="cross")
+    # add a dummy observation value
+    vpop["value"] = 1.0
+    nlme_model.add_observations(vpop)
+
+    out_tensor, _ = nlme_model.predict_outputs_from_theta(theta)
+    out_with_noise = nlme_model.add_residual_error(out_tensor)
+    out_df = nlme_model.outputs_to_df(out_with_noise)
+    out_df = out_df.rename(columns={"predicted_value": "value"})
+
+    return out_df
