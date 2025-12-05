@@ -349,7 +349,7 @@ class PySaem:
                 {
                     pdu: {
                         "mu": [beta[beta_index]],
-                        "sigma_sq": [omega[beta_index, beta_index]],
+                        "sigma_sq": [omega[i, i]],
                     }
                 }
             )
@@ -377,7 +377,7 @@ class PySaem:
         for i, pdu in enumerate(self.model.PDU_names):
             beta_index = self.model.population_betas_names.index(pdu)
             self.history[pdu]["mu"].append(beta[beta_index])
-            self.history[pdu]["sigma_sq"].append(omega[beta_index, beta_index])
+            self.history[pdu]["sigma_sq"].append(omega[i, i])
 
         for i, cov in enumerate(self.model.covariate_coeffs_names):
             beta_index = self.model.population_betas_names.index(cov)
