@@ -171,4 +171,5 @@ def test_gp_saem():
     optimizer.run()
     optimizer.continue_iterating(nb_add_iters_ph1=1, nb_add_iters_ph2=1)
     optimizer.plot_convergence_history()
-    optimizer.plot_map_estimates()
+    plot_map_estimates(nlme_surrogate)
+    check_surrogate_validity_gp(nlme_surrogate)

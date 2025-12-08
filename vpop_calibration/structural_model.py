@@ -1,7 +1,6 @@
 import torch
 import pandas as pd
 import numpy as np
-from typing import List
 import uuid
 
 from .model.gp import GP
@@ -28,13 +27,13 @@ class StructuralModel:
             task_idx_to_output_idx (list[str]): _description_
             task_idx_to_protocol (list[str]): _description_
         """
-        self.parameter_names: List[str] = parameter_names
+        self.parameter_names: list[str] = parameter_names
         self.nb_parameters: int = len(self.parameter_names)
-        self.output_names: List[str] = output_names
+        self.output_names: list[str] = output_names
         self.nb_outputs: int = len(self.output_names)
-        self.protocols: List[str] = protocol_arms
+        self.protocols: list[str] = protocol_arms
         self.nb_protocols: int = len(self.protocols)
-        self.tasks: List[str] = tasks
+        self.tasks: list[str] = tasks
         self.task_idx_to_output_idx: dict[int, int] = task_idx_to_output_idx
         self.task_idx_to_protocol: dict[int, str] = task_idx_to_protocol
 
@@ -43,7 +42,7 @@ class StructuralModel:
         list_X: list[torch.Tensor],
         list_rows: list[torch.LongTensor],
         list_tasks: list[torch.LongTensor],
-    ) -> list[torch.Tensor]:
+    ) -> tuple[list[torch.Tensor], list[torch.Tensor]]:
         raise ValueError("Not implemented")
 
 
@@ -71,20 +70,26 @@ class StructuralGp(StructuralModel):
         list_X: list[torch.Tensor],
         list_rows: list[torch.LongTensor],
         list_tasks: list[torch.LongTensor],
-    ) -> list[torch.Tensor]:
+    ) -> tuple[list[torch.Tensor], list[torch.Tensor]]:
         # X must be ordered like parameter names from the GP
         # Concatenate all the inputs
         X_cat = torch.cat(list_X)
         chunk_sizes = [X.shape[0] for X in list_X]
         # Simulate the GP
-        out_cat, _ = self.gp_model.predict_wide_scaled(X_cat)
+        out_cat, var_cat = self.gp_model.predict_wide_scaled(X_cat)
         # Split into individual chunks
         pred_wide_list = torch.split(out_cat, chunk_sizes)
+        var_wide_list = torch.split(var_cat, chunk_sizes)
         pred_list = []
-        for pred, rows, cols in zip(pred_wide_list, list_rows, list_tasks):
+        var_list = []
+        for pred, var_wide, rows, cols in zip(
+            pred_wide_list, var_wide_list, list_rows, list_tasks
+        ):
             y = pred.index_select(0, rows).gather(1, cols.view(-1, 1)).squeeze(1)
+            var = var_wide.index_select(0, rows).gather(1, cols.view(-1, 1)).squeeze(1)
             pred_list.append(y)
-        return pred_list
+            var_list.append(var)
+        return pred_list, var_list
 
 
 class StructuralOdeModel(StructuralModel):
@@ -97,8 +102,8 @@ class StructuralOdeModel(StructuralModel):
         self.ode_model = ode_model
         protocol_arms = protocol_design["protocol_arm"].drop_duplicates().to_list()
         self.protocol_design = protocol_design
-        output_names: List[str] = self.ode_model.variable_names
-        tasks: List[str] = [
+        output_names: list[str] = self.ode_model.variable_names
+        tasks: list[str] = [
             output + "_" + protocol
             for protocol in protocol_arms
             for output in output_names
@@ -122,7 +127,7 @@ class StructuralOdeModel(StructuralModel):
         # Map task index to protocol arm
         task_idx_to_protocol = {tasks.index(k): v for k, v in task_to_protocol.items()}
 
-        # List the structural model parameters: the protocol overrides are ignored
+        # list the structural model parameters: the protocol overrides are ignored
         self.protocol_overrides = self.protocol_design.drop(
             columns="protocol_arm"
         ).columns.to_list()
@@ -149,7 +154,7 @@ class StructuralOdeModel(StructuralModel):
         list_X: list[torch.Tensor],
         list_rows: list[torch.LongTensor],
         list_tasks: list[torch.LongTensor],
-    ) -> list[torch.Tensor]:
+    ) -> tuple[list[torch.Tensor], list[torch.Tensor]]:
         # each X must be ordered like parameter names from the ode model
 
         input_df_list = []
@@ -195,6 +200,8 @@ class StructuralOdeModel(StructuralModel):
         output_df = self.ode_model.simulate_model(full_input)
         # Convert back to tensor
         out_tensor = torch.Tensor(output_df["predicted_value"].values)
+        out_var = torch.zeros_like(out_tensor)
         # Split into chunks
         out_list = list(torch.split(out_tensor, chunks_list))
-        return out_list
+        var_list = list(torch.split(out_var, chunks_list))
+        return out_list, var_list

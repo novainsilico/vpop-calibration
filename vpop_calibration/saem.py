@@ -2,13 +2,15 @@ import torch
 import matplotlib.pyplot as plt
 from scipy.optimize import minimize
 from tqdm.notebook import tqdm
-from typing import List, Dict, Union, Optional
+from typing import Union, Optional
 from pandas import DataFrame
 import pandas as pd
 import numpy as np
+from IPython.display import display
 
 from .utils import smoke_test
 from .nlme import NlmeModel
+from .structural_model import StructuralGp
 
 
 # Main SAEM Algorithm Class
@@ -29,6 +31,14 @@ class PySaem:
         init_step_size: float = 0.5,  # stick to the 0.1 - 1 range
         verbose: bool = False,
         optim_max_fun: int = 50,
+        live_plot: bool = True,
+        plot_frames: int = 20,
+        plot_columns: int = 3,
+        plot_indiv_figsize: tuple[float, float] = (3.0, 1.2),
+        true_log_MI: Optional[dict[str, float]] = None,
+        true_log_PDU: Optional[dict[str, dict[str, float | bool]]] = None,
+        true_res_var: Optional[list[float]] = None,
+        true_covariates: Optional[dict[str, dict[str, dict[str, str | float]]]] = None,
     ):
         """Instantiate an SAEM optimizer for an NLME model
 
@@ -45,11 +55,15 @@ class PySaem:
             annealing_factor (float, optional): Exploration phase annealing factor for residual and parameter variance. Defaults to 0.95.
             init_step_size (float, optional): Initial MCMC step size scaling factor. Defaults to 0.5.
             optim_max_fun(int): Maximum number of function calls in the scipy.optimize (used for model intrinsic parameters calibration). Defaults to 50.
+            verbose (bool): Print various info during iterations. Defaults to False.
+            live_plot (bool): Print and update a plot of parameters during iterations. Defaults to True.
+            plot_frames (int): Frequency at which the live plot should be updated (number of iterations). The lower the slower. Defaults to 20.
+            plot_columns (int): Number of columns to display the convergence plot. Defaults to 3.
+            plot_indiv_figsize (tuple[float,float]): individual figure size in the convergence plot (width, height).
         """
 
         self.model: NlmeModel = model
         self.model.add_observations(observations_df)
-        self.observations_df = observations_df
         # MCMC sampling in the E-step parameters
         self.mcmc_first_burn_in: int = mcmc_first_burn_in
         self.mcmc_nb_transitions: int = mcmc_nb_transitions
@@ -94,11 +108,13 @@ class PySaem:
             self.optim_max_fun = 1
         else:
             self.optim_max_fun = optim_max_fun
+        self.live_plot = live_plot
+        self.plot_frames = plot_frames
+        self.plot_columns = plot_columns
+        self.plot_indiv_figsize = plot_indiv_figsize
 
         # Initialize the random effects to 0
-        self.current_etas: torch.Tensor = torch.zeros(
-            (self.model.nb_patients, self.model.nb_PDU)
-        )
+        self.current_etas = self.model.current_eta_samples
 
         # Initialize current estimation of patient parameters from the 0 random effects
         (
@@ -106,18 +122,23 @@ class PySaem:
             self.current_thetas,
             self.current_log_pdu,
             self.current_pred,
+            flagged_patients,
         ) = self.model.log_posterior_etas(self.current_etas)
+        self.current_complete_likelihood = torch.exp(self.current_log_prob.sum(dim=0))
 
         # Initialize the optimizer history
-        self.history: Dict[str, List[torch.Tensor]] = {
-            "log_MI": [self.model.log_MI],
-            "population_betas": [self.model.population_betas],
-            "population_omega": [self.model.omega_pop],
-            "residual_error_var": [self.model.residual_var],
-        }
+        self._init_history(
+            self.model.population_betas,
+            self.model.omega_pop,
+            self.model.log_MI,
+            self.model.residual_var,
+            self.current_complete_likelihood,
+            flagged_patients,
+        )
+        self.current_iteration: int = 0
 
         # Initialize the values for convergence checks
-        self.prev_params: Dict[str, torch.Tensor] = {
+        self.prev_params: dict[str, torch.Tensor] = {
             "log_MI": self.model.log_MI,
             "population_betas": self.model.population_betas,
             "population_omega": self.model.omega_pop,
@@ -141,6 +162,33 @@ class PySaem:
         self.sufficient_stat_outer_product = torch.matmul(
             self.current_log_pdu.transpose(0, 1), self.current_log_pdu
         )
+
+        self.true_log_MI = true_log_MI
+        self.true_log_PDUs = true_log_PDU
+        if true_covariates is not None:
+            self.true_cov = {
+                str(cov["coef"]): float(cov["value"])
+                for item in true_covariates.values()
+                for cov in item.values()
+            }
+        if true_res_var is not None:
+            self.true_res_var = {
+                self.model.outputs_names[k]: val for k, val in enumerate(true_res_var)
+            }
+
+        if isinstance(self.model.structural_model, StructuralGp):
+            self.training_ranges = {}
+            training_samples = np.log(
+                self.model.structural_model.gp_model.data.full_df_raw[
+                    self.model.PDU_names + self.model.MI_names
+                ]
+            )
+            train_min = training_samples.min(axis=0)
+            train_max = training_samples.max(axis=0)
+            for param in self.model.PDU_names + self.model.MI_names:
+                self.training_ranges.update(
+                    {param: {"low": train_min[param], "high": train_max[param]}}
+                )
 
     def m_step_update(
         self,
@@ -286,6 +334,72 @@ class PySaem:
 
         return matrix_spd
 
+    def _init_history(
+        self,
+        beta: torch.Tensor,
+        omega: torch.Tensor,
+        log_mi: torch.Tensor,
+        res_var: torch.Tensor,
+        likelihood: torch.Tensor,
+        flagged_patients: list,
+    ) -> None:
+        # Initialize the history
+        self.history = {}
+        # Add the pdus (mean, variance)
+        for i, pdu in enumerate(self.model.PDU_names):
+            beta_index = self.model.population_betas_names.index(pdu)
+            self.history.update(
+                {
+                    pdu: {
+                        "mu": [beta[beta_index]],
+                        "sigma_sq": [omega[i, i]],
+                    }
+                }
+            )
+        # Add the covariates
+        for i, cov in enumerate(self.model.covariate_coeffs_names):
+            beta_index = self.model.population_betas_names.index(cov)
+            self.history.update({cov: [beta[beta_index]]})
+        # Add Omega
+        self.history.update({"omega": [omega]})
+        # Add the model intrinsic params
+        for i, mi in enumerate(self.model.MI_names):
+            self.history.update({mi: [log_mi[i]]})
+        # Add the residual variance
+        for i, output in enumerate(self.model.outputs_names):
+            self.history.update({output: [res_var[i]]})
+        self.history.update({"complete_likelihood": [likelihood]})
+        self.history.update({"flagged_patients": [flagged_patients]})
+
+    def _append_history(
+        self,
+        beta: torch.Tensor,
+        omega: torch.Tensor,
+        log_mi: torch.Tensor,
+        res_var: torch.Tensor,
+        complete_likelihood: torch.Tensor,
+        flagged_patients: list,
+    ) -> None:
+        # Update the history
+        for i, pdu in enumerate(self.model.PDU_names):
+            beta_index = self.model.population_betas_names.index(pdu)
+            self.history[pdu]["mu"].append(beta[beta_index])
+            self.history[pdu]["sigma_sq"].append(omega[i, i])
+
+        for i, cov in enumerate(self.model.covariate_coeffs_names):
+            beta_index = self.model.population_betas_names.index(cov)
+            self.history[cov].append(beta[beta_index])
+
+        self.history["omega"].append(omega)
+
+        for i, mi in enumerate(self.model.MI_names):
+            self.history[mi].append(log_mi[i])
+
+        for i, output in enumerate(self.model.outputs_names):
+            self.history[output].append(res_var[i])
+        self.history["complete_likelihood"].append(complete_likelihood)
+        self.history["flagged_patients"].append(flagged_patients)
+
     def one_iteration(self, k: int) -> bool:
         """Perform one iteration of SAEM
 
@@ -295,7 +409,6 @@ class PySaem:
 
         if self.verbose:
             print(f"Running iteration {k}")
-            print(self.current_thetas.shape)
         # If first iteration, consider burn in
         if k == 0:
             current_iter_burn_in = self.mcmc_first_burn_in
@@ -308,19 +421,22 @@ class PySaem:
 
         # --- E-step: perform MCMC kernel transitions
         if self.verbose:
-            print(f"Current learning rate: {self.learning_rate_m_step: .2f}")
             print("  MCMC sampling")
+            print(
+                f"  Current MCMC parameters: step-size={self.step_size:.2f}, adaptation rate={self.step_size_adaptation:.2f}"
+            )
 
+        flagged_patients_iter = []
         for _ in range(current_iter_burn_in + self.mcmc_nb_transitions):
-            if self.verbose:
-                print(f"  Current MCMC step-size: {self.step_size: .2f}")
             (
                 self.current_etas,
                 self.current_log_prob,
+                self.current_complete_likelihood,
                 self.current_pred,
                 self.current_thetas,
                 self.current_log_pdu,
                 self.step_size,
+                flagged_patients,
             ) = self.model.mh_step(
                 current_etas=self.current_etas,
                 current_log_prob=self.current_log_prob,
@@ -331,15 +447,17 @@ class PySaem:
                 learning_rate=self.step_size_adaptation,
                 verbose=self.verbose,
             )
+            flagged_patients_iter += flagged_patients
+
+        # Update the model's eta and thetas
+        self.model.update_eta_samples(self.current_etas)
+        self.model.update_map_estimates(self.current_thetas)
 
         # --- M-Step: Update Population Means, Omega and Residual variance ---
 
         # 1. Update residual error variances
-
-        if self.verbose:
-            print("  Res var update")
-
-        target_res_var: torch.Tensor = self.model.sum_sq_residuals(self.current_pred)
+        sum_sq_res = self.model.sum_sq_residuals(self.current_pred)
+        target_res_var: torch.Tensor = sum_sq_res / self.model.n_tot_observations
         current_res_var: torch.Tensor = self.model.residual_var
         if k < self.nb_phase1_iterations:
             target_res_var = self._simulated_annealing(current_res_var, target_res_var)
@@ -351,8 +469,6 @@ class PySaem:
         self.model.update_res_var(new_residual_error_var)
 
         # 2. Update sufficient statistics with stochastic approximation
-        if self.verbose:
-            print("  M-step update:")
         (
             self.sufficient_stat_cross_product,
             self.sufficient_stat_outer_product,
@@ -363,11 +479,13 @@ class PySaem:
             self.sufficient_stat_cross_product,
             self.sufficient_stat_outer_product,
         )
+
         # Update beta
         self.model.update_betas(new_beta)
 
-        # Update omega with simulated annealing (phase 1)
+        # Update omega
         if k < self.nb_phase1_iterations:
+            # Simulated annealing during phase 1
             new_omega_diag = torch.diag(new_omega)
             current_omega_diag = torch.diag(self.model.omega_pop)
             annealed_omega_diag = self._simulated_annealing(
@@ -407,7 +525,7 @@ class PySaem:
             )
 
         # Convergence check
-        new_params: Dict[str, torch.Tensor] = {
+        new_params: dict[str, torch.Tensor] = {
             "log_MI": self.model.log_MI,
             "population_betas": self.model.population_betas,
             "population_omega": self.model.omega_pop,
@@ -416,10 +534,14 @@ class PySaem:
         is_converged = self._check_convergence(new_params)
 
         # store history
-        self.history["log_MI"].append(self.model.log_MI)
-        self.history["population_betas"].append(self.model.population_betas)
-        self.history["population_omega"].append(self.model.omega_pop)
-        self.history["residual_error_var"].append(self.model.residual_var)
+        self._append_history(
+            self.model.population_betas,
+            self.model.omega_pop,
+            self.model.log_MI,
+            self.model.residual_var,
+            self.current_complete_likelihood,
+            flagged_patients_iter,
+        )
 
         # update prev_params for the next iteration's convergence check
         self.prev_params = new_params
@@ -452,7 +574,7 @@ class PySaem:
             ),
             dim=1,
         )
-        predictions = self.model.predict_outputs_from_theta(
+        predictions, _ = self.model.predict_outputs_from_theta(
             new_thetas, self.model.patients
         )
         total_log_lik = 0
@@ -493,10 +615,22 @@ class PySaem:
             )
             print(f"Initial Omega:\n{self.model.omega_pop}")
             print(f"Initial Residual Variance: {self.model.residual_var}")
+
         print("Phase 1 (exploration):")
-        for k in tqdm(range(self.nb_phase1_iterations)):
+        (
+            self.convergence_plot_handle,
+            self.convergence_plot_fig,
+            self.convergence_plot_axes,
+        ) = self._build_convergence_plot(
+            indiv_figsize=self.plot_indiv_figsize, n_cols=self.plot_columns
+        )
+        for k in tqdm(range(1, self.nb_phase1_iterations)):
             # Run iteration, do not check for convergence in the exploration phase
+            # Iteration 0 is in fact already done (initialization)
             _ = self.one_iteration(k)
+            self.current_iteration = k
+            if (self.live_plot) & (k % self.plot_frames == 0):
+                self._update_convergence_plot()
 
         if self.nb_phase2_iterations > 0:
             self.current_phase = 2
@@ -509,6 +643,10 @@ class PySaem:
             ):
                 # Run iteration
                 is_converged = self.one_iteration(k)
+                self.current_iteration = k
+
+                if (self.live_plot) & (k % self.plot_frames == 0):
+                    self._update_convergence_plot()
                 # Check for convergence, and stop if criterion matched
                 if is_converged:
                     self.consecutive_converged_iters += 1
@@ -520,10 +658,12 @@ class PySaem:
                         print(
                             f"\nConvergence reached after {k + 1} iterations. Stopping early."
                         )
+                        self._update_convergence_plot()
                         break
                 else:
                     self.consecutive_converged_iters = 0
-
+        self._update_convergence_plot()
+        plt.close(self.convergence_plot_fig)
         return None
 
     def continue_iterating(self, nb_add_iters_ph1=0, nb_add_iters_ph2=0) -> None:
@@ -574,190 +714,229 @@ class PySaem:
                     self.consecutive_converged_iters = 0
         return None
 
-    def plot_convergence_history(
+    def _build_convergence_plot(
         self,
-        true_MI: Optional[Dict[str, float]] = None,
-        true_betas: Optional[Dict[str, float]] = None,
-        true_sd: Optional[Dict[str, float]] = None,
-        true_residual_var: Optional[Dict[str, float]] = None,
+        indiv_figsize: tuple[float, float] = (2.0, 1.2),
+        n_cols: int = 3,
     ):
         """
         This method plots the evolution of the estimated parameters (MI, betas, omega, residual error variances) across iterations
         """
-        history: Dict[str, List[torch.Tensor]] = self.history
+        history = self.history
         nb_MI: int = self.model.nb_MI
         nb_betas: int = self.model.nb_betas
         nb_omega_diag_params: int = self.model.nb_PDU
         nb_var_res_params: int = self.model.nb_outputs
-        fig, axs = plt.subplots(
-            nb_MI + nb_betas + nb_omega_diag_params + nb_var_res_params,
-            1,
+        nb_plots = nb_MI + nb_betas + nb_omega_diag_params + nb_var_res_params + 2
+        nb_cols = n_cols
+        nb_rows = int(np.ceil(nb_plots / nb_cols))
+        maxiter = self.nb_phase1_iterations + self.nb_phase2_iterations
+        fig, axes = plt.subplots(
+            nrows=nb_rows,
+            ncols=nb_cols,
             figsize=(
-                5,
-                2 * (nb_betas + nb_omega_diag_params + nb_var_res_params),
+                nb_cols * indiv_figsize[0],
+                nb_rows * indiv_figsize[1],
             ),
+            squeeze=False,
+            sharex="all",
         )
+
+        self.traces = {}
         plot_idx: int = 0
-        for j, MI_name in enumerate(self.model.MI_names):
-            MI_history = [torch.exp(h[j]).item() for h in history["log_MI"]]
-            axs[plot_idx].plot(
+        # Plot the MI parameters
+        for mi_name in self.model.MI_names:
+            row, col = plot_idx // nb_cols, plot_idx % nb_cols
+            ax = axes[row, col]
+            ax.set_xlim(0, maxiter)
+            MI_history = [h.item() for h in history[mi_name]]
+            (tr,) = ax.plot(
                 MI_history,
-                label=f"Estimated MI for {MI_name} ",
             )
-            if true_MI is not None:
-                axs[plot_idx].axhline(
-                    y=true_MI[MI_name],
-                    linestyle="--",
-                    label=f"True MI for {MI_name}",
-                )
-            axs[plot_idx].set_title(f"Convergence of MI ${{{MI_name}}}$")
-            axs[plot_idx].set_xlabel("SAEM Iteration")
-            axs[plot_idx].set_ylabel("Parameter Value")
-            axs[plot_idx].legend()
-            axs[plot_idx].grid(True)
-            plot_idx += 1
-        for j, beta_name in enumerate(self.model.population_betas_names):
-            beta_history = [h[j].item() for h in history["population_betas"]]
-            axs[plot_idx].plot(
-                beta_history,
-                label=f"Estimated beta for {beta_name} ",
-            )
-            if true_betas is not None:
-                axs[plot_idx].axhline(
-                    y=true_betas[beta_name],
-                    linestyle="--",
-                    label=f"True beta for {beta_name}",
-                )
-            axs[plot_idx].set_title(f"Convergence of beta_{beta_name}")
-            axs[plot_idx].set_xlabel("SAEM Iteration")
-            axs[plot_idx].set_ylabel("Parameter Value")
-            axs[plot_idx].legend()
-            axs[plot_idx].grid(True)
-            plot_idx += 1
-        for j, PDU_name in enumerate(self.model.PDU_names):
-            omega_diag_history = [
-                torch.sqrt(h[j, j]).item() for h in history["population_omega"]
-            ]
-            axs[plot_idx].plot(
-                omega_diag_history,
-                label=f"Estimated Omega for {PDU_name}",
-            )
-            if true_sd is not None:
-                axs[plot_idx].axhline(
-                    y=true_sd[PDU_name],
-                    linestyle="--",
-                    label=f"True Omega for {PDU_name}",
-                )
-            axs[plot_idx].set_title(f"Convergence of Omega for {PDU_name}")
-            axs[plot_idx].set_xlabel("SAEM Iteration")
-            axs[plot_idx].set_ylabel("Variance")
-            axs[plot_idx].legend()
-            axs[plot_idx].grid(True)
-            plot_idx += 1
-        for j, res_name in enumerate(self.model.outputs_names):
-            var_res_history = [h[j].item() for h in history["residual_error_var"]]
-            axs[plot_idx].plot(
-                var_res_history,
-                label=f"Estimated residual error variance for {res_name}",
-            )
-            if true_residual_var is not None:
-                axs[plot_idx].axhline(
-                    y=true_residual_var[res_name],
-                    linestyle="--",
-                    label=f"True residual variance for {res_name}",
-                )
-            axs[plot_idx].set_title("Residual Error var Convergence")
-            axs[plot_idx].set_xlabel("SAEM Iteration")
-            axs[plot_idx].set_ylabel("var Value")
-            axs[plot_idx].legend()
-            axs[plot_idx].grid(True)
-            plot_idx += 1
-
-        if not smoke_test:
-            plt.tight_layout()
-            plt.show()
-
-    def map_estimates_descriptors(self) -> pd.DataFrame:
-        theta = self.current_thetas
-        if theta is None:
-            raise ValueError("No estimation available yet. Run the algorithm first.")
-
-        map_per_patient = pd.DataFrame(
-            data=theta.numpy(), columns=self.model.descriptors
-        )
-        return map_per_patient
-
-    def map_estimates_predictions(self) -> pd.DataFrame:
-        theta = self.current_thetas
-        if theta is None:
-            raise ValueError(
-                "No estimation available yet. Run the optimization algorithm first."
-            )
-        simulated_tensor = self.model.predict_outputs_from_theta(
-            theta, self.model.patients
-        )
-        simulated_df = self.model.outputs_to_df(simulated_tensor, self.model.patients)
-        return simulated_df
-
-    def plot_map_estimates(self) -> None:
-        observed = self.observations_df
-        simulated_df = self.map_estimates_predictions()
-
-        n_cols = self.model.nb_outputs
-        n_rows = self.model.structural_model.nb_protocols
-        _, axes = plt.subplots(
-            n_rows, n_cols, figsize=(5 * n_cols, 4 * n_rows), squeeze=False
-        )
-
-        cmap = plt.get_cmap("Spectral")
-        colors = cmap(np.linspace(0, 1, self.model.nb_patients))
-        for output_index, output_name in enumerate(self.model.outputs_names):
-            for protocol_index, protocol_arm in enumerate(
-                self.model.structural_model.protocols
-            ):
-                obs_loop = observed.loc[
-                    (observed["output_name"] == output_name)
-                    & (observed["protocol_arm"] == protocol_arm)
-                ]
-                pred_loop = simulated_df.loc[
-                    (simulated_df["output_name"] == output_name)
-                    & (simulated_df["protocol_arm"] == protocol_arm)
-                ]
-                ax = axes[protocol_index, output_index]
-                ax.set_xlabel("Time")
-                patients_protocol = obs_loop["id"].drop_duplicates().to_list()
-                for patient_ind in patients_protocol:
-                    patient_num = self.model.patients.index(patient_ind)
-                    patient_obs = obs_loop.loc[obs_loop["id"] == patient_ind]
-                    patient_pred = pred_loop.loc[pred_loop["id"] == patient_ind]
-                    time_vec = patient_obs["time"].values
-                    sorted_indices = np.argsort(time_vec)
-                    sorted_times = time_vec[sorted_indices]
-                    obs_vec = patient_obs["value"].values[sorted_indices]
-                    ax.plot(
-                        sorted_times,
-                        obs_vec,
-                        "+",
-                        color=colors[patient_num],
-                        linewidth=2,
-                        alpha=0.6,
+            if hasattr(self, "true_log_MI"):
+                if self.true_log_MI is not None:
+                    ax.axhline(
+                        y=self.true_log_MI[mi_name],
+                        linestyle="--",
                     )
-                    if patient_pred.shape[0] > 0:
-                        pred_vec = patient_pred["predicted_value"].values[
-                            sorted_indices
-                        ]
-                        ax.plot(
-                            sorted_times,
-                            pred_vec,
-                            "-",
-                            color=colors[patient_num],
-                            linewidth=2,
-                            alpha=0.5,
-                        )
+            if hasattr(self, "training_ranges"):
+                if self.training_ranges is not None:
+                    ax.fill_between(
+                        [0, maxiter],
+                        self.training_ranges[mi_name]["low"],
+                        self.training_ranges[mi_name]["high"],
+                        alpha=0.25,
+                    )
+            ax.set_title("Model intrinsic {MI_name}")
+            ax.grid(True)
+            self.traces.update({mi_name: tr})
+            plot_idx += 1
+        # Plot the PDUs means
+        for pdu in self.model.PDU_names:
+            row, col = plot_idx // nb_cols, plot_idx % nb_cols
+            ax = axes[row, col]
+            ax.set_xlim(0, maxiter)
+            beta_history = [h.item() for h in history[pdu]["mu"]]
+            (tr,) = ax.plot(
+                beta_history,
+            )
+            if hasattr(self, "true_log_PDUs"):
+                if self.true_log_PDUs is not None:
+                    ax.axhline(
+                        y=self.true_log_PDUs[pdu]["mean"],
+                        linestyle="--",
+                    )
+            if hasattr(self, "training_ranges"):
+                if self.training_ranges is not None:
+                    ax.fill_between(
+                        [0, maxiter],
+                        self.training_ranges[pdu]["low"],
+                        self.training_ranges[pdu]["high"],
+                        alpha=0.25,
+                    )
+            ax.set_title(rf"{pdu}: $\mu$ (log)")
+            ax.set_xlabel("")
+            ax.grid(True)
+            self.traces.update({pdu: {"mu": tr}})
+            plot_idx += 1
+        # Plot the PDUs sigma
+        for pdu in self.model.PDU_names:
+            row, col = plot_idx // nb_cols, plot_idx % nb_cols
+            ax = axes[row, col]
+            ax.set_xlim(0, maxiter)
+            beta_history = [h.item() for h in history[pdu]["sigma_sq"]]
+            (tr,) = ax.plot(
+                beta_history,
+            )
+            if hasattr(self, "true_log_PDUs"):
+                if self.true_log_PDUs is not None:
+                    ax.axhline(
+                        y=self.true_log_PDUs[pdu]["sd"],
+                        linestyle="--",
+                    )
+            ax.set_title(rf"{pdu}: $\sigma^2$")
+            ax.set_xlabel("")
+            ax.grid(True)
+            self.traces[pdu].update({"sigma_sq": tr})
+            plot_idx += 1
+        # Plot the coefficients of covariation
+        for beta_name in self.model.covariate_coeffs_names:
+            row, col = plot_idx // nb_cols, plot_idx % nb_cols
+            ax = axes[row, col]
+            ax.set_xlim(0, maxiter)
+            beta_history = [h.item() for h in history[beta_name]]
+            (tr,) = ax.plot(
+                beta_history,
+            )
+            if hasattr(self, "true_cov"):
+                if self.true_cov is not None:
+                    ax.axhline(
+                        y=self.true_cov[beta_name],
+                        linestyle="--",
+                    )
+            ax.set_title(rf"{beta_name}")
+            ax.set_xlabel("")
+            ax.grid(True)
+            self.traces.update({beta_name: tr})
+            plot_idx += 1
+        # Plot the residual variance
+        for res_name in self.model.outputs_names:
+            row, col = plot_idx // nb_cols, plot_idx % nb_cols
+            ax = axes[row, col]
+            ax.set_xlim(0, maxiter)
+            var_res_history = [h.item() for h in history[res_name]]
+            (tr,) = ax.plot(
+                var_res_history,
+            )
+            if hasattr(self, "true_res_var"):
+                if self.true_res_var is not None:
+                    ax.axhline(
+                        y=self.true_res_var[res_name],
+                        linestyle="--",
+                    )
+            ax.set_title(rf"{res_name}: $\sigma^2$")
+            ax.grid(True)
+            self.traces.update({res_name: tr})
+            plot_idx += 1
+        # Plot the convergence indicator (total log prob)
+        row, col = plot_idx // nb_cols, plot_idx % nb_cols
+        ax = axes[row, col]
+        ax.set_xlim(0, maxiter)
+        convergence_ind = [h.item() for h in history["complete_likelihood"]]
+        (tr,) = ax.plot(
+            convergence_ind,
+        )
+        ax.set_title(rf"Convergence indicator")
+        ax.grid(True)
+        self.traces.update({"convergence_ind": tr})
+        plot_idx += 1
+        # Plot the number of out of bounds patients
+        row, col = plot_idx // nb_cols, plot_idx % nb_cols
+        ax = axes[row, col]
+        ax.set_xlim(0, maxiter)
+        ax.set_ylim(0, self.model.nb_patients)
+        oob_patients = [len(h) for h in history["flagged_patients"]]
+        (tr,) = ax.plot(
+            oob_patients,
+        )
+        ax.set_title(rf"Out-of-bounds patients")
+        ax.grid(True)
+        self.traces.update({"oob_patients": tr})
+        plot_idx += 1
 
-                title = f"{output_name} in {protocol_arm}"  # More descriptive title
-                ax.set_title(title)
-
+        # Turn off extra subplots
+        while plot_idx < nb_rows * nb_cols:
+            row, col = plot_idx // nb_cols, plot_idx % nb_cols
+            ax = axes[row, col]
+            ax.set_visible(False)
+            plot_idx += 1
         if not smoke_test:
             plt.tight_layout()
-            plt.show()
+            handle = display(fig, display_id=True)
+        else:
+            handle = None
+        return (handle, fig, axes)
+
+    def _update_convergence_plot(self):
+        history = self.history
+        new_xaxis = np.arange(self.current_iteration + 1)
+        # Plot the MI parameters
+        for mi_name in self.model.MI_names:
+            MI_history = [h.item() for h in history[mi_name]]
+            self.traces[mi_name].set_data(new_xaxis, MI_history)
+        # Plot the PDUs means
+        for pdu in self.model.PDU_names:
+            beta_history = [h.item() for h in history[pdu]["mu"]]
+            self.traces[pdu]["mu"].set_data(new_xaxis, beta_history)
+        # Plot the PDUs sigma
+        for pdu in self.model.PDU_names:
+            beta_history = [h.item() for h in history[pdu]["sigma_sq"]]
+            self.traces[pdu]["sigma_sq"].set_data(new_xaxis, beta_history)
+        # Plot the coefficients of covariation
+        for beta_name in self.model.covariate_coeffs_names:
+            beta_history = [h.item() for h in history[beta_name]]
+            self.traces[beta_name].set_data(new_xaxis, beta_history)
+        # Plot the residual variance
+        for res_name in self.model.outputs_names:
+            var_res_history = [h.item() for h in history[res_name]]
+            self.traces[res_name].set_data(new_xaxis, var_res_history)
+        conv_ind = [h.item() for h in history["complete_likelihood"]]
+        self.traces["convergence_ind"].set_data(new_xaxis, conv_ind)
+        oob_patients = [len(h) for h in history["flagged_patients"]]
+        self.traces["oob_patients"].set_data(new_xaxis, oob_patients)
+        if not smoke_test:
+            for ax in self.convergence_plot_axes.flatten():
+                ax.autoscale_view(scaley=True, scalex=False)
+                ax.relim()
+            if self.convergence_plot_handle is not None:
+                self.convergence_plot_handle.update(self.convergence_plot_fig)
+
+    def plot_convergence_history(
+        self,
+        indiv_figsize: tuple[float, float] = (2.0, 1.2),
+        n_cols: int = 3,
+    ):
+        handle, fig, axes = self._build_convergence_plot(
+            indiv_figsize=indiv_figsize, n_cols=n_cols
+        )
+        plt.close(fig)

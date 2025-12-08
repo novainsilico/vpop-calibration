@@ -1,5 +1,5 @@
 import torch
-from typing import List, Dict, Union, Tuple, Optional
+from typing import Union, Optional
 import pandas as pd
 import numpy as np
 
@@ -11,11 +11,12 @@ class NlmeModel:
         self,
         structural_model: StructuralModel,
         patients_df: pd.DataFrame,
-        init_log_MI: Dict[str, float],
-        init_PDU: Dict[str, Dict[str, float]],
-        init_res_var: List[float],
+        init_log_MI: dict[str, float],
+        init_PDU: dict[str, dict[str, float]],
+        init_res_var: list[float],
         covariate_map: Optional[dict[str, dict[str, dict[str, str | float]]]] = None,
         error_model_type: str = "additive",
+        pred_var_threshold: float = 1e-2,
     ):
         """Create a non-linear mixed effects model
 
@@ -35,13 +36,15 @@ class NlmeModel:
                     }
                 }
             error_model_type (str): either `additive` or `proportional` error model
+            pred_var_threshold (float): Threshold of predictive variance that will issue a warning. Default 1e-2.
         """
         self.structural_model: StructuralModel = structural_model
+        self.pred_var_threshold = pred_var_threshold
 
-        self.MI_names: List[str] = list(init_log_MI.keys())
+        self.MI_names: list[str] = list(init_log_MI.keys())
         self.nb_MI: int = len(self.MI_names)
         self.initial_log_MI = torch.Tensor([val for _, val in init_log_MI.items()])
-        self.PDU_names: List[str] = list(init_PDU.keys())
+        self.PDU_names: list[str] = list(init_PDU.keys())
         self.nb_PDU: int = len(self.PDU_names)
 
         if set(self.MI_names) & set(self.PDU_names):
@@ -50,23 +53,24 @@ class NlmeModel:
             )
 
         self.patients_df: pd.DataFrame = patients_df.drop_duplicates()
-        self.patients: List[str | int] = self.patients_df["id"].unique().tolist()
+        self.patients: list[str | int] = self.patients_df["id"].unique().tolist()
         self.nb_patients: int = len(self.patients)
         covariate_columns = self.patients_df.columns.to_list()
         if "protocol_arm" not in covariate_columns:
             self.patients_df["protocol_arm"] = "identity"
 
-        additional_columns: List[str] = self.patients_df.drop(
+        additional_columns: list[str] = self.patients_df.drop(
             ["id", "protocol_arm"], axis=1
         ).columns.tolist()
 
-        init_betas_list: List = []
+        init_betas_list: list = []
         if covariate_map is None:
             print(
                 f"No covariate map provided. All additional columns in `patients_df` will be handled as known descriptors: {additional_columns}"
             )
             self.covariate_map = None
             self.covariate_names = []
+            self.covariate_coeffs_names = []
             self.nb_covariates = 0
             self.population_betas_names = self.PDU_names
             init_betas_list = [val["mean"] for _, val in init_PDU.items()]
@@ -74,8 +78,9 @@ class NlmeModel:
             self.nb_PDK = len(self.PDK_names)
         else:
             self.covariate_map = covariate_map
-            self.population_betas_names: List = []
+            self.population_betas_names: list = []
             covariate_set = set()
+            covariate_coeffs_set = set()
             pdk_names = set(additional_columns)
             for PDU_name in self.PDU_names:
                 self.population_betas_names.append(PDU_name)
@@ -94,10 +99,12 @@ class NlmeModel:
                         if covariate in pdk_names:
                             pdk_names.remove(covariate)
                         coef_name = coef["coef"]
+                        covariate_coeffs_set.add(coef_name)
                         coef_val = coef["value"]
                         self.population_betas_names.append(coef_name)
                         init_betas_list.append(coef_val)
             self.covariate_names = list(covariate_set)
+            self.covariate_coeffs_names = list(covariate_coeffs_set)
             self.nb_covariates = len(self.covariate_names)
             self.PDK_names = list(pdk_names)
             self.nb_PDK = len(self.PDK_names)
@@ -126,7 +133,7 @@ class NlmeModel:
                 f"Non-matching descriptor set and structural model parameter set:\n{set(self.PDK_names + self.PDU_names + self.MI_names)}\n{set(self.structural_model.parameter_names)}"
             )
 
-        self.descriptors: List[str] = self.PDK_names + self.PDU_names + self.MI_names
+        self.descriptors: list[str] = self.PDK_names + self.PDU_names + self.MI_names
         self.nb_descriptors: int = len(self.descriptors)
         # Assume that the descriptors will always be provided to the model in the following order:
         #   PDK, PDU, MI
@@ -138,12 +145,12 @@ class NlmeModel:
         )
         self.initial_betas = torch.Tensor(init_betas_list)
         self.nb_betas: int = len(self.population_betas_names)
-        self.outputs_names: List[str] = self.structural_model.output_names
+        self.outputs_names: list[str] = self.structural_model.output_names
         self.nb_outputs: int = self.structural_model.nb_outputs
         self.error_model_type: str = error_model_type
         self.init_res_var = torch.Tensor(init_res_var)
         self.init_omega = torch.diag(
-            torch.tensor([float(pdu["sd"] ** 2) for pdu in init_PDU.values()])
+            torch.tensor([float(init_PDU[pdu]["sd"]) for pdu in self.PDU_names])
         )
 
         # Assemble the list of design matrices from the covariance structure
@@ -159,8 +166,12 @@ class NlmeModel:
             loc=torch.zeros(self.nb_PDU),
             covariance_matrix=self.omega_pop,
         )
+        self.current_eta_samples = self.sample_individual_etas()
+        self.current_map_estimates = self.individual_parameters(
+            self.current_eta_samples
+        )
 
-    def _create_design_matrix(self, covariates: Dict[str, float]) -> torch.Tensor:
+    def _create_design_matrix(self, covariates: dict[str, float]) -> torch.Tensor:
         """
         Creates the design matrix X_i for a single individual based on the model's covariate map.
         This matrix will be multiplied with population betas so that log(theta_i[PDU]) = X_i @ betas + eta_i.
@@ -176,7 +187,7 @@ class NlmeModel:
                     col_idx += 1
         return design_matrix_X_i
 
-    def _create_all_design_matrices(self) -> Dict[Union[str, int], torch.Tensor]:
+    def _create_all_design_matrices(self) -> dict[Union[str, int], torch.Tensor]:
         """Creates a design matrix for each unique individual based on their covariates, given the in the covariates_df."""
         design_matrices = {}
         if self.nb_covariates == 0:
@@ -203,6 +214,8 @@ class NlmeModel:
             - `output_name`
             - `value`
         """
+        # Store the raw data frame
+        self.observations_df = observations_df
         # Data validation
         input_columns = observations_df.columns.tolist()
         unique_outputs = observations_df["output_name"].unique().tolist()
@@ -248,15 +261,23 @@ class NlmeModel:
             lambda t: global_time_steps.index(t)
         )
         self.global_time_steps = torch.Tensor(global_time_steps).unsqueeze(-1)
-        self.observations_tensors: Dict = {}
+        self.observations_tensors: dict = {}
+        self.n_tot_observations = torch.zeros(self.nb_outputs)
         for patient in self.patients:
             this_patient = processed_df.loc[processed_df["id"] == patient]
 
             tasks_indices = this_patient["task_index"].values
-            outputs_indices = [
-                self.structural_model.task_idx_to_output_idx[task]
-                for task in tasks_indices
-            ]
+            outputs_indices = torch.LongTensor(
+                [
+                    self.structural_model.task_idx_to_output_idx[task]
+                    for task in tasks_indices
+                ]
+            )
+            self.n_tot_observations.scatter_add_(
+                0,
+                outputs_indices,
+                torch.ones_like(outputs_indices, dtype=torch.float64),
+            )
 
             outputs = torch.Tensor(this_patient["value"].values)
 
@@ -277,7 +298,9 @@ class NlmeModel:
 
     def update_omega(self, omega: torch.Tensor) -> None:
         """Update the covariance matrix of the NLME model."""
-        assert self.omega_pop.shape == omega.shape, "Wrong omega shape"
+        assert (
+            self.omega_pop.shape == omega.shape
+        ), f"Wrong omega shape: {omega.shape}, expected: {self.omega_pop.shape}"
         self.omega_pop = omega
         self.omega_pop_lower_chol = torch.linalg.cholesky(self.omega_pop)
         self.eta_distribution = torch.distributions.MultivariateNormal(
@@ -287,18 +310,38 @@ class NlmeModel:
 
     def update_res_var(self, residual_var: torch.Tensor) -> None:
         """Update the residual variance of the NLME model."""
-        assert self.residual_var.shape == residual_var.shape, "Wrong res var shape"
+        assert (
+            self.residual_var.shape == residual_var.shape
+        ), f"Wrong res var shape: {residual_var.shape}, expected: {self.residual_var.shape}"
         self.residual_var = residual_var
 
     def update_betas(self, betas: torch.Tensor) -> None:
         """Update the betas of the NLME model."""
-        assert self.population_betas.shape == betas.shape, "Wrong beta shape"
+        assert (
+            self.population_betas.shape == betas.shape
+        ), f"Wrong beta shape: {betas.shape}, expected: {self.population_betas.shape}"
         self.population_betas = betas
 
     def update_log_mi(self, log_MI: torch.Tensor) -> None:
         """Update the model intrinsic parameter values of the NLME model."""
-        assert self.log_MI.shape == log_MI.shape, "Wrong MI shape"
+        assert (
+            self.log_MI.shape == log_MI.shape
+        ), f"Wrong MI shape: {log_MI.shape}, expected: {self.log_MI.shape}"
         self.log_MI = log_MI
+
+    def update_eta_samples(self, eta: torch.Tensor) -> None:
+        """Update the model current individual random effect sampels."""
+        assert (
+            self.current_eta_samples.shape == eta.shape
+        ), f"Wrong individual samples shape: {eta.shape}, expected: {self.current_eta_samples.shape}"
+        self.current_eta_samples = eta
+
+    def update_map_estimates(self, theta: torch.Tensor) -> None:
+        """Update the model current maximum a posteriori estimates."""
+        assert (
+            self.current_map_estimates.shape == theta.shape
+        ), f"Wrong individual parameters shape: {theta.shape}, expected: {self.current_map_estimates.shape}"
+        self.current_map_estimates = theta
 
     def sample_individual_etas(self, nb_patients=None) -> torch.Tensor:
         """Sample individual random effects from the current estimate of Omega
@@ -319,7 +362,7 @@ class NlmeModel:
     def individual_parameters(
         self,
         individual_etas: torch.Tensor,
-        ind_ids_for_etas: Optional[List[Union[str, int]]] = None,
+        ind_ids_for_etas: Optional[list[Union[str, int]]] = None,
     ) -> torch.Tensor:
         """Compute individual patient parameters
 
@@ -328,7 +371,7 @@ class NlmeModel:
 
         Args:
             individual_etas (torch.Tensor): one set of sampled random effects for each patient
-            ind_ids_for_etas (List[Union[str, int]]): List of individual ids corresponding to the sampled etas, used to fetch the design matrices
+            ind_ids_for_etas (list[Union[str, int]]): list of individual ids corresponding to the sampled etas, used to fetch the design matrices
         Returns:
             torch.Tensor [nb_patients x nb_parameters]: One parameter set for each patient. Dim 0 corresponds to the patients, dim 1 is the parameters
         """
@@ -347,7 +390,7 @@ class NlmeModel:
         # Gather the MI values, and expand them (same for each patient)
         log_MI_expanded = self.log_MI.unsqueeze(0).repeat(nb_patients_for_etas, 1)
 
-        # List the PDK values for each patient, and assemble them in a tensor
+        # list the PDK values for each patient, and assemble them in a tensor
         if hasattr(self, "patients_pdk"):
             patients_pdk = torch.cat(
                 [self.patients_pdk[ind_id] for ind_id in ind_ids_for_etas]
@@ -366,16 +409,16 @@ class NlmeModel:
         return thetas
 
     def struc_model_inputs_from_theta(
-        self, thetas: torch.Tensor, ind_ids: Optional[List[str | int]] = None
-    ) -> tuple[List[torch.Tensor], List[torch.LongTensor], List[torch.LongTensor]]:
+        self, thetas: torch.Tensor, ind_ids: Optional[list[str | int]] = None
+    ) -> tuple[list[torch.Tensor], list[torch.LongTensor], list[torch.LongTensor]]:
         """Return model inputs for all patients
 
         Args:
             thetas (torch.Tensor): Parameter values per patient (one by row)
-            ind_ids(List[str | int]): the ids of the patients to be simulated
+            ind_ids(list[str | int]): the ids of the patients to be simulated
 
         Returns:
-            tuple[List[torch.Tensor], List[torch.LongTensor], List[torch.LongTensor]]:
+            tuple[list[torch.Tensor], list[torch.LongTensor], list[torch.LongTensor]]:
             - the inputs required to simulate this patient
             - the requested rows in the long data frame
             - the requested tasks in the long data frame (same length as requested rows)
@@ -410,33 +453,53 @@ class NlmeModel:
         return list_X, list_rows, list_tasks
 
     def predict_outputs_from_theta(
-        self, thetas: torch.Tensor, ind_ids: Optional[List[str | int]] = None
-    ) -> List[torch.Tensor]:
+        self, thetas: torch.Tensor, ind_ids: Optional[list[str | int]] = None
+    ) -> tuple[list[torch.Tensor], list[torch.Tensor]]:
         """Return model predictions for all patients
 
         Args:
             thetas (torch.Tensor): Parameter values per patient (one by row)
-            ind_ids(List[str | int]): the ids of the patients to be simulated
+            ind_ids(list[str | int]): the ids of the patients to be simulated
 
         Returns:
-            List[torch.Tensor]: a tensor of predictions for each patient
+            list[torch.Tensor]: a tensor of predictions for each patient
         """
         list_X, list_rows, list_tasks = self.struc_model_inputs_from_theta(
             thetas, ind_ids
         )
-        pred = self.structural_model.simulate(
+        pred_mean, pred_var = self.structural_model.simulate(
             list_X=list_X, list_rows=list_rows, list_tasks=list_tasks
         )
-        return pred
+        return pred_mean, pred_var
+
+    def add_residual_error(
+        self, outputs: list[torch.Tensor], ind_ids: Optional[list[str | int]] = None
+    ) -> list[torch.Tensor]:
+        if ind_ids is None:
+            ind_ids = self.patients
+        transformed_out = []
+        for ind_idx, ind in enumerate(ind_ids):
+            output_indx = self.observations_tensors[ind]["outputs_indices"]
+            n_obs = output_indx.shape[0]
+            res_var = self.residual_var.index_select(0, output_indx)
+            noise = torch.distributions.Normal(torch.zeros(n_obs), res_var).sample()
+            if self.error_model_type == "additive":
+                new_out = outputs[ind_idx] + noise
+            elif self.error_model_type == "proportional":
+                new_out = outputs[ind_idx] * noise
+            else:
+                raise ValueError(f"Non-implemented error model {self.error_model_type}")
+            transformed_out.append(new_out)
+        return transformed_out
 
     def outputs_to_df(
-        self, outputs: List[torch.Tensor], ind_ids: List[str | int]
+        self, outputs: list[torch.Tensor], ind_ids: Optional[list[str | int]] = None
     ) -> pd.DataFrame:
         """Transform the NLME model outputs to a data frame in order to compare with observed data
 
         Args:
-            outputs (List[torch.Tensor]): Outputs from `self.predict_outputs_from_theta`
-            ind_ids (List[str  |  int]): the list of patients that were simulated
+            outputs (list[torch.Tensor]): Outputs from `self.predict_outputs_from_theta`
+            ind_ids (list[str  |  int]): the list of patients that were simulated
 
         Returns:
             pd.DataFrame: A data frame containing the following columns
@@ -446,6 +509,8 @@ class NlmeModel:
             - `time`
             - `predicted_value`
         """
+        if ind_ids is None:
+            ind_ids = self.patients
         df_list = []
         for ind_idx, ind in enumerate(ind_ids):
             time_steps = self.observations_tensors[ind]["time_steps"]
@@ -491,16 +556,22 @@ class NlmeModel:
     def log_posterior_etas(
         self,
         etas: torch.Tensor,
-        ind_ids_for_etas: Optional[List[Union[str, int]]] = None,
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, dict[int | str, torch.Tensor]]:
+        ind_ids_for_etas: Optional[list[Union[str, int]]] = None,
+    ) -> tuple[
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        dict[int | str, torch.Tensor],
+        list,
+    ]:
         """Compute the log-posterior of a list of random effects
 
         Args:
             etas (torch.Tensor): Random effects samples
-            ind_ids_for_etas (List[Union[str, int]], optional): Patient ids corresponding to each eta. By default, all patients from the observation data set
+            ind_ids_for_etas (list[Union[str, int]], optional): Patient ids corresponding to each eta. By default, all patients from the observation data set
 
         Returns:
-            Tuple[torch.Tensor, List[torch.Tensor], DataFrame]:
+            tuple[torch.Tensor, list[torch.Tensor], DataFrame]:
             - log-posterior likelihood of etas
             - current thetas
             - log values of current pdu estimation (useful for SAEM)
@@ -531,13 +602,19 @@ class NlmeModel:
             self.residual_var[output_indices] for output_indices in output_indices_list
         ]
         # Run the surrogate model
-        full_pred = self.predict_outputs_from_theta(individual_params, ind_ids_for_etas)
+        full_pred, full_var = self.predict_outputs_from_theta(
+            individual_params, ind_ids_for_etas
+        )
+
+        # Validate the variance magnitude
+        warnings = self.variance_level_check(full_var, self.pred_var_threshold)
+        flagged_patients = [individual_params[i, :].tolist() for i in warnings]
 
         # calculate log-prior of the random samples
         log_priors: torch.Tensor = self._log_prior_etas(etas)
 
         # group by individual and calculate log-likelihood for each
-        list_log_lik_obs: List[torch.Tensor] = list(
+        list_log_lik_obs: list[torch.Tensor] = list(
             map(self.log_likelihood_observation, full_pred, observations, res_var)
         )
 
@@ -549,7 +626,13 @@ class NlmeModel:
         current_log_pdu = torch.log(
             individual_params[:, self.nb_PDK : self.nb_PDK + self.nb_PDU]
         )
-        return log_posterior, individual_params, current_log_pdu, pred_dict
+        return (
+            log_posterior,
+            individual_params,
+            current_log_pdu,
+            pred_dict,
+            flagged_patients,
+        )
 
     def calculate_residuals(
         self, observed_data: torch.Tensor, predictions: torch.Tensor
@@ -570,10 +653,10 @@ class NlmeModel:
         else:
             raise ValueError("Unsupported error model type.")
 
-    def sum_sq_residuals(self, pred: Dict[str | int, torch.Tensor]) -> torch.Tensor:
+    def sum_sq_residuals(self, pred: dict[str | int, torch.Tensor]) -> torch.Tensor:
         sum_residuals = torch.zeros(self.nb_outputs)
-        for output_ind in range(self.nb_outputs):
-            for patient in self.patients:
+        for patient in self.patients:
+            for output_ind in range(self.nb_outputs):
                 mask = torch.BoolTensor(
                     self.observations_tensors[patient]["outputs_indices"] == output_ind
                 )
@@ -581,13 +664,10 @@ class NlmeModel:
                 if n_obs > 0:
                     observed = self.observations_tensors[patient]["observations"][mask]
                     predicted = pred[patient][mask]
-                    sum_residuals[output_ind] += (
-                        torch.square(
-                            self.calculate_residuals(observed, predicted)
-                        ).sum()
-                        / n_obs
-                    )
-        return sum_residuals / self.nb_patients
+                    sum_residuals[output_ind] += torch.square(
+                        self.calculate_residuals(observed, predicted)
+                    ).sum()
+        return sum_residuals
 
     def log_likelihood_observation(
         self,
@@ -636,17 +716,19 @@ class NlmeModel:
     ) -> tuple[
         torch.Tensor,
         torch.Tensor,
+        torch.Tensor,
         dict[str | int, torch.Tensor],
         torch.Tensor,
         torch.Tensor,
         float,
+        list,
     ]:
         """Perform one step of a Metropolis-Hastings transition kernel
 
         Args:
             current_etas (torch.Tensor): values of the individual random effects for all patients
             current_log_prob (torch.Tensor): log posterior likelihood of current random effects
-            current_pred (List[torch.Tensor]): associated model predictions with current random effects
+            current_pred (list[torch.Tensor]): associated model predictions with current random effects
             step_size (torch.Tensor): current value of MH step size,
             learning_rate (float): current learning rate (defined by the optimization algorithm)
             target_acceptance_rate (float, optional): Target for the MCMC acceptance rate. Defaults to 0.234 [1].
@@ -661,13 +743,18 @@ class NlmeModel:
             - updated thetas
             - updated values of log PDUs
             - updated step size
+            - a dict of warnings for all patients with predictive variance above threshold
         """
 
         proposal_noise = torch.randn_like(current_etas) @ self.omega_pop_lower_chol
         proposal_etas = current_etas + step_size * proposal_noise
-        proposal_log_prob, proposal_theta, proposal_log_pdus, proposal_pred = (
-            self.log_posterior_etas(proposal_etas)
-        )
+        (
+            proposal_log_prob,
+            proposal_theta,
+            proposal_log_pdus,
+            proposal_pred,
+            warnings,
+        ) = self.log_posterior_etas(proposal_etas)
         deltas: torch.Tensor = proposal_log_prob - current_log_prob
         log_u: torch.Tensor = torch.log(torch.rand_like(deltas))
         accept_mask: torch.Tensor = log_u < deltas
@@ -678,14 +765,15 @@ class NlmeModel:
         new_etas = torch.where(accept_mask_extended, proposal_etas, current_etas)
         new_log_pdus = torch.where(accept_mask_extended, proposal_log_pdus, current_pdu)
         new_log_prob = torch.where(accept_mask, proposal_log_prob, current_log_prob)
+        new_complete_likelihood = -2 * new_log_prob.sum(dim=0)
         new_pred = {
             patient: proposal_pred[patient] if accept_mask[i] else current_pred[patient]
             for i, patient in enumerate(self.patients)
         }
         new_acceptance_rate: float = accept_mask.float().mean().item()
         if verbose:
-            print(f"Acceptance rate: {new_acceptance_rate}")
-        new_step_size: float = np.exp(
+            print(f"  Acceptance rate: {new_acceptance_rate:.2f}")
+        new_step_size: float = step_size * np.exp(
             learning_rate * (new_acceptance_rate - target_acceptance_rate)
         )
         new_theta = torch.where(
@@ -696,8 +784,38 @@ class NlmeModel:
         return (
             new_etas,
             new_log_prob,
+            new_complete_likelihood,
             new_pred,
             new_theta,
             new_log_pdus,
             new_step_size,
+            warnings,
         )
+
+    def map_estimates_descriptors(self) -> pd.DataFrame:
+        theta = self.current_map_estimates
+        if theta is None:
+            raise ValueError("No estimation available yet. Run the algorithm first.")
+
+        map_per_patient = pd.DataFrame(data=theta.numpy(), columns=self.descriptors)
+        return map_per_patient
+
+    def map_estimates_predictions(self) -> pd.DataFrame:
+        theta = self.current_map_estimates
+        if theta is None:
+            raise ValueError(
+                "No estimation available yet. Run the optimization algorithm first."
+            )
+        simulated_tensor, _ = self.predict_outputs_from_theta(theta, self.patients)
+        simulated_df = self.outputs_to_df(simulated_tensor, self.patients)
+        return simulated_df
+
+    def variance_level_check(
+        self, var_list: list[torch.Tensor], threshold: float
+    ) -> list:
+        warnings = []
+        for i in range(self.nb_patients):
+            var, _ = var_list[i].max(0)
+            if var > threshold:
+                warnings.append(i)
+        return warnings
