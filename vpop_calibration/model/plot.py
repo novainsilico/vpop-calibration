@@ -1,7 +1,9 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.figure import Figure
 from typing import Optional
+from IPython.display import display, DisplayHandle
 
 from ..utils import smoke_test
 
@@ -232,12 +234,34 @@ def plot_obs_vs_predicted(
         plt.show()
 
 
-def plot_loss(iterations: np.ndarray, losses: np.ndarray) -> None:
-    # plot the loss over iterations
-    plt.plot(iterations, losses)
-    plt.xlabel("Iteration")
-    plt.ylabel("Loss")
-    plt.title("Training Loss over Iterations")
+class LossPlot:
+    def __init__(self, nb_iter_max: int):
+        self.fig, self.ax = plt.subplots(ncols=1, nrows=1)
+        (tr1,) = plt.plot([0], [0], label="Training")
+        (tr2,) = plt.plot([0], [0], label="Validation")
+        self.traces = {
+            "training": tr1,
+            "validation": tr2,
+        }
+        plt.xlabel("Iteration")
+        plt.ylabel("Loss")
+        self.ax.legend()
 
-    if not smoke_test:
-        plt.show()
+        plt.title("Training and validation loss over Iterations")
+        if not smoke_test:
+            self.handle = display(self.fig, display_id=True)
+
+    def update_plot(
+        self,
+        iterations: np.ndarray,
+        train_losses: np.ndarray,
+        validation_losses: np.ndarray,
+    ):
+        self.traces["training"].set_data(iterations, train_losses)
+        if len(validation_losses) > 0:
+            self.traces["validation"].set_data(iterations, validation_losses)
+        if not smoke_test:
+            assert self.handle is not None
+            self.ax.relim()
+            self.ax.autoscale_view(scalex=True, scaley=True)
+            self.handle.update(self.fig)

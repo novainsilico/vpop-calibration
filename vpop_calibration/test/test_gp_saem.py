@@ -82,7 +82,6 @@ def test_gp_training():
         log_inputs=learned_ode_params,
     )
     myGP.train()
-    myGP.plot_loss()
     myGP.plot_obs_vs_predicted("training")
     myGP.plot_individual_solution(0)
     myGP.plot_all_solutions("training")
