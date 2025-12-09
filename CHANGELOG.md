@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - GP: training and validation losses are now plotted live during the training.
 - GP: early stopping criterion added. The algorithm now stops if the loss (validation loss, if available, otherwise training loss) stabilizes for at least a certain number of iterations. Stabilization parametrized with `min_delta` parameter, number of iterations parametrized by `patience` parameter
+- GP: all plotting methods can now be configured with a `fig_scaling` parameter, giving the `(width, height)` tuple that will define the size of each individual facet in the plots
 
 ### Removed
 
