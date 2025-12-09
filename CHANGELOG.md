@@ -12,6 +12,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Torch: support device management and use cuda if available
 - Torch: refactor implementation with better tensor manipulation, allowing actual scaling on GPU. Marginal speed-up observed on CPU as well, via the use of torch.compile wherever possible
 
+## [2.2.1] - 2025-12-09
+
+### Modified
+
+- GP: training and validation losses are now plotted live during the training.
+- GP: early stopping criterion added. The algorithm now stops if the loss (validation loss, if available, otherwise training loss) stabilizes for at least a certain number of iterations. Stabilization parametrized with `min_delta` parameter, number of iterations parametrized by `patience` parameter
+
+### Removed
+
+- GP: `plot_loss` method deprecated
+
 ## [2.2.0] - 2025-12-05
 
 ### Added

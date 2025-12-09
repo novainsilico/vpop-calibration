@@ -170,6 +170,7 @@ class TrainingDataSet:
             )
 
         else:  # no validation data set provided
+            self.training_patients = self.patients
             self.training_df_normalized = self.normalized_df
             self.validation_df = None
             self.X_validation = None
@@ -200,7 +201,7 @@ class TrainingDataSet:
         """
 
         # util function to rename columns as `output_protocol`
-        def join_if_two(tup: list[str]) -> str:
+        def join_if_two(tup: str) -> str:
             if tup[0] == "":
                 return tup[1]
             elif tup[1] == "":
@@ -214,7 +215,9 @@ class TrainingDataSet:
             columns=["output_name", "protocol_arm"],
             values="value",
         ).reset_index()
-        reshaped_df.columns = list(map(join_if_two, reshaped_df.columns.to_series()))
+        nested_column_names = reshaped_df.columns.to_list()
+        flat_column_names = list(map(join_if_two, nested_column_names))
+        reshaped_df.columns = flat_column_names
 
         assert set(reshaped_df.columns) == set(
             ["id"] + self.parameter_names + self.tasks
