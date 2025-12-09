@@ -547,27 +547,38 @@ class GP:
         out_df = self.data.merge_predictions_long(pred, wide_df, long_df, remove_value)
         return out_df
 
-    def plot_obs_vs_predicted(self, data_set: pd.DataFrame | str, logScale=None):
+    def plot_obs_vs_predicted(
+        self,
+        data_set: pd.DataFrame | str,
+        fig_scaling: tuple[float, float] = (5.0, 2.0),
+        logScale=None,
+    ):
         """Plots the observed vs. predicted values on the training or validation data set, or on a new data set."""
 
         obs_vs_pred = self.predict_new_data(data_set)
-        plot_obs_vs_predicted(obs_vs_pred, logScale)
+        plot_obs_vs_predicted(obs_vs_pred, fig_scaling, logScale)
 
     # plot function
-    def plot_individual_solution(self, patient_number: int):
+    def plot_individual_solution(
+        self, patient_number: int, fig_scaling: tuple[float, float] = (5.0, 3.0)
+    ):
         """Plot the model prediction (and confidence interval) vs. the input data for a single patient from the GP's internal data set. Can be either training or validation patient."""
         patient_index = self.data.patients[patient_number]
         input_df = self.data.full_df_raw.loc[
             self.data.full_df_raw["id"] == patient_index
         ]
         obs_vs_pred = self.predict_new_data(input_df)
-        plot_individual_solution(obs_vs_pred)
+        plot_individual_solution(obs_vs_pred, fig_scaling)
 
-    def plot_all_solutions(self, data_set: str | pd.DataFrame):
+    def plot_all_solutions(
+        self,
+        data_set: str | pd.DataFrame,
+        fig_scaling: tuple[float, float] = (5.0, 2.0),
+    ):
         """Plot the overlapped observations and model predictions for all patients, either on one the GP's intrinsic data sets, or on a new data set."""
 
         obs_vs_pred = self.predict_new_data(data_set)
-        plot_all_solutions(obs_vs_pred)
+        plot_all_solutions(obs_vs_pred, fig_scaling)
 
 
 class LargeFeatureExtractor(torch.nn.Sequential):
