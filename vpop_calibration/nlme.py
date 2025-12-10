@@ -144,12 +144,13 @@ class NlmeModel:
         self.nb_descriptors: int = len(self.descriptors)
         # Assume that the descriptors will always be provided to the model in the following order:
         #   PDK, PDU, MI
-        self.model_input_to_descriptor = torch.LongTensor(
+        self.model_input_to_descriptor = torch.as_tensor(
             [
                 self.descriptors.index(param)
                 for param in self.structural_model.parameter_names
             ],
-        ).to(device)
+            device=device,
+        ).long()
         self.initial_betas = torch.as_tensor(init_betas_list, device=device)
         self.nb_betas: int = len(self.population_betas_names)
         self.outputs_names: list[str] = self.structural_model.output_names
@@ -278,12 +279,13 @@ class NlmeModel:
             this_patient = processed_df.loc[processed_df["id"] == patient]
 
             tasks_indices = this_patient["task_index"].values
-            outputs_indices = torch.LongTensor(
+            outputs_indices = torch.as_tensor(
                 [
                     self.structural_model.task_idx_to_output_idx[task]
                     for task in tasks_indices
                 ],
-            ).to(device)
+                device=device,
+            ).long()
             self.n_tot_observations.scatter_add_(
                 0,
                 outputs_indices,
@@ -293,12 +295,10 @@ class NlmeModel:
             outputs = torch.as_tensor(this_patient["value"].values, device=device)
 
             time_steps = torch.as_tensor(this_patient["time"].values, device=device)
-            time_step_indices = torch.LongTensor(
-                torch.as_tensor(this_patient["time_step_index"].values, device=device)
-            )
-            tasks_indices = torch.LongTensor(
-                torch.as_tensor(tasks_indices, device=device)
-            )
+            time_step_indices = torch.as_tensor(
+                this_patient["time_step_index"].values, device=device
+            ).long()
+            tasks_indices = torch.as_tensor(tasks_indices, device=device).long()
 
             self.observations_tensors.update(
                 {
@@ -409,7 +409,7 @@ class NlmeModel:
                 [self.patients_pdk[ind_id] for ind_id in ind_ids_for_etas]
             ).to(device)
         else:
-            patients_pdk = torch.tensor(data=None).to(device)
+            patients_pdk = torch.empty((self.nb_patients, 0), device=device)
         # This step is crucial: we need to ensure the parameters are stored in the correct order
         # PDK, PDU, MI
         thetas = torch.cat(

@@ -566,7 +566,7 @@ class PySaem:
         if hasattr(self.model, "patients_pdk"):
             pdk_full = self.model.patients_pdk_full
         else:
-            pdk_full = torch.tensor(data=None)
+            pdk_full = torch.empty((self.model.nb_patients, 0), device=device)
         # Assemble the patient parameters in the right order: PDK, PDU, MI
         new_thetas = torch.cat(
             (
