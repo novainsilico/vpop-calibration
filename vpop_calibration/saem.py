@@ -589,10 +589,11 @@ class PySaem:
         total_log_lik = 0
         for output_ind in range(self.model.nb_outputs):
             for patient_ind, patient in enumerate(self.model.patients):
-                mask = torch.BoolTensor(
+                mask = torch.tensor(
                     self.model.observations_tensors[patient]["outputs_indices"]
-                    == output_ind
-                )
+                    == output_ind,
+                    device=device,
+                ).bool()
                 observed_data = self.model.observations_tensors[patient][
                     "observations"
                 ][mask]
