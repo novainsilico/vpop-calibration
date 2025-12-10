@@ -559,14 +559,14 @@ class PySaem:
 
     def MI_objective_function(self, log_MI):
         log_MI_expanded = (
-            torch.Tensor(log_MI, device=device)
+            torch.as_tensor(log_MI, device=device)
             .unsqueeze(0)
             .repeat((self.model.nb_patients, 1))
         )
         if hasattr(self.model, "patients_pdk"):
             pdk_full = self.model.patients_pdk_full
         else:
-            pdk_full = torch.Tensor()
+            pdk_full = torch.empty((self.model.nb_patients, 0), device=device)
         # Assemble the patient parameters in the right order: PDK, PDU, MI
         new_thetas = torch.cat(
             (
