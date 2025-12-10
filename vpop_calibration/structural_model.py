@@ -210,7 +210,7 @@ class StructuralOdeModel(StructuralModel):
         # Simulate the ODE model
         output_df = self.ode_model.simulate_model(full_input)
         # Convert back to tensor
-        out_tensor = torch.Tensor(output_df["predicted_value"].values, device=device)
+        out_tensor = torch.as_tensor(output_df["predicted_value"].values, device=device)
         out_var = torch.zeros_like(out_tensor, device=device)
         # Split into chunks
         out_list = list(torch.split(out_tensor, chunks_list))

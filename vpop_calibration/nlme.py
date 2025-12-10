@@ -44,7 +44,7 @@ class NlmeModel:
 
         self.MI_names: list[str] = list(init_log_MI.keys())
         self.nb_MI: int = len(self.MI_names)
-        self.initial_log_MI = torch.Tensor([val for _, val in init_log_MI.items()]).to(
+        self.initial_log_MI = torch.tensor([val for _, val in init_log_MI.items()]).to(
             device
         )
         self.PDU_names: list[str] = list(init_PDU.keys())
@@ -149,16 +149,15 @@ class NlmeModel:
                 self.descriptors.index(param)
                 for param in self.structural_model.parameter_names
             ],
-            device=device,
-        )
-        self.initial_betas = torch.Tensor(init_betas_list, device=device)
+        ).to(device)
+        self.initial_betas = torch.as_tensor(init_betas_list, device=device)
         self.nb_betas: int = len(self.population_betas_names)
         self.outputs_names: list[str] = self.structural_model.output_names
         self.nb_outputs: int = self.structural_model.nb_outputs
         self.error_model_type: str = error_model_type
-        self.init_res_var = torch.Tensor(init_res_var, device=device)
+        self.init_res_var = torch.as_tensor(init_res_var, device=device)
         self.init_omega = torch.diag(
-            torch.tensor(
+            torch.as_tensor(
                 [float(init_PDU[pdu]["sd"]) for pdu in self.PDU_names], device=device
             )
         )
@@ -270,7 +269,7 @@ class NlmeModel:
         processed_df["time_step_index"] = processed_df["time"].apply(
             lambda t: global_time_steps.index(t)
         )
-        self.global_time_steps = torch.Tensor(
+        self.global_time_steps = torch.as_tensor(
             global_time_steps, device=device
         ).unsqueeze(-1)
         self.observations_tensors: dict = {}
@@ -410,7 +409,7 @@ class NlmeModel:
                 [self.patients_pdk[ind_id] for ind_id in ind_ids_for_etas]
             ).to(device)
         else:
-            patients_pdk = torch.Tensor(device=device)
+            patients_pdk = torch.tensor(data=None).to(device)
         # This step is crucial: we need to ensure the parameters are stored in the correct order
         # PDK, PDU, MI
         thetas = torch.cat(
@@ -700,7 +699,7 @@ class NlmeModel:
         residual_error_var: torch.Tensor of the error for each output, dim: [nb_outputs]
         """
         if torch.any(torch.isinf(predictions)) or torch.any(torch.isnan(predictions)):
-            return torch.Tensor([-torch.inf])  # invalid predictions
+            return torch.tensor([-torch.inf])  # invalid predictions
         residuals: torch.Tensor = self.calculate_residuals(observed_data, predictions)
         # ensure error_std is positive
         res_error_var = torch.maximum(

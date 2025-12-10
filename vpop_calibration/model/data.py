@@ -129,12 +129,12 @@ class TrainingDataSet:
                 self.full_df_reshaped, ["id"]
             )
             self.normalizing_input_mean, self.normalizing_input_std = (
-                mean.loc[self.parameter_names],
-                std.loc[self.parameter_names],
+                torch.as_tensor(mean.loc[self.parameter_names].values, device=device),
+                torch.as_tensor(std.loc[self.parameter_names].values, device=device),
             )
             self.normalizing_output_mean, self.normalizing_output_std = (
-                torch.Tensor(mean.loc[self.tasks].values).to(device),
-                torch.Tensor(std.loc[self.tasks].values).to(device),
+                torch.as_tensor(mean.loc[self.tasks].values, device=device),
+                torch.as_tensor(std.loc[self.tasks].values, device=device),
             )
 
         # Compute the number of patients for training
@@ -161,12 +161,13 @@ class TrainingDataSet:
             self.validation_df_normalized: pd.DataFrame = self.normalized_df.loc[
                 self.normalized_df["id"].isin(self.validation_patients)
             ]
-            self.X_validation = torch.Tensor(
-                self.validation_df_normalized[self.parameter_names].values
-            ).to(device)
-            self.Y_validation = torch.Tensor(
-                self.validation_df_normalized[self.tasks].values
-            ).to(device)
+            self.X_validation = torch.as_tensor(
+                self.validation_df_normalized[self.parameter_names].values,
+                device=device,
+            )
+            self.Y_validation = torch.as_tensor(
+                self.validation_df_normalized[self.tasks].values, device=device
+            )
 
         else:  # no validation data set provided
             self.training_df_normalized = self.normalized_df
@@ -174,12 +175,12 @@ class TrainingDataSet:
             self.X_validation = None
             self.Y_validation = None
 
-        self.X_training: torch.Tensor = torch.Tensor(
-            self.training_df_normalized[self.parameter_names].values
-        ).to(device)
-        self.Y_training: torch.Tensor = torch.Tensor(
-            self.training_df_normalized[self.tasks].values
-        ).to(device)
+        self.X_training: torch.Tensor = torch.as_tensor(
+            self.training_df_normalized[self.parameter_names].values, device=device
+        )
+        self.Y_training: torch.Tensor = torch.as_tensor(
+            self.training_df_normalized[self.tasks].values, device=device
+        )
 
     def pivot_input_data(self, data_in: pd.DataFrame) -> pd.DataFrame:
         """Pivot and reorder columns from a data frame to feed to the model
@@ -261,8 +262,8 @@ class TrainingDataSet:
         """Normalize new inputs provided to the model as a tensor. The columns of the input tensor should be the same as [self.descriptors]"""
         X = inputs.to(device)
         X[:, self.log_inputs_indices] = torch.log(X[:, self.log_inputs_indices])
-        mean = torch.Tensor(self.normalizing_input_mean.values)
-        std = torch.Tensor(self.normalizing_input_std.values)
+        mean = self.normalizing_input_mean
+        std = self.normalizing_input_std
         norm_X = (X - mean) / std
 
         return norm_X
@@ -367,8 +368,8 @@ class TrainingDataSet:
             new_data["value"] = 1.0
 
         wide_df = self.pivot_input_data(new_data)
-        tensor_inputs_wide = torch.Tensor(wide_df[self.parameter_names].values).to(
-            device
+        tensor_inputs_wide = torch.as_tensor(
+            wide_df[self.parameter_names].values, device=device
         )
 
         return tensor_inputs_wide, wide_df, new_data, remove_value
