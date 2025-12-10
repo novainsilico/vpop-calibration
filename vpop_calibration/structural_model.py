@@ -185,7 +185,7 @@ class StructuralOdeModel(StructuralModel):
             )
             # The passed params include the _global_ time steps
             # Filter the time steps that we actually want for this patient
-            input_df_temp = input_df_temp.iloc[rows.numpy()]
+            input_df_temp = input_df_temp.iloc[rows.cpu().numpy()]
             # Add the task index as a temporary column
             input_df_temp["task_index"] = task_index
             # Deduce protocol arm and output name from task index
