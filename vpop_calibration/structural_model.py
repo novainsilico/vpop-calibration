@@ -5,6 +5,7 @@ import uuid
 
 from .model.gp import GP
 from .ode import OdeModel
+from .utils import device
 
 
 class StructuralModel:
@@ -73,7 +74,7 @@ class StructuralGp(StructuralModel):
     ) -> tuple[list[torch.Tensor], list[torch.Tensor]]:
         # X must be ordered like parameter names from the GP
         # Concatenate all the inputs
-        X_cat = torch.cat(list_X)
+        X_cat = torch.cat(list_X).to(device)
         chunk_sizes = [X.shape[0] for X in list_X]
         # Simulate the GP
         out_cat, var_cat = self.gp_model.predict_wide_scaled(X_cat)
@@ -85,8 +86,18 @@ class StructuralGp(StructuralModel):
         for pred, var_wide, rows, cols in zip(
             pred_wide_list, var_wide_list, list_rows, list_tasks
         ):
-            y = pred.index_select(0, rows).gather(1, cols.view(-1, 1)).squeeze(1)
-            var = var_wide.index_select(0, rows).gather(1, cols.view(-1, 1)).squeeze(1)
+            y = (
+                pred.index_select(0, rows)
+                .gather(1, cols.view(-1, 1))
+                .squeeze(1)
+                .to(device)
+            )
+            var = (
+                var_wide.index_select(0, rows)
+                .gather(1, cols.view(-1, 1))
+                .squeeze(1)
+                .to(device)
+            )
             pred_list.append(y)
             var_list.append(var)
         return pred_list, var_list
@@ -164,9 +175,9 @@ class StructuralOdeModel(StructuralModel):
             # store the size of X for proper splitting
             chunks_list.append(rows.shape[0])
             # Extract the parameters and time values
-            params = X.index_select(0, rows).detach().numpy()
+            params = X.index_select(0, rows).cpu().detach().numpy()
             # Extract the task order
-            task_index = tasks.detach().numpy()
+            task_index = tasks.cpu().detach().numpy()
             # Format the data inputs
             # This step is where the order of parameters is implicit
             input_df_temp = pd.DataFrame(
@@ -199,8 +210,8 @@ class StructuralOdeModel(StructuralModel):
         # Simulate the ODE model
         output_df = self.ode_model.simulate_model(full_input)
         # Convert back to tensor
-        out_tensor = torch.Tensor(output_df["predicted_value"].values)
-        out_var = torch.zeros_like(out_tensor)
+        out_tensor = torch.Tensor(output_df["predicted_value"].values, device=device)
+        out_var = torch.zeros_like(out_tensor, device=device)
         # Split into chunks
         out_list = list(torch.split(out_tensor, chunks_list))
         var_list = list(torch.split(out_var, chunks_list))
