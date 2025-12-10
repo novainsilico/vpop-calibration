@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 
 from .structural_model import StructuralModel
+from .utils import device
 
 
 class NlmeModel:
@@ -43,7 +44,9 @@ class NlmeModel:
 
         self.MI_names: list[str] = list(init_log_MI.keys())
         self.nb_MI: int = len(self.MI_names)
-        self.initial_log_MI = torch.Tensor([val for _, val in init_log_MI.items()])
+        self.initial_log_MI = torch.Tensor([val for _, val in init_log_MI.items()]).to(
+            device
+        )
         self.PDU_names: list[str] = list(init_PDU.keys())
         self.nb_PDU: int = len(self.PDU_names)
 
@@ -118,7 +121,11 @@ class NlmeModel:
                     self.patients_df["id"] == patient
                 ].drop_duplicates()
                 self.patients_pdk.update(
-                    {patient: torch.Tensor(row[self.PDK_names].values)}
+                    {
+                        patient: torch.as_tensor(
+                            row[self.PDK_names].values, device=device
+                        )
+                    }
                 )
             self.patients_pdk_full = torch.cat(
                 [self.patients_pdk[ind] for ind in self.patients]
@@ -141,16 +148,19 @@ class NlmeModel:
             [
                 self.descriptors.index(param)
                 for param in self.structural_model.parameter_names
-            ]
+            ],
+            device=device,
         )
-        self.initial_betas = torch.Tensor(init_betas_list)
+        self.initial_betas = torch.Tensor(init_betas_list, device=device)
         self.nb_betas: int = len(self.population_betas_names)
         self.outputs_names: list[str] = self.structural_model.output_names
         self.nb_outputs: int = self.structural_model.nb_outputs
         self.error_model_type: str = error_model_type
-        self.init_res_var = torch.Tensor(init_res_var)
+        self.init_res_var = torch.Tensor(init_res_var, device=device)
         self.init_omega = torch.diag(
-            torch.tensor([float(init_PDU[pdu]["sd"]) for pdu in self.PDU_names])
+            torch.tensor(
+                [float(init_PDU[pdu]["sd"]) for pdu in self.PDU_names], device=device
+            )
         )
 
         # Assemble the list of design matrices from the covariance structure
@@ -160,10 +170,10 @@ class NlmeModel:
         self.log_MI = self.initial_log_MI
         self.population_betas = self.initial_betas
         self.omega_pop = self.init_omega
-        self.omega_pop_lower_chol = torch.linalg.cholesky(self.omega_pop)
+        self.omega_pop_lower_chol = torch.linalg.cholesky(self.omega_pop).to(device)
         self.residual_var = self.init_res_var
         self.eta_distribution = torch.distributions.MultivariateNormal(
-            loc=torch.zeros(self.nb_PDU),
+            loc=torch.zeros(self.nb_PDU, device=device),
             covariance_matrix=self.omega_pop,
         )
         self.current_eta_samples = self.sample_individual_etas()
@@ -176,7 +186,7 @@ class NlmeModel:
         Creates the design matrix X_i for a single individual based on the model's covariate map.
         This matrix will be multiplied with population betas so that log(theta_i[PDU]) = X_i @ betas + eta_i.
         """
-        design_matrix_X_i = torch.zeros((self.nb_PDU, self.nb_betas))
+        design_matrix_X_i = torch.zeros((self.nb_PDU, self.nb_betas), device=device)
         col_idx = 0
         for i, PDU_name in enumerate(self.PDU_names):
             design_matrix_X_i[i, col_idx] = 1.0
@@ -260,9 +270,11 @@ class NlmeModel:
         processed_df["time_step_index"] = processed_df["time"].apply(
             lambda t: global_time_steps.index(t)
         )
-        self.global_time_steps = torch.Tensor(global_time_steps).unsqueeze(-1)
+        self.global_time_steps = torch.Tensor(
+            global_time_steps, device=device
+        ).unsqueeze(-1)
         self.observations_tensors: dict = {}
-        self.n_tot_observations = torch.zeros(self.nb_outputs)
+        self.n_tot_observations = torch.zeros(self.nb_outputs, device=device)
         for patient in self.patients:
             this_patient = processed_df.loc[processed_df["id"] == patient]
 
@@ -271,27 +283,32 @@ class NlmeModel:
                 [
                     self.structural_model.task_idx_to_output_idx[task]
                     for task in tasks_indices
-                ]
-            )
+                ],
+            ).to(device)
             self.n_tot_observations.scatter_add_(
                 0,
                 outputs_indices,
-                torch.ones_like(outputs_indices, dtype=torch.float64),
+                torch.ones_like(outputs_indices, device=device, dtype=torch.float64),
             )
 
-            outputs = torch.Tensor(this_patient["value"].values)
+            outputs = torch.as_tensor(this_patient["value"].values, device=device)
 
-            time_steps = torch.Tensor(this_patient["time"].values)
-            time_step_indices = this_patient["time_step_index"].values
+            time_steps = torch.as_tensor(this_patient["time"].values, device=device)
+            time_step_indices = torch.LongTensor(
+                torch.as_tensor(this_patient["time_step_index"].values, device=device)
+            )
+            tasks_indices = torch.LongTensor(
+                torch.as_tensor(tasks_indices, device=device)
+            )
 
             self.observations_tensors.update(
                 {
                     patient: {
                         "observations": outputs,
                         "time_steps": time_steps,
-                        "time_step_indices": torch.LongTensor(time_step_indices),
-                        "tasks_indices": torch.LongTensor(tasks_indices),
-                        "outputs_indices": torch.LongTensor(outputs_indices),
+                        "time_step_indices": time_step_indices,
+                        "tasks_indices": tasks_indices,
+                        "outputs_indices": outputs_indices,
                     }
                 }
             )
@@ -302,9 +319,9 @@ class NlmeModel:
             self.omega_pop.shape == omega.shape
         ), f"Wrong omega shape: {omega.shape}, expected: {self.omega_pop.shape}"
         self.omega_pop = omega
-        self.omega_pop_lower_chol = torch.linalg.cholesky(self.omega_pop)
+        self.omega_pop_lower_chol = torch.linalg.cholesky(self.omega_pop).to(device)
         self.eta_distribution = torch.distributions.MultivariateNormal(
-            loc=torch.zeros(self.nb_PDU),
+            loc=torch.zeros(self.nb_PDU, device=device),
             covariance_matrix=self.omega_pop,
         )
 
@@ -352,10 +369,7 @@ class NlmeModel:
         if nb_patients is None:
             # In case no number of patients is requested, assume we want to sample one set of random effects per patient in the observation data set
             nb_patients = self.nb_patients
-        etas_dist = torch.distributions.MultivariateNormal(
-            loc=torch.zeros(self.nb_PDU),
-            covariance_matrix=self.omega_pop,
-        ).expand([nb_patients])
+        etas_dist = self.eta_distribution.expand([nb_patients])
         etas = etas_dist.sample()
         return etas
 
@@ -384,7 +398,7 @@ class NlmeModel:
             self.design_matrices[ind_id] for ind_id in ind_ids_for_etas
         ]
         # stack all design matrices into a single large tensor
-        stacked_X = torch.stack(list_design_matrices)
+        stacked_X = torch.stack(list_design_matrices).to(device)
         # Compute the inidividual PDU
         log_thetas_PDU = stacked_X @ self.population_betas + individual_etas
         # Gather the MI values, and expand them (same for each patient)
@@ -394,9 +408,9 @@ class NlmeModel:
         if hasattr(self, "patients_pdk"):
             patients_pdk = torch.cat(
                 [self.patients_pdk[ind_id] for ind_id in ind_ids_for_etas]
-            )
+            ).to(device)
         else:
-            patients_pdk = torch.Tensor()
+            patients_pdk = torch.Tensor(device=device)
         # This step is crucial: we need to ensure the parameters are stored in the correct order
         # PDK, PDU, MI
         thetas = torch.cat(
@@ -436,8 +450,10 @@ class NlmeModel:
         list_rows = []
         for ind_idx, ind in enumerate(ind_ids):
             this_patient_theta_ordered = thetas[ind_idx, self.model_input_to_descriptor]
-            thetas_repeated = this_patient_theta_ordered.unsqueeze(0).repeat(
-                (self.global_time_steps.shape[0], 1)
+            thetas_repeated = (
+                this_patient_theta_ordered.unsqueeze(0)
+                .repeat((self.global_time_steps.shape[0], 1))
+                .to(device)
             )
             # This steps requires that the `time` is passed as the last input column to the structural model
             inputs = torch.cat(
@@ -446,7 +462,7 @@ class NlmeModel:
                     self.global_time_steps,
                 ),
                 dim=1,
-            )
+            ).to(device)
             list_X.append(inputs)
             list_tasks.append(self.observations_tensors[ind]["tasks_indices"])
             list_rows.append(self.observations_tensors[ind]["time_step_indices"])
@@ -479,10 +495,12 @@ class NlmeModel:
             ind_ids = self.patients
         transformed_out = []
         for ind_idx, ind in enumerate(ind_ids):
-            output_indx = self.observations_tensors[ind]["outputs_indices"]
+            output_indx = self.observations_tensors[ind]["outputs_indices"].to(device)
             n_obs = output_indx.shape[0]
-            res_var = self.residual_var.index_select(0, output_indx)
-            noise = torch.distributions.Normal(torch.zeros(n_obs), res_var).sample()
+            res_var = self.residual_var.index_select(0, output_indx).to(device)
+            noise = torch.distributions.Normal(
+                torch.zeros(n_obs, device=device), res_var
+            ).sample()
             if self.error_model_type == "additive":
                 new_out = outputs[ind_idx] + noise
             elif self.error_model_type == "proportional":
@@ -517,10 +535,10 @@ class NlmeModel:
             task_list = self.observations_tensors[ind]["tasks_indices"]
             temp_df = pd.DataFrame(
                 {
-                    "time": time_steps.numpy(),
+                    "time": time_steps.cpu().numpy(),
                     "id": ind,
-                    "task_index": task_list,
-                    "predicted_value": outputs[ind_idx].numpy(),
+                    "task_index": task_list.cpu(),
+                    "predicted_value": outputs[ind_idx].cpu().numpy(),
                 }
             )
             temp_df["output_name"] = temp_df["task_index"].apply(
@@ -550,7 +568,7 @@ class NlmeModel:
 
         """
 
-        log_priors: torch.Tensor = self.eta_distribution.log_prob(etas)
+        log_priors: torch.Tensor = self.eta_distribution.log_prob(etas).to(device)
         return log_priors
 
     def log_posterior_etas(
@@ -618,14 +636,14 @@ class NlmeModel:
             map(self.log_likelihood_observation, full_pred, observations, res_var)
         )
 
-        log_lik_obs = torch.tensor(list_log_lik_obs)
+        log_lik_obs = torch.tensor(list_log_lik_obs).to(device)
         log_posterior = log_lik_obs + log_priors
         pred_dict = {
             ind_ids_for_etas[i]: full_pred[i] for i in range(len(ind_ids_for_etas))
         }
         current_log_pdu = torch.log(
             individual_params[:, self.nb_PDK : self.nb_PDK + self.nb_PDU]
-        )
+        ).to(device)
         return (
             log_posterior,
             individual_params,
@@ -654,12 +672,12 @@ class NlmeModel:
             raise ValueError("Unsupported error model type.")
 
     def sum_sq_residuals(self, pred: dict[str | int, torch.Tensor]) -> torch.Tensor:
-        sum_residuals = torch.zeros(self.nb_outputs)
+        sum_residuals = torch.zeros(self.nb_outputs, device=device)
         for patient in self.patients:
             for output_ind in range(self.nb_outputs):
                 mask = torch.BoolTensor(
-                    self.observations_tensors[patient]["outputs_indices"] == output_ind
-                )
+                    self.observations_tensors[patient]["outputs_indices"] == output_ind,
+                ).to(device)
                 n_obs = mask.sum()
                 if n_obs > 0:
                     observed = self.observations_tensors[patient]["observations"][mask]
@@ -686,7 +704,7 @@ class NlmeModel:
         residuals: torch.Tensor = self.calculate_residuals(observed_data, predictions)
         # ensure error_std is positive
         res_error_var = torch.maximum(
-            torch.full_like(residual_error_var, 1e-6), residual_error_var
+            torch.full_like(residual_error_var, 1e-6, device=device), residual_error_var
         )
         # Log-likelihood of normal distribution
         if self.error_model_type == "additive":
@@ -700,7 +718,7 @@ class NlmeModel:
             )  # each row of res_error_var is the variance of the residual error corresponding to the same row of residuals (one row = one output)
         else:
             raise ValueError("Non supported error type.")
-        return log_lik
+        return log_lik.to(device)
 
     def mh_step(
         self,
@@ -746,7 +764,9 @@ class NlmeModel:
             - a dict of warnings for all patients with predictive variance above threshold
         """
 
-        proposal_noise = torch.randn_like(current_etas) @ self.omega_pop_lower_chol
+        proposal_noise = (
+            torch.randn_like(current_etas, device=device) @ self.omega_pop_lower_chol
+        )
         proposal_etas = current_etas + step_size * proposal_noise
         (
             proposal_log_prob,
@@ -756,21 +776,27 @@ class NlmeModel:
             warnings,
         ) = self.log_posterior_etas(proposal_etas)
         deltas: torch.Tensor = proposal_log_prob - current_log_prob
-        log_u: torch.Tensor = torch.log(torch.rand_like(deltas))
+        log_u: torch.Tensor = torch.log(torch.rand_like(deltas, device=device))
         accept_mask: torch.Tensor = log_u < deltas
         accept_mask_extended = accept_mask.unsqueeze(1).expand(
             -1, current_etas.shape[1]
         )
 
-        new_etas = torch.where(accept_mask_extended, proposal_etas, current_etas)
-        new_log_pdus = torch.where(accept_mask_extended, proposal_log_pdus, current_pdu)
-        new_log_prob = torch.where(accept_mask, proposal_log_prob, current_log_prob)
+        new_etas = torch.where(accept_mask_extended, proposal_etas, current_etas).to(
+            device
+        )
+        new_log_pdus = torch.where(
+            accept_mask_extended, proposal_log_pdus, current_pdu
+        ).to(device)
+        new_log_prob = torch.where(accept_mask, proposal_log_prob, current_log_prob).to(
+            device
+        )
         new_complete_likelihood = -2 * new_log_prob.sum(dim=0)
         new_pred = {
             patient: proposal_pred[patient] if accept_mask[i] else current_pred[patient]
             for i, patient in enumerate(self.patients)
         }
-        new_acceptance_rate: float = accept_mask.float().mean().item()
+        new_acceptance_rate: float = accept_mask.cpu().float().mean().item()
         if verbose:
             print(f"  Acceptance rate: {new_acceptance_rate:.2f}")
         new_step_size: float = step_size * np.exp(
@@ -780,7 +806,7 @@ class NlmeModel:
             accept_mask.unsqueeze(1).expand(-1, current_thetas.shape[1]),
             proposal_theta,
             current_thetas,
-        )
+        ).to(device)
         return (
             new_etas,
             new_log_prob,
@@ -797,7 +823,9 @@ class NlmeModel:
         if theta is None:
             raise ValueError("No estimation available yet. Run the algorithm first.")
 
-        map_per_patient = pd.DataFrame(data=theta.numpy(), columns=self.descriptors)
+        map_per_patient = pd.DataFrame(
+            data=theta.cpu().numpy(), columns=self.descriptors
+        )
         return map_per_patient
 
     def map_estimates_predictions(self) -> pd.DataFrame:
@@ -815,7 +843,7 @@ class NlmeModel:
     ) -> list:
         warnings = []
         for i in range(self.nb_patients):
-            var, _ = var_list[i].max(0)
+            var, _ = var_list[i].cpu().max(0)
             if var > threshold:
                 warnings.append(i)
         return warnings

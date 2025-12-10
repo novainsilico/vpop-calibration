@@ -8,7 +8,7 @@ import pandas as pd
 import numpy as np
 from IPython.display import display
 
-from .utils import smoke_test
+from .utils import smoke_test, device
 from .nlme import NlmeModel
 from .structural_model import StructuralGp
 
@@ -124,7 +124,9 @@ class PySaem:
             self.current_pred,
             flagged_patients,
         ) = self.model.log_posterior_etas(self.current_etas)
-        self.current_complete_likelihood = torch.exp(self.current_log_prob.sum(dim=0))
+        self.current_complete_likelihood = torch.exp(
+            self.current_log_prob.sum(dim=0)
+        ).to(device)
 
         # Initialize the optimizer history
         self._init_history(
@@ -139,29 +141,31 @@ class PySaem:
 
         # Initialize the values for convergence checks
         self.prev_params: dict[str, torch.Tensor] = {
-            "log_MI": self.model.log_MI,
-            "population_betas": self.model.population_betas,
-            "population_omega": self.model.omega_pop,
-            "residual_error_var": self.model.residual_var,
+            "log_MI": self.model.log_MI.cpu(),
+            "population_betas": self.model.population_betas.cpu(),
+            "population_omega": self.model.omega_pop.cpu(),
+            "residual_error_var": self.model.residual_var.cpu(),
         }
 
         # pre-compute full design matrix once
         self.X = torch.stack(
             [self.model.design_matrices[ind] for ind in self.model.patients],
             dim=0,
-        )
+        ).to(device)
         # Precompute the gram matrix
-        self.sufficient_stat_gram_matrix = torch.matmul(
-            self.X.transpose(1, 2), self.X
-        ).sum(dim=0)
+        self.sufficient_stat_gram_matrix = (
+            torch.matmul(self.X.transpose(1, 2), self.X).sum(dim=0).to(device)
+        )
 
         # Initialize sufficient statistics
         self.sufficient_stat_cross_product = (
-            self.X.transpose(1, 2) @ self.current_log_pdu.unsqueeze(-1)
-        ).sum(dim=0)
+            (self.X.transpose(1, 2) @ self.current_log_pdu.unsqueeze(-1))
+            .sum(dim=0)
+            .to(device)
+        )
         self.sufficient_stat_outer_product = torch.matmul(
             self.current_log_pdu.transpose(0, 1), self.current_log_pdu
-        )
+        ).to(device)
 
         self.true_log_MI = true_log_MI
         self.true_log_PDUs = true_log_PDU
@@ -212,20 +216,22 @@ class PySaem:
         """
 
         assert log_pdu.shape[0] == self.X.shape[0]
-        cross_product = (self.X.transpose(1, 2) @ log_pdu.unsqueeze(-1)).sum(dim=0)
+        cross_product = (
+            (self.X.transpose(1, 2) @ log_pdu.unsqueeze(-1)).sum(dim=0).to(device)
+        )
         new_s_cross_product = self._stochastic_approximation(
             s_cross_product, cross_product
         )
-        outer_product = torch.matmul(log_pdu.transpose(0, 1), log_pdu)
+        outer_product = torch.matmul(log_pdu.transpose(0, 1), log_pdu).to(device)
         new_s_outer_product = self._stochastic_approximation(
             s_outer_product, outer_product
         )
 
         new_beta = torch.linalg.solve(
             self.sufficient_stat_gram_matrix, new_s_cross_product
-        )
+        ).to(device)
 
-        new_log_pdu = torch.matmul(self.X, new_beta.unsqueeze(0)).squeeze(-1)
+        new_log_pdu = torch.matmul(self.X, new_beta.unsqueeze(0)).squeeze(-1).to(device)
         # Propose a new value for omega
         new_omega = (
             1
@@ -234,7 +240,7 @@ class PySaem:
                 new_s_outer_product
                 - torch.matmul(new_log_pdu.transpose(0, 1), new_log_pdu)
             )
-        )
+        ).to(device)
         new_omega = self._clamp_eigen_values(new_omega)
 
         return (
@@ -296,9 +302,10 @@ class PySaem:
         assert (
             previous.shape == new.shape
         ), f"Wrong shape in stochastic approximation: {previous.shape}, {new.shape}"
-        return (
-            1 - self.learning_rate_m_step
-        ) * previous + self.learning_rate_m_step * new
+        stochastic_approx = (
+            (1 - self.learning_rate_m_step) * previous + self.learning_rate_m_step * new
+        ).to(device)
+        return stochastic_approx
 
     def _simulated_annealing(
         self, current: torch.Tensor, target: torch.Tensor
@@ -314,14 +321,14 @@ class PySaem:
         Returns:
             torch.Tensor: maximum(annealing_factor * current, target)
         """
-        return torch.maximum(self.annealing_factor * current, target)
+        return torch.maximum(self.annealing_factor * current, target).to(device)
 
     def _clamp_eigen_values(self, omega: torch.Tensor, min_eigenvalue: float = 1e-6):
         """
         Project a matrix onto the cone of Positive Definite matrices.
         """
         # 1. Ensure symmetry (sometimes float error breaks symmetry slightly)
-        omega = 0.5 * (omega + omega.T)
+        omega = (0.5 * (omega + omega.T)).to(device)
 
         # 2. Eigen Decomposition
         L, V = torch.linalg.eigh(omega)
@@ -332,7 +339,7 @@ class PySaem:
         # 4. Reconstruct
         matrix_spd = torch.matmul(V, torch.matmul(torch.diag(L_clamped), V.T))
 
-        return matrix_spd
+        return matrix_spd.to(device)
 
     def _init_history(
         self,
@@ -351,24 +358,24 @@ class PySaem:
             self.history.update(
                 {
                     pdu: {
-                        "mu": [beta[beta_index]],
-                        "sigma_sq": [omega[i, i]],
+                        "mu": [beta[beta_index].cpu()],
+                        "sigma_sq": [omega[i, i].cpu()],
                     }
                 }
             )
         # Add the covariates
         for i, cov in enumerate(self.model.covariate_coeffs_names):
             beta_index = self.model.population_betas_names.index(cov)
-            self.history.update({cov: [beta[beta_index]]})
+            self.history.update({cov: [beta[beta_index].cpu()]})
         # Add Omega
-        self.history.update({"omega": [omega]})
+        self.history.update({"omega": [omega.cpu()]})
         # Add the model intrinsic params
         for i, mi in enumerate(self.model.MI_names):
-            self.history.update({mi: [log_mi[i]]})
+            self.history.update({mi: [log_mi[i].cpu()]})
         # Add the residual variance
         for i, output in enumerate(self.model.outputs_names):
-            self.history.update({output: [res_var[i]]})
-        self.history.update({"complete_likelihood": [likelihood]})
+            self.history.update({output: [res_var[i].cpu()]})
+        self.history.update({"complete_likelihood": [likelihood.cpu()]})
         self.history.update({"flagged_patients": [flagged_patients]})
 
     def _append_history(
@@ -383,21 +390,21 @@ class PySaem:
         # Update the history
         for i, pdu in enumerate(self.model.PDU_names):
             beta_index = self.model.population_betas_names.index(pdu)
-            self.history[pdu]["mu"].append(beta[beta_index])
-            self.history[pdu]["sigma_sq"].append(omega[i, i])
+            self.history[pdu]["mu"].append(beta[beta_index].cpu())
+            self.history[pdu]["sigma_sq"].append(omega[i, i].cpu())
 
         for i, cov in enumerate(self.model.covariate_coeffs_names):
             beta_index = self.model.population_betas_names.index(cov)
-            self.history[cov].append(beta[beta_index])
+            self.history[cov].append(beta[beta_index].cpu())
 
-        self.history["omega"].append(omega)
+        self.history["omega"].append(omega.cpu())
 
         for i, mi in enumerate(self.model.MI_names):
-            self.history[mi].append(log_mi[i])
+            self.history[mi].append(log_mi[i].cpu())
 
         for i, output in enumerate(self.model.outputs_names):
-            self.history[output].append(res_var[i])
-        self.history["complete_likelihood"].append(complete_likelihood)
+            self.history[output].append(res_var[i].cpu())
+        self.history["complete_likelihood"].append(complete_likelihood.cpu())
         self.history["flagged_patients"].append(flagged_patients)
 
     def one_iteration(self, k: int) -> bool:
@@ -486,12 +493,12 @@ class PySaem:
         # Update omega
         if k < self.nb_phase1_iterations:
             # Simulated annealing during phase 1
-            new_omega_diag = torch.diag(new_omega)
-            current_omega_diag = torch.diag(self.model.omega_pop)
+            new_omega_diag = torch.diag(new_omega).to(device)
+            current_omega_diag = torch.diag(self.model.omega_pop).to(device)
             annealed_omega_diag = self._simulated_annealing(
                 current_omega_diag, new_omega_diag
             )
-            new_omega = torch.diag(annealed_omega_diag)
+            new_omega = torch.diag(annealed_omega_diag).to(device)
         self.model.update_omega(new_omega)
 
         # 3. Update fixed effects MIs
@@ -499,11 +506,11 @@ class PySaem:
             # This step is notoriously under-optimized
             target_log_MI_np = minimize(
                 fun=self.MI_objective_function,
-                x0=self.model.log_MI.squeeze().numpy(),
+                x0=self.model.log_MI.cpu().squeeze().numpy(),
                 method="L-BFGS-B",
                 options={"maxfun": self.optim_max_fun},
             ).x
-            target_log_MI = torch.from_numpy(target_log_MI_np)
+            target_log_MI = torch.from_numpy(target_log_MI_np).to(device)
             new_log_MI = self._stochastic_approximation(
                 self.model.log_MI, target_log_MI
             )
@@ -512,13 +519,13 @@ class PySaem:
 
         if self.verbose:
             print(
-                f"  Updated MIs: {', '.join([f'{torch.exp(logMI).item():.4f}' for logMI in self.model.log_MI])}"
+                f"  Updated MIs: {', '.join([f'{torch.exp(logMI).item():.4f}' for logMI in self.model.log_MI.detach().cpu()])}"
             )
             print(
                 f"  Updated Betas: {', '.join([f'{beta:.4f}' for beta in self.model.population_betas.detach().cpu().numpy().flatten()])}"
             )
             print(
-                f"  Updated Omega (diag): {', '.join([f'{val.item():.4f}' for val in torch.diag(self.model.omega_pop)])}"
+                f"  Updated Omega (diag): {', '.join([f'{val.item():.4f}' for val in torch.diag(self.model.omega_pop.detach().cpu())])}"
             )
             print(
                 f"  Updated Residual Var: {', '.join([f'{res_var:.4f}' for res_var in self.model.residual_var.detach().cpu().numpy().flatten()])}"
@@ -552,7 +559,9 @@ class PySaem:
 
     def MI_objective_function(self, log_MI):
         log_MI_expanded = (
-            torch.Tensor(log_MI).unsqueeze(0).repeat((self.model.nb_patients, 1))
+            torch.Tensor(log_MI, device=device)
+            .unsqueeze(0)
+            .repeat((self.model.nb_patients, 1))
         )
         if hasattr(self.model, "patients_pdk"):
             pdk_full = self.model.patients_pdk_full
@@ -593,7 +602,7 @@ class PySaem:
                     observed_data,
                     predicted_data,
                     self.model.residual_var[output_ind],
-                )
+                ).cpu()
 
         return -total_log_lik
 
@@ -608,13 +617,13 @@ class PySaem:
         if self.verbose:
             print("Starting SAEM Estimation...")
             print(
-                f"Initial Population Betas: {', '.join([f'{beta.item():.2f}' for beta in self.model.population_betas])}"
+                f"Initial Population Betas: {', '.join([f'{beta.item():.2f}' for beta in self.model.population_betas.cpu()])}"
             )
             print(
-                f"Initial Population MIs: {', '.join([f'{torch.exp(logMI).item():.2f}' for logMI in self.model.log_MI])}"
+                f"Initial Population MIs: {', '.join([f'{torch.exp(logMI).item():.2f}' for logMI in self.model.log_MI.cpu()])}"
             )
-            print(f"Initial Omega:\n{self.model.omega_pop}")
-            print(f"Initial Residual Variance: {self.model.residual_var}")
+            print(f"Initial Omega:\n{self.model.omega_pop.cpu()}")
+            print(f"Initial Residual Variance: {self.model.residual_var.cpu()}")
 
         print("Phase 1 (exploration):")
         (

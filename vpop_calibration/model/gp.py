@@ -16,7 +16,7 @@ from .plot import (
     plot_obs_vs_predicted,
     plot_loss,
 )
-from ..utils import smoke_test
+from ..utils import smoke_test, device
 
 torch.set_default_dtype(torch.float64)
 gpytorch.settings.cholesky_jitter(1e-6)
@@ -277,6 +277,11 @@ class GP:
             )
         else:
             raise ValueError(f"Invalid MLL choice ({self.mll}). Choose ELBO or PLL.")
+
+        # Move all components to the selected device
+        self.model.to(device)
+        self.likelihood.to(device)
+        self.mll.to(device)
 
     def train(
         self, mini_batching: bool = False, mini_batch_size: Optional[int] = None

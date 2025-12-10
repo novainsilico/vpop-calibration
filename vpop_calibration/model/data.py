@@ -4,6 +4,8 @@ import numpy as np
 import pandas as pd
 from functools import reduce
 
+from ..utils import device
+
 
 class TrainingDataSet:
     def __init__(
@@ -131,8 +133,8 @@ class TrainingDataSet:
                 std.loc[self.parameter_names],
             )
             self.normalizing_output_mean, self.normalizing_output_std = (
-                torch.Tensor(mean.loc[self.tasks].values),
-                torch.Tensor(std.loc[self.tasks].values),
+                torch.Tensor(mean.loc[self.tasks].values).to(device),
+                torch.Tensor(std.loc[self.tasks].values).to(device),
             )
 
         # Compute the number of patients for training
@@ -161,10 +163,10 @@ class TrainingDataSet:
             ]
             self.X_validation = torch.Tensor(
                 self.validation_df_normalized[self.parameter_names].values
-            )
+            ).to(device)
             self.Y_validation = torch.Tensor(
                 self.validation_df_normalized[self.tasks].values
-            )
+            ).to(device)
 
         else:  # no validation data set provided
             self.training_df_normalized = self.normalized_df
@@ -174,10 +176,10 @@ class TrainingDataSet:
 
         self.X_training: torch.Tensor = torch.Tensor(
             self.training_df_normalized[self.parameter_names].values
-        )
+        ).to(device)
         self.Y_training: torch.Tensor = torch.Tensor(
             self.training_df_normalized[self.tasks].values
-        )
+        ).to(device)
 
     def pivot_input_data(self, data_in: pd.DataFrame) -> pd.DataFrame:
         """Pivot and reorder columns from a data frame to feed to the model
@@ -257,7 +259,7 @@ class TrainingDataSet:
 
     def normalize_inputs_tensor(self, inputs: torch.Tensor) -> torch.Tensor:
         """Normalize new inputs provided to the model as a tensor. The columns of the input tensor should be the same as [self.descriptors]"""
-        X = inputs
+        X = inputs.to(device)
         X[:, self.log_inputs_indices] = torch.log(X[:, self.log_inputs_indices])
         mean = torch.Tensor(self.normalizing_input_mean.values)
         std = torch.Tensor(self.normalizing_input_std.values)
@@ -271,7 +273,7 @@ class TrainingDataSet:
         """Given wide outputs from a model and a comparison data frame (wide format), add the patient descriptors and reshape to a long format, with a `protocol_arm` and an `output_name` column."""
         # Assuming Y is a wide output from the model, its columns are self.tasks
         base_df = pd.DataFrame(
-            data=Y.detach().float().numpy(),
+            data=Y.cpu().detach().float().numpy(),
             columns=self.tasks,
         )
         # The rows are assumed to correspond to the rows of the comparison data frame
@@ -365,7 +367,9 @@ class TrainingDataSet:
             new_data["value"] = 1.0
 
         wide_df = self.pivot_input_data(new_data)
-        tensor_inputs_wide = torch.Tensor(wide_df[self.parameter_names].values)
+        tensor_inputs_wide = torch.Tensor(wide_df[self.parameter_names].values).to(
+            device
+        )
 
         return tensor_inputs_wide, wide_df, new_data, remove_value
 
