@@ -674,9 +674,10 @@ class NlmeModel:
         sum_residuals = torch.zeros(self.nb_outputs, device=device)
         for patient in self.patients:
             for output_ind in range(self.nb_outputs):
-                mask = torch.BoolTensor(
+                mask = torch.tensor(
                     self.observations_tensors[patient]["outputs_indices"] == output_ind,
-                ).to(device)
+                    device=device,
+                ).bool()
                 n_obs = mask.sum()
                 if n_obs > 0:
                     observed = self.observations_tensors[patient]["observations"][mask]

@@ -249,7 +249,7 @@ class TrainingDataSet:
         rescaled_data = data
         for task_idx in range(self.nb_tasks):
             log_task = self.tasks[task_idx] in self.log_tasks
-            mask = torch.BoolTensor(task_indices == task_idx)
+            mask = torch.tensor(task_indices == task_idx, device=device).bool()
             rescaled_data[mask] = (
                 rescaled_data[mask] * self.normalizing_output_std[task_idx]
                 + self.normalizing_output_mean[task_idx]
