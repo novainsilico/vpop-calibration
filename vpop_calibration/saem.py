@@ -464,7 +464,9 @@ class PySaem:
 
         # 1. Update residual error variances
         sum_sq_res = self.model.sum_sq_residuals(self.current_pred)
-        target_res_var: torch.Tensor = sum_sq_res / self.model.n_tot_observations
+        target_res_var: torch.Tensor = (
+            sum_sq_res / self.model.n_tot_observations_per_output
+        )
         current_res_var: torch.Tensor = self.model.residual_var
         if k < self.nb_phase1_iterations:
             target_res_var = self._simulated_annealing(current_res_var, target_res_var)
@@ -590,7 +592,6 @@ class PySaem:
         total_log_lik = (
             self.model.log_likelihood_observation(
                 predictions,
-                self.current_full_res_var_for_MI,
             )
             .cpu()
             .sum()

@@ -41,8 +41,7 @@ class StructuralModel:
     def simulate(
         self,
         X: torch.Tensor,
-        rows: torch.Tensor,
-        tasks: torch.Tensor,
+        prediction_index: tuple[torch.Tensor, torch.Tensor, torch.Tensor],
         chunks: list[int],
     ) -> tuple[torch.Tensor, torch.Tensor]:
         raise ValueError("Not implemented")
@@ -70,17 +69,20 @@ class StructuralGp(StructuralModel):
     def simulate(
         self,
         X: torch.Tensor,
-        rows: torch.Tensor,
-        tasks: torch.Tensor,
+        prediction_index: tuple[torch.Tensor, torch.Tensor, torch.Tensor],
         chunks: list[int],
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        # X must be ordered like parameter names from the GP, and contain the full inputs (all patients, all time steps)
+        # X contains [nb_patients, nb_timesteps, nb_params + 1]
         # Simulate the GP
-        X_vertical = X.view(-1, X.shape[-1])
+        (nb_patients, nb_timesteps, nb_params) = X.shape
+        X_vertical = X.view(-1, nb_params)
         out_cat, var_cat = self.gp_model.predict_wide_scaled(X_vertical)
+        out_wide = out_cat.view(nb_patients, nb_timesteps, -1)
+        var_wide = var_cat.view(nb_patients, nb_timesteps, -1)
+
         # Retrieve the necessary rows and columns to transform into a single column tensor
-        y = out_cat.index_select(0, rows).gather(1, tasks.view(-1, 1)).squeeze(1)
-        var = var_cat.index_select(0, rows).gather(1, tasks.view(-1, 1)).squeeze(1)
+        y = out_wide[prediction_index]
+        var = var_wide[prediction_index]
         return y, var
 
 
@@ -144,20 +146,20 @@ class StructuralOdeModel(StructuralModel):
     def simulate(
         self,
         X: torch.Tensor,
-        rows: torch.Tensor,
-        tasks: torch.Tensor,
+        prediction_index: tuple[torch.Tensor, torch.Tensor, torch.Tensor],
         chunks: list[int],
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        # each X must be ordered like parameter names from the ode model
+        (nb_patients, nb_timesteps, nb_params) = X.shape
         list_X = [ind_X for ind_X in X]
-        list_rows = torch.split(rows, chunks)
-        list_tasks = torch.split(tasks, chunks)
+        patient_index_full, rows_full, tasks_full = prediction_index
+        list_rows = torch.split(rows_full, chunks)
+        list_tasks = torch.split(tasks_full, chunks)
 
         input_df_list = []
         for ind_X, ind_rows, ind_tasks in zip(list_X, list_rows, list_tasks):
             temp_id = str(uuid.uuid4())
             # Extract the parameters and time values
-            params = ind_X.index_select(0, rows).cpu().detach().numpy()
+            params = ind_X.index_select(0, ind_rows).cpu().detach().numpy()
             # Extract the task order
             task_index = ind_tasks.cpu().detach().numpy()
             # Format the data inputs

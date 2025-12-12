@@ -233,6 +233,7 @@ class TrainingDataSet:
         norm_data[selected_columns] = (norm_data[selected_columns] - mean) / std
         return norm_data, mean, std
 
+    @torch.compile
     def unnormalize_output_wide(self, data: torch.Tensor) -> torch.Tensor:
         """Unnormalize wide outputs (all tasks included) from the model."""
         unnormalized = data * self.normalizing_output_std + self.normalizing_output_mean
@@ -242,6 +243,7 @@ class TrainingDataSet:
 
         return unnormalized
 
+    @torch.compile
     def unnormalize_output_long(
         self, data: torch.Tensor, task_indices: torch.LongTensor
     ) -> torch.Tensor:
@@ -258,6 +260,7 @@ class TrainingDataSet:
                 rescaled_data[mask] = torch.exp(rescaled_data[mask])
         return rescaled_data
 
+    @torch.compile
     def normalize_inputs_tensor(self, inputs: torch.Tensor) -> torch.Tensor:
         """Normalize new inputs provided to the model as a tensor. The columns of the input tensor should be the same as [self.descriptors]"""
         X = inputs.to(device)

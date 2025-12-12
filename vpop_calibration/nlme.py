@@ -272,6 +272,9 @@ class NlmeModel:
         processed_df["task_index"] = processed_df["task"].apply(
             lambda t: self.structural_model.tasks.index(t)
         )
+        processed_df["output_index"] = processed_df["output_name"].apply(
+            lambda o: self.structural_model.output_names.index(o)
+        )
         global_time_steps = (
             processed_df["time"].drop_duplicates().sort_values().to_list()
         )
@@ -285,20 +288,19 @@ class NlmeModel:
             .unsqueeze(-1)
             .repeat((self.nb_patients, 1, 1))
         )
+        # Browse the observed data set and store relevant elements
         self.observations_tensors: dict = {}
-        self.n_tot_observations = torch.zeros(self.nb_outputs, device=device)
+        self.n_tot_observations_per_output = torch.zeros(self.nb_outputs, device=device)
         for ind, patient in enumerate(self.patients):
             this_patient = processed_df.loc[processed_df["id"] == patient]
 
             tasks_indices_np = this_patient["task_index"].values
-            outputs_indices = torch.as_tensor(
-                [
-                    self.structural_model.task_idx_to_output_idx[task]
-                    for task in tasks_indices_np
-                ],
-                device=device,
-            ).long()
-            self.n_tot_observations.scatter_add_(
+            tasks_indices = torch.as_tensor(tasks_indices_np, device=device).long()
+
+            outputs_indices_np = this_patient["output_index"].values
+            outputs_indices = torch.as_tensor(outputs_indices_np, device=device).long()
+            # Add counts of observations to the total per output
+            self.n_tot_observations_per_output.scatter_add_(
                 0,
                 outputs_indices,
                 torch.ones_like(outputs_indices, device=device, dtype=torch.float64),
@@ -310,8 +312,9 @@ class NlmeModel:
             time_step_indices = torch.as_tensor(
                 this_patient["time_step_index"].values, device=device
             ).long()
-            tasks_indices = torch.as_tensor(tasks_indices_np, device=device).long()
-            p_index_repeated = torch.full(outputs.shape, ind, dtype=torch.int64)
+            p_index_repeated = torch.full(
+                outputs.shape, ind, dtype=torch.int64, device=device
+            )
 
             self.observations_tensors.update(
                 {
@@ -330,8 +333,18 @@ class NlmeModel:
         self.full_obs_data = torch.cat(
             [self.observations_tensors[p]["observations"] for p in self.patients]
         ).to(device)
-
-        self.full_row_indices = (
+        # Construct the indexing tensors
+        self.observation_to_patient_index = (
+            torch.cat(
+                [
+                    self.observations_tensors[p]["p_index_repeated"]
+                    for p in self.patients
+                ]
+            )
+            .long()
+            .to(device)
+        )
+        self.observation_to_timestep_index = (
             torch.cat(
                 [
                     self.observations_tensors[p]["time_step_indices"]
@@ -341,13 +354,20 @@ class NlmeModel:
             .long()
             .to(device)
         )
-        self.full_task_indices = (
+        self.observation_to_task_index = (
             torch.cat(
                 [self.observations_tensors[p]["tasks_indices"] for p in self.patients]
             )
             .long()
             .to(device)
         )
+        # Construct a tuple allowing to index a 3D tensor of outputs into a 1D tensor of outputs
+        self.prediction_index = (
+            self.observation_to_patient_index,
+            self.observation_to_timestep_index,
+            self.observation_to_task_index,
+        )
+
         self.full_output_indices = (
             torch.cat(
                 [self.observations_tensors[p]["outputs_indices"] for p in self.patients]
@@ -359,16 +379,6 @@ class NlmeModel:
             self.observations_tensors[p]["observations"].cpu().shape[0]
             for p in self.patients
         ]
-        self.observation_to_patient_index = (
-            torch.cat(
-                [
-                    self.observations_tensors[p]["p_index_repeated"]
-                    for p in self.patients
-                ]
-            )
-            .long()
-            .to(device)
-        )
 
     def update_omega(self, omega: torch.Tensor) -> None:
         """Update the covariance matrix of the NLME model."""
@@ -383,11 +393,11 @@ class NlmeModel:
         )
 
     def update_res_var(self, residual_var: torch.Tensor) -> None:
-        """Update the residual variance of the NLME model."""
+        """Update the residual variance of the NLME model, while ensuring it remains positive."""
         assert (
             self.residual_var.shape == residual_var.shape
         ), f"Wrong res var shape: {residual_var.shape}, expected: {self.residual_var.shape}"
-        self.residual_var = residual_var
+        self.residual_var = residual_var.clamp(min=1e-6)
 
     def update_betas(self, betas: torch.Tensor) -> None:
         """Update the betas of the NLME model."""
@@ -417,6 +427,7 @@ class NlmeModel:
         ), f"Wrong individual parameters shape: {theta.shape}, expected: {self.current_map_estimates.shape}"
         self.current_map_estimates = theta
 
+    @torch.compile
     def sample_individual_etas(self) -> torch.Tensor:
         """Sample individual random effects from the current estimate of Omega
 
@@ -427,6 +438,7 @@ class NlmeModel:
         etas = etas_dist.sample()
         return etas
 
+    @torch.compile
     def individual_parameters(
         self,
         individual_etas: torch.Tensor,
@@ -461,6 +473,7 @@ class NlmeModel:
         )
         return thetas
 
+    @torch.compile
     def struc_model_inputs_from_theta(self, thetas: torch.Tensor) -> torch.Tensor:
         """Return model inputs for all patients
 
@@ -488,6 +501,11 @@ class NlmeModel:
             ),
             dim=2,
         )
+        assert full_inputs.shape == (
+            self.nb_patients,
+            self.nb_global_time_steps,
+            self.nb_descriptors + 1,
+        )
         return full_inputs
 
     def predict_outputs_from_theta(
@@ -505,8 +523,7 @@ class NlmeModel:
         # shape: [nb_patients, nb_time_steps, nb_params + 1]
         pred_mean, pred_var = self.structural_model.simulate(
             model_inputs,
-            self.full_row_indices,
-            self.full_task_indices,
+            self.prediction_index,
             self.chunk_sizes,
         )
         return pred_mean, pred_var
@@ -612,7 +629,6 @@ class NlmeModel:
         individual_params: torch.Tensor = self.individual_parameters(
             individual_etas=etas,
         )
-        res_var = self.residual_var.index_select(0, self.full_output_indices)
         # Run the surrogate model
         full_pred, full_var = self.predict_outputs_from_theta(individual_params)
         var_list = full_var.split(self.chunk_sizes)
@@ -624,9 +640,7 @@ class NlmeModel:
         log_priors: torch.Tensor = self._log_prior_etas(etas)
 
         # group by individual and calculate log-likelihood for each
-        log_likelihood_observations = self.log_likelihood_observation(
-            full_pred, res_var
-        )
+        log_likelihood_observations = self.log_likelihood_observation(full_pred)
 
         log_posterior = log_likelihood_observations + log_priors
         current_log_pdu = torch.log(
@@ -640,6 +654,7 @@ class NlmeModel:
             flagged_patients,
         )
 
+    @torch.compile
     def calculate_residuals(
         self, observed_data: torch.Tensor, predictions: torch.Tensor
     ) -> torch.Tensor:
@@ -659,6 +674,7 @@ class NlmeModel:
         else:
             raise ValueError("Unsupported error model type.")
 
+    @torch.compile
     def sum_sq_residuals(self, prediction: torch.Tensor) -> torch.Tensor:
         sq_residuals = torch.square(
             self.calculate_residuals(self.full_obs_data, prediction)
@@ -667,10 +683,10 @@ class NlmeModel:
         sum_residuals.scatter_add_(0, self.full_output_indices, sq_residuals)
         return sum_residuals
 
+    @torch.compile
     def log_likelihood_observation(
         self,
         predictions: torch.Tensor,
-        residual_error_var: torch.Tensor,
     ) -> torch.Tensor:
         """
         Calculates the log-likelihood of observations given predictions and error model, assuming errors follow N(0,sqrt(residual_error_var))
@@ -681,10 +697,7 @@ class NlmeModel:
         residuals: torch.Tensor = self.calculate_residuals(
             self.full_obs_data, predictions
         )
-        # ensure error_std is positive
-        res_error_var = torch.maximum(
-            torch.full_like(residual_error_var, 1e-6, device=device), residual_error_var
-        )
+        res_error_var = self.residual_var.index_select(0, self.full_output_indices)
         # Log-likelihood of normal distribution
         if self.error_model_type == "additive":
             log_lik_full = -0.5 * (
