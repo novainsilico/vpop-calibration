@@ -40,10 +40,10 @@ class StructuralModel:
 
     def simulate(
         self,
-        list_X: list[torch.Tensor],
-        list_rows: list[torch.LongTensor],
-        list_tasks: list[torch.LongTensor],
-    ) -> tuple[list[torch.Tensor], list[torch.Tensor]]:
+        X: torch.Tensor,
+        prediction_index: tuple[torch.Tensor, torch.Tensor, torch.Tensor],
+        chunks: list[int],
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         raise ValueError("Not implemented")
 
 
@@ -68,39 +68,22 @@ class StructuralGp(StructuralModel):
 
     def simulate(
         self,
-        list_X: list[torch.Tensor],
-        list_rows: list[torch.LongTensor],
-        list_tasks: list[torch.LongTensor],
-    ) -> tuple[list[torch.Tensor], list[torch.Tensor]]:
-        # X must be ordered like parameter names from the GP
-        # Concatenate all the inputs
-        X_cat = torch.cat(list_X).to(device)
-        chunk_sizes = [X.shape[0] for X in list_X]
+        X: torch.Tensor,
+        prediction_index: tuple[torch.Tensor, torch.Tensor, torch.Tensor],
+        chunks: list[int],
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        # X contains [nb_patients, nb_timesteps, nb_params + 1]
         # Simulate the GP
-        out_cat, var_cat = self.gp_model.predict_wide_scaled(X_cat)
-        # Split into individual chunks
-        pred_wide_list = torch.split(out_cat, chunk_sizes)
-        var_wide_list = torch.split(var_cat, chunk_sizes)
-        pred_list = []
-        var_list = []
-        for pred, var_wide, rows, cols in zip(
-            pred_wide_list, var_wide_list, list_rows, list_tasks
-        ):
-            y = (
-                pred.index_select(0, rows)
-                .gather(1, cols.view(-1, 1))
-                .squeeze(1)
-                .to(device)
-            )
-            var = (
-                var_wide.index_select(0, rows)
-                .gather(1, cols.view(-1, 1))
-                .squeeze(1)
-                .to(device)
-            )
-            pred_list.append(y)
-            var_list.append(var)
-        return pred_list, var_list
+        (nb_patients, nb_timesteps, nb_params) = X.shape
+        X_vertical = X.view(-1, nb_params)
+        out_cat, var_cat = self.gp_model.predict_wide_scaled(X_vertical)
+        out_wide = out_cat.view(nb_patients, nb_timesteps, -1)
+        var_wide = var_cat.view(nb_patients, nb_timesteps, -1)
+
+        # Retrieve the necessary rows and columns to transform into a single column tensor
+        y = out_wide[prediction_index]
+        var = var_wide[prediction_index]
+        return y, var
 
 
 class StructuralOdeModel(StructuralModel):
@@ -162,22 +145,23 @@ class StructuralOdeModel(StructuralModel):
 
     def simulate(
         self,
-        list_X: list[torch.Tensor],
-        list_rows: list[torch.LongTensor],
-        list_tasks: list[torch.LongTensor],
-    ) -> tuple[list[torch.Tensor], list[torch.Tensor]]:
-        # each X must be ordered like parameter names from the ode model
+        X: torch.Tensor,
+        prediction_index: tuple[torch.Tensor, torch.Tensor, torch.Tensor],
+        chunks: list[int],
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        (nb_patients, nb_timesteps, nb_params) = X.shape
+        list_X = [ind_X for ind_X in X]
+        patient_index_full, rows_full, tasks_full = prediction_index
+        list_rows = torch.split(rows_full, chunks)
+        list_tasks = torch.split(tasks_full, chunks)
 
         input_df_list = []
-        chunks_list = []
-        for X, rows, tasks in zip(list_X, list_rows, list_tasks):
+        for ind_X, ind_rows, ind_tasks in zip(list_X, list_rows, list_tasks):
             temp_id = str(uuid.uuid4())
-            # store the size of X for proper splitting
-            chunks_list.append(rows.shape[0])
             # Extract the parameters and time values
-            params = X.index_select(0, rows).cpu().detach().numpy()
+            params = ind_X.index_select(0, ind_rows).cpu().detach().numpy()
             # Extract the task order
-            task_index = tasks.cpu().detach().numpy()
+            task_index = ind_tasks.cpu().detach().numpy()
             # Format the data inputs
             # This step is where the order of parameters is implicit
             input_df_temp = pd.DataFrame(
@@ -185,7 +169,7 @@ class StructuralOdeModel(StructuralModel):
             )
             # The passed params include the _global_ time steps
             # Filter the time steps that we actually want for this patient
-            input_df_temp = input_df_temp.iloc[rows.cpu().numpy()]
+            input_df_temp = input_df_temp.iloc[ind_rows.cpu().numpy()]
             # Add the task index as a temporary column
             input_df_temp["task_index"] = task_index
             # Deduce protocol arm and output name from task index
@@ -206,13 +190,11 @@ class StructuralOdeModel(StructuralModel):
             # Add the initial conditions
             input_df_temp = input_df_temp.merge(self.init_cond_df, how="cross")
             input_df_list.append(input_df_temp)
+
         full_input = pd.concat(input_df_list)
         # Simulate the ODE model
         output_df = self.ode_model.simulate_model(full_input)
         # Convert back to tensor
         out_tensor = torch.as_tensor(output_df["predicted_value"].values, device=device)
         out_var = torch.zeros_like(out_tensor, device=device)
-        # Split into chunks
-        out_list = list(torch.split(out_tensor, chunks_list))
-        var_list = list(torch.split(out_var, chunks_list))
-        return out_list, var_list
+        return out_tensor, out_var

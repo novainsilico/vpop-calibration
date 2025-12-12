@@ -141,10 +141,10 @@ class PySaem:
 
         # Initialize the values for convergence checks
         self.prev_params: dict[str, torch.Tensor] = {
-            "log_MI": self.model.log_MI.cpu(),
-            "population_betas": self.model.population_betas.cpu(),
-            "population_omega": self.model.omega_pop.cpu(),
-            "residual_error_var": self.model.residual_var.cpu(),
+            "log_MI": self.model.log_MI,
+            "population_betas": self.model.population_betas,
+            "population_omega": self.model.omega_pop,
+            "residual_error_var": self.model.residual_var,
         }
 
         # pre-compute full design matrix once
@@ -464,7 +464,9 @@ class PySaem:
 
         # 1. Update residual error variances
         sum_sq_res = self.model.sum_sq_residuals(self.current_pred)
-        target_res_var: torch.Tensor = sum_sq_res / self.model.n_tot_observations
+        target_res_var: torch.Tensor = (
+            sum_sq_res / self.model.n_tot_observations_per_output
+        )
         current_res_var: torch.Tensor = self.model.residual_var
         if k < self.nb_phase1_iterations:
             target_res_var = self._simulated_annealing(current_res_var, target_res_var)
@@ -504,6 +506,9 @@ class PySaem:
         # 3. Update fixed effects MIs
         if self.model.nb_MI > 0:
             # This step is notoriously under-optimized
+            self.current_full_res_var_for_MI = self.model.residual_var.index_select(
+                0, self.model.full_output_indices
+            )
             target_log_MI_np = minimize(
                 fun=self.MI_objective_function,
                 x0=self.model.log_MI.cpu().squeeze().numpy(),
@@ -583,27 +588,15 @@ class PySaem:
             ),
             dim=1,
         )
-        predictions, _ = self.model.predict_outputs_from_theta(
-            new_thetas, self.model.patients
+        predictions, _ = self.model.predict_outputs_from_theta(new_thetas)
+        total_log_lik = (
+            self.model.log_likelihood_observation(
+                predictions,
+            )
+            .cpu()
+            .sum()
+            .item()
         )
-        total_log_lik = 0
-        for output_ind in range(self.model.nb_outputs):
-            for patient_ind, patient in enumerate(self.model.patients):
-                mask = torch.tensor(
-                    self.model.observations_tensors[patient]["outputs_indices"]
-                    == output_ind,
-                    device=device,
-                ).bool()
-                observed_data = self.model.observations_tensors[patient][
-                    "observations"
-                ][mask]
-                predicted_data = predictions[patient_ind][mask]
-
-                total_log_lik += self.model.log_likelihood_observation(
-                    observed_data,
-                    predicted_data,
-                    self.model.residual_var[output_ind],
-                ).cpu()
 
         return -total_log_lik
 

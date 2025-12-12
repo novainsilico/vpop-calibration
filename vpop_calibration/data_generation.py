@@ -163,7 +163,7 @@ def simulate_dataset_from_omega(
         error_model,
     )
     etas = nlme_model.sample_individual_etas()
-    theta = nlme_model.individual_parameters(etas, nlme_model.patients)
+    theta = nlme_model.individual_parameters(etas)
     vpop = pd.DataFrame(data=theta.cpu().numpy(), columns=nlme_model.descriptors)
     vpop["id"] = nlme_model.patients
     protocol_arms = patient_covariates[["id", "protocol_arm"]]
