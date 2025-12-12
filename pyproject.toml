@@ -1,6 +1,6 @@
 [project]
 name = "vpop-calibration"
-version = "2.2.9"
+version = "2.3.0"
 description = ""
 authors = [{ name = "Paul Lemarre", email = "paul.lemarre@novainsilico.ai" }]
 readme = "README.md"
