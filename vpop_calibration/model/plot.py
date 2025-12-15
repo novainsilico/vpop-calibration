@@ -1,12 +1,16 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.figure import Figure
 from typing import Optional
+from IPython.display import display, DisplayHandle
 
 from ..utils import smoke_test
 
 
-def plot_all_solutions(obs_vs_pred: pd.DataFrame) -> None:
+def plot_all_solutions(
+    obs_vs_pred: pd.DataFrame, fig_scaling: tuple[float, float]
+) -> None:
     """Plot the overlapped observations and model predictions for all patients, facetted by output and protocol.
 
     Args:
@@ -27,7 +31,10 @@ def plot_all_solutions(obs_vs_pred: pd.DataFrame) -> None:
     n_cols = nb_outputs
     n_rows = nb_protocol_arms
     _, axes = plt.subplots(
-        n_rows, n_cols, figsize=(5 * n_cols, 4 * n_rows), squeeze=False
+        n_rows,
+        n_cols,
+        figsize=(fig_scaling[0] * n_cols, fig_scaling[1] * n_rows),
+        squeeze=False,
     )
 
     cmap = plt.get_cmap("Spectral")
@@ -71,7 +78,9 @@ def plot_all_solutions(obs_vs_pred: pd.DataFrame) -> None:
         plt.show()
 
 
-def plot_individual_solution(obs_vs_pred: pd.DataFrame) -> None:
+def plot_individual_solution(
+    obs_vs_pred: pd.DataFrame, fig_scaling: tuple[float, float]
+) -> None:
     """Plot the model prediction (and confidence interval) vs. the input data for a single patient"""
     outputs = obs_vs_pred["output_name"].unique().tolist()
     nb_outputs = len(outputs)
@@ -82,7 +91,12 @@ def plot_individual_solution(obs_vs_pred: pd.DataFrame) -> None:
     patient_id = patients[0]
     ncols = nb_outputs
     nrows = nb_protocol_arms
-    _, axes = plt.subplots(nrows, ncols, figsize=(9.0 * nb_outputs, 4.0), squeeze=False)
+    _, axes = plt.subplots(
+        nrows,
+        ncols,
+        figsize=(fig_scaling[0] * nrows, fig_scaling[1] * ncols),
+        squeeze=False,
+    )
 
     patient_params = obs_vs_pred.drop(
         columns=[
@@ -138,23 +152,8 @@ def plot_individual_solution(obs_vs_pred: pd.DataFrame) -> None:
                 label="GP prediction for " + output_name + " (CI)",
             )
 
-            ax.legend(loc="upper right")
             title = f"{output_name} in {protocol_arm} for patient {patient_id}"
             ax.set_title(title)
-
-            param_text = "Parameters:\n"
-            for param in patient_params:
-                param_text += f"  {param}: {patient_params[param][0]:.3f}\n"  # Format to 4 decimal places
-
-            ax.text(
-                1.02,
-                0.98,
-                param_text,
-                transform=ax.transAxes,  # Coordinate system is relative to the axis
-                fontsize=9,
-                verticalalignment="top",
-                bbox=dict(boxstyle="round,pad=0.5", fc="wheat", alpha=0.5, ec="k"),
-            )
 
     if not smoke_test:
         plt.tight_layout()
@@ -162,7 +161,9 @@ def plot_individual_solution(obs_vs_pred: pd.DataFrame) -> None:
 
 
 def plot_obs_vs_predicted(
-    obs_vs_pred: pd.DataFrame, logScale: Optional[list[bool]] = None
+    obs_vs_pred: pd.DataFrame,
+    fig_scaling: tuple[float, float],
+    logScale: Optional[list[bool]] = None,
 ) -> None:
     """Plots the observed vs. predicted values on the training or validation data set, or on a new data set."""
 
@@ -175,7 +176,10 @@ def plot_obs_vs_predicted(
     n_cols = nb_outputs
     n_rows = nb_protocol_arms
     _, axes = plt.subplots(
-        n_rows, n_cols, figsize=(5 * n_cols, 4 * n_rows), squeeze=False
+        n_rows,
+        n_cols,
+        figsize=(fig_scaling[0] * n_cols, fig_scaling[1] * n_rows),
+        squeeze=False,
     )
 
     if not logScale:
@@ -232,12 +236,34 @@ def plot_obs_vs_predicted(
         plt.show()
 
 
-def plot_loss(iterations: np.ndarray, losses: np.ndarray) -> None:
-    # plot the loss over iterations
-    plt.plot(iterations, losses)
-    plt.xlabel("Iteration")
-    plt.ylabel("Loss")
-    plt.title("Training Loss over Iterations")
+class LossPlot:
+    def __init__(self, nb_iter_max: int):
+        self.fig, self.ax = plt.subplots(ncols=1, nrows=1)
+        (tr1,) = plt.plot([0], [0], label="Training")
+        (tr2,) = plt.plot([0], [0], label="Validation")
+        self.traces = {
+            "training": tr1,
+            "validation": tr2,
+        }
+        plt.xlabel("Iteration")
+        plt.ylabel("Loss")
+        self.ax.legend()
 
-    if not smoke_test:
-        plt.show()
+        plt.title("Training and validation loss over Iterations")
+        if not smoke_test:
+            self.handle = display(self.fig, display_id=True)
+
+    def update_plot(
+        self,
+        iterations: np.ndarray,
+        train_losses: np.ndarray,
+        validation_losses: np.ndarray,
+    ):
+        self.traces["training"].set_data(iterations, train_losses)
+        if len(validation_losses) > 0:
+            self.traces["validation"].set_data(iterations, validation_losses)
+        if not smoke_test:
+            assert self.handle is not None
+            self.ax.relim()
+            self.ax.autoscale_view(scalex=True, scaley=True)
+            self.handle.update(self.fig)

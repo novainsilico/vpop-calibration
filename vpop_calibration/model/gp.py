@@ -14,7 +14,7 @@ from .plot import (
     plot_all_solutions,
     plot_individual_solution,
     plot_obs_vs_predicted,
-    plot_loss,
+    LossPlot,
 )
 from ..utils import smoke_test, device
 
@@ -166,6 +166,8 @@ class GP:
         kernel: str = "RBF",  # RBF or SMK
         deep_kernel: bool = True,
         nb_training_iter: int = 400,
+        min_delta: float = 0.05,
+        patience: int = 50,
         training_proportion: float = 0.7,
         nb_inducing_points: int = 200,
         data_already_normalized: bool = False,
@@ -180,6 +182,7 @@ class GP:
         num_mixtures: int = 4,  # only for the SMK kernel
         nb_features: int = 10,  # only for the DK kernel
         jitter: float = 1e-6,
+        plot_frame_rate: int = 10,
     ):
         """Instantiate a GP model on a training data frame
 
@@ -228,6 +231,11 @@ class GP:
         self.jitter = jitter
         if lr_decay is not None:
             self.lr_decay = lr_decay
+
+        self.min_delta = min_delta
+        self.patience = patience
+        self.min_loss = np.inf
+        self.plot_frame_rate = plot_frame_rate
 
         self.data = TrainingDataSet(
             training_df,
@@ -307,61 +315,126 @@ class GP:
             scheduler = None
 
         # keep track of the loss
-        losses_list = []
+        self.training_losses = []
+        self.validation_losses = []
+
+        self.loss_plot = LossPlot(self.nb_training_iter)
+
         epochs = tqdm(range(self.nb_training_iter), desc="Epochs", position=0)
         with gpytorch.settings.observation_nan_policy("fill"):
-            # Batch training loop
             if mini_batching:
                 # set the mini_batch_size to a power of two of the total size -4
                 if mini_batch_size == None:
                     power = np.maximum(
                         math.floor(math.log2(self.data.X_training.shape[0])) - 4, 1
                     )
-                    self.mini_batch_size: int = math.floor(2**power)
+                    self.mini_batch_size: int | None = math.floor(2**power)
                 else:
                     self.mini_batch_size = mini_batch_size
-
-                # prepare mini-batching
-                train_dataset = TensorDataset(
-                    self.data.X_training, self.data.Y_training
-                )
-                train_loader = DataLoader(
-                    train_dataset,
-                    batch_size=self.mini_batch_size,
-                    shuffle=True,
-                )
-
-                # main training loop
-                for _ in epochs:
-                    for batch_params, batch_outputs in tqdm(
-                        train_loader, desc="Batch progress", position=1, leave=False
-                    ):
-                        optimizer.zero_grad()  # zero gradients from previous iteration
-                        output = self.model(batch_params)  # recalculate the prediction
-                        loss = -cast(torch.Tensor, self.mll(output, batch_outputs))
-                        loss.backward()  # compute the gradients of the parameters that can be changed
-                        epochs.set_postfix({"loss": loss.item()})
-                        optimizer.step()
-                    if scheduler is not None:
-                        scheduler.step()
-
-            # Full data set training loop
             else:
-                for _ in epochs:
-                    optimizer.zero_grad()  # zero gradients from previous iteration
-                    output = self.model(
-                        self.data.X_training
-                    )  # calculate the prediction with current parameters
-                    loss = -cast(torch.Tensor, self.mll(output, self.data.Y_training))
-                    loss.backward()  # compute the gradients of the parameters that can be changed
-                    losses_list.append(loss.item())
-                    optimizer.step()
-                    epochs.set_postfix({"loss": loss.item()})
-                    if scheduler is not None:
-                        scheduler.step()
-            self.losses = losses_list
+                # No batching - load the whole data set at each iteration
+                self.mini_batch_size = self.data.X_training.shape[0]
 
-    def _predict_training(self, X: torch.Tensor):
+            # prepare data loader
+            train_dataset = TensorDataset(self.data.X_training, self.data.Y_training)
+            train_loader = DataLoader(
+                train_dataset,
+                batch_size=self.mini_batch_size,
+                shuffle=True,
+            )
+
+            # main training loop
+            for i in epochs:
+                epoch_loss = 0.0
+                for batch_params, batch_outputs in tqdm(
+                    train_loader, desc="Batch progress", position=1, leave=False
+                ):
+                    optimizer.zero_grad()  # zero gradients from previous iteration
+                    output = self.model(batch_params)  # recalculate the prediction
+                    loss = -cast(torch.Tensor, self.mll(output, batch_outputs))
+                    loss.backward()  # compute the gradients of the parameters that can be changed
+                    optimizer.step()
+                    epoch_loss += loss.item()
+                self.training_losses.append(epoch_loss)
+                if scheduler is not None:
+                    scheduler.step()
+                # In case we have a validatio ndata set
+                if self.data.training_proportion < 1.0:
+                    validation_loss = -cast(
+                        torch.Tensor,
+                        self.mll(
+                            self.model(self.data.X_validation),
+                            self.data.Y_validation,
+                        ),
+                    ).item()
+                    # Append validation loss
+                    self.validation_losses.append(validation_loss)
+                    epochs.set_postfix(
+                        {
+                            "training loss": epoch_loss,
+                            "validation loss": validation_loss,
+                        }
+                    )
+                    # Define the loss that will be tested for convergence
+                    current_loss = float(validation_loss)
+                    if i > 0:
+                        previous_loss = self.validation_losses[-2]
+                    else:
+                        previous_loss = np.inf
+                else:
+                    current_loss = float(epoch_loss)
+                    if i > 0:
+                        previous_loss = self.training_losses[-2]
+                    else:
+                        previous_loss = np.inf
+                    epochs.set_postfix(
+                        {
+                            "training loss": epoch_loss,
+                        }
+                    )
+                if self.early_stop(current_loss, previous_loss):
+                    # Break out of the iterations
+                    print(f"Early convergence reached, stopping after {i} iterations.")
+                    # Update loss plot one final time
+                    self.loss_plot.update_plot(
+                        np.arange(i + 1),
+                        np.array(self.training_losses),
+                        np.array(self.validation_losses),
+                    )
+                    break
+                # Update loss plot at frame rate
+                if (i % self.plot_frame_rate == 0) | (i == self.nb_training_iter - 1):
+                    self.loss_plot.update_plot(
+                        np.arange(i + 1),
+                        np.array(self.training_losses),
+                        np.array(self.validation_losses),
+                    )
+            plt.close(self.loss_plot.fig)
+
+    def early_stop(self, current_loss: float, previous_loss: float) -> bool:
+        """Early convergence criterion
+
+        Returns a stop signal when the loss is stabilized for more than a certain number of iterations (self.patience)
+
+        Args:
+            current_loss (float): The loss from current iteration
+            previous_loss (float): The loss from previous iteration
+
+        Returns:
+            bool: True is convergence criterion is met
+        """
+        converged = False
+        if np.abs(current_loss - previous_loss) > self.min_delta:
+            self.patience_counter = 0
+        else:
+            self.patience_counter += 1
+            if self.patience_counter >= self.patience:
+                converged = True
+        return converged
+
+    def _predict_training(
+        self, X: torch.Tensor
+    ) -> tuple[torch.Tensor, tuple[torch.Tensor, torch.Tensor]]:
         """Internal method used to predict normalized outputs on normalized inputs."""
         self.model.eval()
         self.likelihood.eval()
@@ -372,7 +445,7 @@ class GP:
                 self.likelihood(self.model(X)),
             )
 
-        return pred.mean, pred.confidence_region
+        return pred.mean, pred.confidence_region()
 
     def predict_wide_scaled(self, X: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """Predict mean and interval confidence values for a given input tensor (normalized inputs). This function outputs rescaled values."""
@@ -404,14 +477,6 @@ class GP:
         else:
             out_mean = self.data.unnormalize_output_long(pred.mean, task_indices=tasks)
         return out_mean, pred.variance
-
-    def plot_loss(self) -> None:
-        if not hasattr(self, "losses"):
-            raise ValueError("Cannot plot loss before training the model.")
-        # plot the loss over iterations
-        iterations = np.arange(1, self.nb_training_iter + 1)
-        losses = np.array(self.losses)
-        plot_loss(iterations, losses)
 
     def RMSE(self, y1: torch.Tensor, y2: torch.Tensor) -> torch.Tensor:
         """Given two tensors of same shape, compute the Root Mean Squared Error on each column (outputs)."""
@@ -482,27 +547,38 @@ class GP:
         out_df = self.data.merge_predictions_long(pred, wide_df, long_df, remove_value)
         return out_df
 
-    def plot_obs_vs_predicted(self, data_set: pd.DataFrame | str, logScale=None):
+    def plot_obs_vs_predicted(
+        self,
+        data_set: pd.DataFrame | str,
+        fig_scaling: tuple[float, float] = (5.0, 2.0),
+        logScale=None,
+    ):
         """Plots the observed vs. predicted values on the training or validation data set, or on a new data set."""
 
         obs_vs_pred = self.predict_new_data(data_set)
-        plot_obs_vs_predicted(obs_vs_pred, logScale)
+        plot_obs_vs_predicted(obs_vs_pred, fig_scaling, logScale)
 
     # plot function
-    def plot_individual_solution(self, patient_number: int):
+    def plot_individual_solution(
+        self, patient_number: int, fig_scaling: tuple[float, float] = (5.0, 3.0)
+    ):
         """Plot the model prediction (and confidence interval) vs. the input data for a single patient from the GP's internal data set. Can be either training or validation patient."""
         patient_index = self.data.patients[patient_number]
         input_df = self.data.full_df_raw.loc[
             self.data.full_df_raw["id"] == patient_index
         ]
         obs_vs_pred = self.predict_new_data(input_df)
-        plot_individual_solution(obs_vs_pred)
+        plot_individual_solution(obs_vs_pred, fig_scaling)
 
-    def plot_all_solutions(self, data_set: str | pd.DataFrame):
+    def plot_all_solutions(
+        self,
+        data_set: str | pd.DataFrame,
+        fig_scaling: tuple[float, float] = (5.0, 2.0),
+    ):
         """Plot the overlapped observations and model predictions for all patients, either on one the GP's intrinsic data sets, or on a new data set."""
 
         obs_vs_pred = self.predict_new_data(data_set)
-        plot_all_solutions(obs_vs_pred)
+        plot_all_solutions(obs_vs_pred, fig_scaling)
 
 
 class LargeFeatureExtractor(torch.nn.Sequential):

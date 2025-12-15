@@ -1,12 +1,12 @@
 import torch
 import matplotlib.pyplot as plt
+from matplotlib.figure import Figure
 from scipy.optimize import minimize
 from tqdm.notebook import tqdm
 from typing import Union, Optional
 from pandas import DataFrame
-import pandas as pd
 import numpy as np
-from IPython.display import display
+from IPython.display import display, DisplayHandle
 
 from .utils import smoke_test, device
 from .nlme import NlmeModel
@@ -721,7 +721,7 @@ class PySaem:
         self,
         indiv_figsize: tuple[float, float] = (2.0, 1.2),
         n_cols: int = 3,
-    ):
+    ) -> tuple[DisplayHandle | None, Figure, np.ndarray]:
         """
         This method plots the evolution of the estimated parameters (MI, betas, omega, residual error variances) across iterations
         """
