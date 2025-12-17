@@ -37,16 +37,16 @@ struct_model_ode = StructuralOdeModel(ode_model, protocol_design, initial_condit
 
 The patient descriptors $\theta_i$ are divided in 4 groups:
 
-- PDK: patient descriptors known. These are parameters informed by the data set, which are used by the structural model directly. Their value is known for each patient.
-- PDU: patient descriptors unknown. These are parameters with inter-individual variability. Their distribution is unknown (to be calibrated).
-- MI: Model intrinsic. These are parameters which are assumed to be constant in the population, but their value is unknown (to be calibrated).
+- PDK: patient descriptors known, denoted as $\nu_i$. These are parameters informed by the data set, which are used by the structural model directly. Their value is known for each patient.
+- PDU: patient descriptors unknown, denoted as $\phi_i$. These are parameters with inter-individual variability. Their distribution is unknown (to be calibrated).
+- MI: Model intrinsic, denoted as $\psi_i$. These are parameters which are assumed to be constant in the population, but their value is unknown (to be calibrated).
 
 #### PDUs
 
 The PDUs are assumed to follow a multivariate log-normal distribution
 
 ```math
-\log \text{PDU} = \beta X_i + \eta_i, \\
+\log \psi_i = \beta X_i + \eta_i, \\
 \eta \sim \mathcal{N}(0, \Omega)
 ```
 
@@ -132,7 +132,7 @@ y_{i,j} = f(\theta_i, t_{i,j}) (1 + \sigma \varepsilon_{i,j}), \\
 
 ## Likelihood maximization
 
-Optimizing an NLME model with respect to an observation data set can be expressed as a maximum likelihood problem. In fact this formulation only applies to the framework of optimizing the PDU distributions, and handling MI (fixed effects) is a specific issue. We assume now that all parameters are PDUs.
+Optimizing an NLME model with respect to an observation data set can be expressed as a maximum likelihood problem. In fact this formulation only applies to the framework of optimizing the PDU distributions, and handling MI (fixed effects) is a specific issue. We assume now that all parameters are PDUs ($\theta_i = \phi_i$).
 
 ### Total likelihood formulation
 
@@ -162,7 +162,7 @@ For an individual patient $i$, the likelihood of the individual parameters $\the
 ```
 
 > [!TIP]
-> This is implemented in the `NlmeModel` class, as the method `log_likelihood_observation` - see [nlme.py](../vpop_calibration/nlme.py#687)
+> This is implemented in the `NlmeModel` class, as the method `log_likelihood_observation` - see [nlme.py](../vpop_calibration/nlme.py)
 
 ### Likelihood of individual parameters
 
@@ -179,6 +179,6 @@ allows to write their contribution to the likelihood as
 ```
 
 > [!TIP]
-> This is implemented in the `NlmeModel` class, as the method `_log_prior_etas` - see [nlme.py](../vpop_calibration/nlme.py#584)
+> This is implemented in the `NlmeModel` class, as the method `_log_prior_etas` - see [nlme.py](../vpop_calibration/nlme.py)
 
 [^Lindstrom90]: Lindstrom, M. J., & Bates, D. M. (1990). Nonlinear Mixed Effects Models for Repeated Measures Data. Biometrics, 46(3), 673–687. https://doi.org/10.2307/2532087
