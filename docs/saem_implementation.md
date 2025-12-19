@@ -10,7 +10,8 @@ In order to run SAEM, the following elements are necessary
 - a data set, containing observations for each patient of the NLME model
 - prior estimates, or guesses, regarding the distribution parameters of the NLME model
 
-> [!TIP] The `PySaem` class implements the optimizer that allows to run SAEM. The source code is available in [saem.py](../vpop_calibration/saem.py)
+> [!TIP] Implementation:
+> The `PySaem` class implements the optimizer that allows to run SAEM. The source code is available in [saem.py](../vpop_calibration/saem.py)
 
 ## SAEM overview
 
@@ -112,7 +113,8 @@ The MI parameters are updated by maximizing the likelihood function over all obs
 \psi^{k+1} = \underset{\psi}{\arg \max} \sum_{i} \log p(\mathbf{y} | \theta^{k+1}, \psi^{k}, \sigma^{k+1})
 ```
 
-> [!TIP] Note: this is a crucially limiting step in the current implementation, as it involves calling an external optimizer.
+> [!TIP] Note:
+> this is a crucially limiting step in the current implementation, as it involves calling an external optimizer.
 
 ### References
 

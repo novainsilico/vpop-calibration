@@ -39,6 +39,7 @@ The patient descriptors $\theta_i$ are divided in 4 groups:
 
 - PDK: patient descriptors known, denoted as $\nu_i$. These are parameters informed by the data set, which are used by the structural model directly. Their value is known for each patient.
 - PDU: patient descriptors unknown, denoted as $\phi_i$. These are parameters with inter-individual variability. Their distribution is unknown (to be calibrated).
+- Covariates: similarly to PDK, these are informed by the data. However, they are not used by the structural model, instead their effect is incorporated inside the statistical model.
 - MI: Model intrinsic, denoted as $\psi_i$. These are parameters which are assumed to be constant in the population, but their value is unknown (to be calibrated).
 
 #### PDUs
