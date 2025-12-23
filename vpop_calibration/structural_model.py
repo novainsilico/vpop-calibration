@@ -2,6 +2,7 @@ import torch
 import pandas as pd
 import numpy as np
 import uuid
+from typing import Callable
 
 from .model.gp import GP
 from .ode import OdeModel
@@ -198,3 +199,57 @@ class StructuralOdeModel(StructuralModel):
         out_tensor = torch.as_tensor(output_df["predicted_value"].values, device=device)
         out_var = torch.zeros_like(out_tensor, device=device)
         return out_tensor, out_var
+
+
+class StructuralAnalytical(StructuralModel):
+    def __init__(
+        self, equations: Callable, parameter_names: list[str], variable_names: list[str]
+    ):
+        self.equations = equations
+        output_names: list[str] = variable_names
+        protocol_arms = ["identity"]
+        tasks: list[str] = [
+            output + "_" + protocol
+            for protocol in protocol_arms
+            for output in output_names
+        ]
+        # Map tasks to output names
+        task_to_output = {
+            output_name + "_" + protocol_arm: output_name
+            for output_name in output_names
+            for protocol_arm in protocol_arms
+        }
+        # Map task index to output index
+        task_idx_to_output_idx = {
+            tasks.index(k): output_names.index(v) for k, v in task_to_output.items()
+        }
+        # Map task to protocol arm
+        task_to_protocol = {
+            output_name + "_" + protocol_arm: protocol_arm
+            for output_name in output_names
+            for protocol_arm in protocol_arms
+        }
+        # Map task index to protocol arm
+        task_idx_to_protocol = {tasks.index(k): v for k, v in task_to_protocol.items()}
+
+        super().__init__(
+            parameter_names,
+            output_names,
+            protocol_arms,
+            tasks,
+            task_idx_to_output_idx,
+            task_idx_to_protocol,
+        )
+
+    def simulate(
+        self,
+        X: torch.Tensor,
+        prediction_index: tuple[torch.Tensor, torch.Tensor, torch.Tensor],
+        chunks: list[int],
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        params = X.split(1, dim=-1)
+        outputs = self.equations(*params)
+        y = outputs[prediction_index]
+        pred_var = torch.zeros_like(y)
+
+        return y, pred_var

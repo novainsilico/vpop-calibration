@@ -427,7 +427,6 @@ class NlmeModel:
         ), f"Wrong individual parameters shape: {theta.shape}, expected: {self.current_map_estimates.shape}"
         self.current_map_estimates = theta
 
-    @torch.compile
     def sample_individual_etas(self) -> torch.Tensor:
         """Sample individual random effects from the current estimate of Omega
 
@@ -454,7 +453,7 @@ class NlmeModel:
         Returns:
             torch.Tensor [nb_patients x nb_parameters]: One parameter set for each patient. Dim 0 corresponds to the patients, dim 1 is the parameters
         """
-        # Compute the inidividual PDU
+        # Compute the individual PDU
         log_thetas_PDU = (
             self.full_design_matrix @ self.population_betas + individual_etas
         )
