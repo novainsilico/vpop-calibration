@@ -73,17 +73,24 @@ class StructuralGp(StructuralModel):
         prediction_index: tuple[torch.Tensor, torch.Tensor, torch.Tensor],
         chunks: list[int],
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        # X contains [nb_patients, nb_timesteps, nb_params + 1]
+        (num_chains, nb_patients, nb_timesteps, nb_params) = X.shape
+        nb_obs_per_chain = prediction_index[0].shape[0]
+        prediction_index_expanded = (
+            torch.arange(num_chains).repeat_interleave(nb_obs_per_chain),
+            prediction_index[0].repeat(num_chains),
+            prediction_index[1].repeat(num_chains),
+            prediction_index[2].repeat(num_chains),
+        )
         # Simulate the GP
-        (nb_patients, nb_timesteps, nb_params) = X.shape
         X_vertical = X.view(-1, nb_params)
         out_cat, var_cat = self.gp_model.predict_wide_scaled(X_vertical)
-        out_wide = out_cat.view(nb_patients, nb_timesteps, -1)
-        var_wide = var_cat.view(nb_patients, nb_timesteps, -1)
+        num_tasks = out_cat.shape[-1]
+        out_wide = out_cat.view(num_chains, nb_patients, nb_timesteps, -1)
+        var_wide = var_cat.view(num_chains, nb_patients, nb_timesteps, -1)
 
         # Retrieve the necessary rows and columns to transform into a single column tensor
-        y = out_wide[prediction_index]
-        var = var_wide[prediction_index]
+        y = out_wide[prediction_index_expanded].view(num_chains, nb_obs_per_chain)
+        var = var_wide[prediction_index_expanded].view(num_chains, nb_obs_per_chain)
         return y, var
 
 
@@ -150,55 +157,63 @@ class StructuralOdeModel(StructuralModel):
         prediction_index: tuple[torch.Tensor, torch.Tensor, torch.Tensor],
         chunks: list[int],
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        (nb_patients, nb_timesteps, nb_params) = X.shape
-        list_X = [ind_X for ind_X in X]
+        (nb_chains, nb_patients, nb_timesteps, nb_params) = X.shape
         patient_index_full, rows_full, tasks_full = prediction_index
         list_rows = torch.split(rows_full, chunks)
         list_tasks = torch.split(tasks_full, chunks)
 
-        input_df_list = []
-        for ind_X, ind_rows, ind_tasks in zip(list_X, list_rows, list_tasks):
-            temp_id = str(uuid.uuid4())
-            # Extract the parameters and time values
-            params = ind_X.index_select(0, ind_rows).cpu().detach().numpy()
-            # Extract the task order
-            task_index = ind_tasks.cpu().detach().numpy()
-            # Format the data inputs
-            # This step is where the order of parameters is implicit
-            input_df_temp = pd.DataFrame(
-                data=params, columns=self.parameter_names + ["time"]
-            )
-            # The passed params include the _global_ time steps
-            # Filter the time steps that we actually want for this patient
-            input_df_temp = input_df_temp.iloc[ind_rows.cpu().numpy()]
-            # Add the task index as a temporary column
-            input_df_temp["task_index"] = task_index
-            # Deduce protocol arm and output name from task index
-            input_df_temp["protocol_arm"] = input_df_temp["task_index"].apply(
-                lambda t: self.task_idx_to_protocol[t]
-            )
-            input_df_temp["output_name"] = input_df_temp["task_index"].apply(
-                lambda t: self.output_names[self.task_idx_to_output_idx[t]]
-            )
-            # Remove the unnecessary task index column
-            input_df_temp = input_df_temp.drop(columns=["task_index"])
-            input_df_temp["id"] = temp_id
-            # Add the protocol overrides
-            if self.nb_protocol_overrides > 0:
-                input_df_temp = input_df_temp.merge(
-                    self.protocol_design, how="left", on=["protocol_arm"]
-                )
-            # Add the initial conditions
-            input_df_temp = input_df_temp.merge(self.init_cond_df, how="cross")
-            input_df_list.append(input_df_temp)
+        output_list = []
+        for chain_X in X:  # iterate through the individual chains
+            # Separate the individual patients
+            list_X = [ind_X for ind_X in chain_X]
 
-        full_input = pd.concat(input_df_list)
-        # Simulate the ODE model
-        output_df = self.ode_model.simulate_model(full_input)
-        # Convert back to tensor
-        out_tensor = torch.as_tensor(output_df["predicted_value"].values, device=device)
-        out_var = torch.zeros_like(out_tensor, device=device)
-        return out_tensor, out_var
+            input_df_list = []
+            for ind_X, ind_rows, ind_tasks in zip(list_X, list_rows, list_tasks):
+                temp_id = str(uuid.uuid4())
+                # Extract the parameters and time values
+                params = ind_X.index_select(0, ind_rows).cpu().detach().numpy()
+                # Extract the task order
+                task_index = ind_tasks.cpu().detach().numpy()
+                # Format the data inputs
+                # This step is where the order of parameters is implicit
+                input_df_temp = pd.DataFrame(
+                    data=params, columns=self.parameter_names + ["time"]
+                )
+                # The passed params include the _global_ time steps
+                # Filter the time steps that we actually want for this patient
+                input_df_temp = input_df_temp.iloc[ind_rows.cpu().numpy()]
+                # Add the task index as a temporary column
+                input_df_temp["task_index"] = task_index
+                # Deduce protocol arm and output name from task index
+                input_df_temp["protocol_arm"] = input_df_temp["task_index"].apply(
+                    lambda t: self.task_idx_to_protocol[t]
+                )
+                input_df_temp["output_name"] = input_df_temp["task_index"].apply(
+                    lambda t: self.output_names[self.task_idx_to_output_idx[t]]
+                )
+                # Remove the unnecessary task index column
+                input_df_temp = input_df_temp.drop(columns=["task_index"])
+                input_df_temp["id"] = temp_id
+                # Add the protocol overrides
+                if self.nb_protocol_overrides > 0:
+                    input_df_temp = input_df_temp.merge(
+                        self.protocol_design, how="left", on=["protocol_arm"]
+                    )
+                # Add the initial conditions
+                input_df_temp = input_df_temp.merge(self.init_cond_df, how="cross")
+                input_df_list.append(input_df_temp)
+
+            full_input = pd.concat(input_df_list)
+            # Simulate the ODE model
+            output_df = self.ode_model.simulate_model(full_input)
+            # Convert back to tensor
+            out_tensor = torch.as_tensor(
+                output_df["predicted_value"].values, device=device
+            )
+            output_list.append(out_tensor)
+        out_full = torch.stack(output_list, dim=0).to(device)
+        out_var = torch.zeros_like(out_full)
+        return out_full, out_var
 
 
 class StructuralAnalytical(StructuralModel):
@@ -247,9 +262,17 @@ class StructuralAnalytical(StructuralModel):
         prediction_index: tuple[torch.Tensor, torch.Tensor, torch.Tensor],
         chunks: list[int],
     ) -> tuple[torch.Tensor, torch.Tensor]:
+        (num_chains, nb_patients, nb_timesteps, nb_params) = X.shape
+        nb_obs_per_chain = prediction_index[0].shape[0]
+        prediction_index_expanded = (
+            torch.arange(num_chains).repeat_interleave(nb_obs_per_chain),
+            prediction_index[0].repeat(num_chains),
+            prediction_index[1].repeat(num_chains),
+            prediction_index[2].repeat(num_chains),
+        )
         params = X.split(1, dim=-1)
         outputs = self.equations(*params)
-        y = outputs[prediction_index]
+        y = outputs[prediction_index_expanded].view(num_chains, nb_obs_per_chain)
         pred_var = torch.zeros_like(y)
 
         return y, pred_var

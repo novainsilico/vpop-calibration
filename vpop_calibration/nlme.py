@@ -18,6 +18,7 @@ class NlmeModel:
         covariate_map: Optional[dict[str, dict[str, dict[str, str | float]]]] = None,
         error_model_type: str = "additive",
         pred_var_threshold: float = 1e-2,
+        num_chains: int = 3,
     ):
         """Create a non-linear mixed effects model
 
@@ -44,7 +45,7 @@ class NlmeModel:
 
         self.MI_names: list[str] = list(init_log_MI.keys())
         self.nb_MI: int = len(self.MI_names)
-        self.initial_log_MI = torch.tensor([val for _, val in init_log_MI.items()]).to(
+        self.init_log_MI = torch.tensor([val for _, val in init_log_MI.items()]).to(
             device
         )
         self.PDU_names: list[str] = list(init_PDU.keys())
@@ -141,7 +142,7 @@ class NlmeModel:
             self.structural_model.parameter_names
         ):
             raise ValueError(
-                f"Non-matching descriptor set and structural model parameter set:\n{set(self.PDK_names + self.PDU_names + self.MI_names)}\n{set(self.structural_model.parameter_names)}"
+                f"Non-matching descriptor set and structural model parameter set:\nPDK, PDU, MI: {set(self.PDK_names + self.PDU_names + self.MI_names)}\nStructural model descriptors: {set(self.structural_model.parameter_names)}"
             )
 
         self.descriptors: list[str] = self.PDK_names + self.PDU_names + self.MI_names
@@ -161,6 +162,7 @@ class NlmeModel:
         self.nb_outputs: int = self.structural_model.nb_outputs
         self.error_model_type: str = error_model_type
         self.init_res_var = torch.as_tensor(init_res_var, device=device)
+        # Initialize the covariance matrix with diagonal entries
         self.init_omega = torch.diag(
             torch.as_tensor(
                 [float(init_PDU[pdu]["sd"]) for pdu in self.PDU_names], device=device
@@ -170,24 +172,29 @@ class NlmeModel:
         # Assemble the list of design matrices from the covariance structure
         self.design_matrices = self._create_all_design_matrices()
         # Store the full design matrix on the device
+        # Size (nb_patients, nb_PDU, nb_betas)
         self.full_design_matrix = torch.stack(
             [self.design_matrices[p] for p in self.patients]
         ).to(device)
 
-        # Initiate the nlme parameters
-        self.log_MI = self.initial_log_MI
-        self.population_betas = self.initial_betas
-        self.omega_pop = self.init_omega
-        self.omega_pop_lower_chol = torch.linalg.cholesky(self.omega_pop).to(device)
-        self.residual_var = self.init_res_var
-        self.eta_distribution = torch.distributions.MultivariateNormal(
-            loc=torch.zeros(self.nb_PDU, device=device),
-            covariance_matrix=self.omega_pop,
+        # Initiate the NLME parameters
+        self.num_chains = num_chains
+        self.update_current_parameters(
+            omega=self.init_omega,
+            beta=self.initial_betas,
+            log_mi=self.init_log_MI,
+            res_var=self.init_res_var,
         )
-        self.current_eta_samples = self.sample_individual_etas()
-        self.current_map_estimates = self.individual_parameters(
-            self.current_eta_samples
-        )
+
+        # Initiate the patient parameters
+        self.init_etas = self.sample_etas_chains()
+        self.update_eta_samples(self.init_etas)
+        # Compute a first naive guess for the patient parameters on all chains
+        gaussian_params = self.etas_to_gaussian_params(self.eta_samples_chains)
+        physical_params = self.gaussian_to_physical_params(gaussian_params)
+        # Average over the chains to estimate the current patient descriptors
+        theta = self.assemble_individual_parameters(physical_params).mean(dim=0)
+        self.update_map_estimates(theta)
 
     def _create_design_matrix(self, covariates: dict[str, float]) -> torch.Tensor:
         """
@@ -328,11 +335,14 @@ class NlmeModel:
                     }
                 }
             )
+        self.nb_tot_obs = self.n_tot_observations_per_output.sum()
 
         # Build the full data set tensors
         self.full_obs_data = torch.cat(
             [self.observations_tensors[p]["observations"] for p in self.patients]
         ).to(device)
+        assert self.full_obs_data.shape[0] == self.nb_tot_obs
+
         # Construct the indexing tensors
         self.observation_to_patient_index = (
             torch.cat(
@@ -381,66 +391,156 @@ class NlmeModel:
         ]
 
     def update_omega(self, omega: torch.Tensor) -> None:
-        """Update the covariance matrix of the NLME model."""
+        """Update the covariance matrix of the NLME model and the distribution of random effects."""
+
+        if hasattr(self, "omega_pop"):
+            expected_shape = self.omega_pop.shape
+        else:
+            expected_shape = (self.nb_PDU, self.nb_PDU)
         assert (
-            self.omega_pop.shape == omega.shape
-        ), f"Wrong omega shape: {omega.shape}, expected: {self.omega_pop.shape}"
+            omega.shape == expected_shape
+        ), f"Wrong shape in omega update: {omega.shape}, expected: {expected_shape}"
+
         self.omega_pop = omega
         self.omega_pop_lower_chol = torch.linalg.cholesky(self.omega_pop).to(device)
         self.eta_distribution = torch.distributions.MultivariateNormal(
             loc=torch.zeros(self.nb_PDU, device=device),
             covariance_matrix=self.omega_pop,
-        )
+        ).expand([self.num_chains, self.nb_patients])
 
     def update_res_var(self, residual_var: torch.Tensor) -> None:
         """Update the residual variance of the NLME model, while ensuring it remains positive."""
+
+        if hasattr(self, "residual_var"):
+            expected_shape = self.residual_var.shape
+        else:
+            expected_shape = (self.nb_outputs,)
         assert (
-            self.residual_var.shape == residual_var.shape
-        ), f"Wrong res var shape: {residual_var.shape}, expected: {self.residual_var.shape}"
+            residual_var.shape == expected_shape
+        ), f"Wrong shape in residual variance update: {residual_var.shape}, expected: {expected_shape}"
+
         self.residual_var = residual_var.clamp(min=1e-6)
 
     def update_betas(self, betas: torch.Tensor) -> None:
         """Update the betas of the NLME model."""
+
+        if hasattr(self, "population_betas"):
+            expected_shape = self.population_betas.shape
+        else:
+            expected_shape = (self.nb_betas,)
         assert (
-            self.population_betas.shape == betas.shape
-        ), f"Wrong beta shape: {betas.shape}, expected: {self.population_betas.shape}"
+            betas.shape == expected_shape
+        ), f"Wrong shape in Betas update: {betas.shape}, expected: {expected_shape}"
+
         self.population_betas = betas
 
     def update_log_mi(self, log_MI: torch.Tensor) -> None:
         """Update the model intrinsic parameter values of the NLME model."""
+
+        if hasattr(self, "log_MI"):
+            expected_shape = self.log_MI.shape
+        else:
+            expected_shape = (self.nb_MI,)
         assert (
-            self.log_MI.shape == log_MI.shape
-        ), f"Wrong MI shape: {log_MI.shape}, expected: {self.log_MI.shape}"
+            log_MI.shape == expected_shape
+        ), f"Wrong shape in model intrinsic parameters update: {log_MI.shape}, expected: {expected_shape}"
+
         self.log_MI = log_MI
 
     def update_eta_samples(self, eta: torch.Tensor) -> None:
         """Update the model current individual random effect samples."""
+
+        if hasattr(self, "eta_samples_chains"):
+            expected_shape = self.eta_samples_chains.shape
+        else:
+            expected_shape = (self.num_chains, self.nb_patients, self.nb_PDU)
         assert (
-            self.current_eta_samples.shape == eta.shape
-        ), f"Wrong individual samples shape: {eta.shape}, expected: {self.current_eta_samples.shape}"
-        self.current_eta_samples = eta
+            eta.shape == expected_shape
+        ), f"Wrong shape in eta samples update: {eta.shape}, expected: {expected_shape}"
+
+        self.eta_samples_chains = eta
 
     def update_map_estimates(self, theta: torch.Tensor) -> None:
-        """Update the model current maximum a posteriori estimates."""
+        """Update the model current maximum a posteriori estimates (PDK, PDU, MIs)."""
+
+        if hasattr(self, "current_map_estimates"):
+            expected_shape = self.current_map_estimates.shape
+        else:
+            expected_shape = (self.nb_patients, self.nb_descriptors)
         assert (
-            self.current_map_estimates.shape == theta.shape
-        ), f"Wrong individual parameters shape: {theta.shape}, expected: {self.current_map_estimates.shape}"
+            theta.shape == expected_shape
+        ), f"Wrong shape in theta estimates update: {theta.shape}, expected: {expected_shape}"
+
         self.current_map_estimates = theta
 
-    def sample_individual_etas(self) -> torch.Tensor:
-        """Sample individual random effects from the current estimate of Omega
+    def update_current_parameters(
+        self,
+        omega: torch.Tensor,
+        beta: torch.Tensor,
+        log_mi: torch.Tensor,
+        res_var: torch.Tensor,
+    ):
+        """Update or initialize the current population parameter values
+
+        Args:
+            omega (torch.Tensor): The random effects covariance matrix
+            beta (torch.Tensor): The fixed effects vector (means and covariates)
+            log_mi (torch.Tensor): The model intrinsic parameters (log-transformed)
+        """
+        self.update_omega(omega)
+        self.update_betas(beta)
+        self.update_log_mi(log_mi)
+        self.update_res_var(res_var)
+
+    def sample_etas_chains(self) -> torch.Tensor:
+        """Sample individual random effects on all chains from the current estimate of Omega
 
         Returns:
-            torch.Tensor (size nb_patients x nb_PDUs): individual random effects for all patients in the population
+            torch.Tensor : individual random effects for all patients in the population, one per chain. Size: (num_chains, nb_patients, nb_PDUs)
         """
-        etas_dist = self.eta_distribution.expand([self.nb_patients])
-        etas = etas_dist.sample()
+        etas = self.eta_distribution.sample()
         return etas
 
     @torch.compile
-    def individual_parameters(
+    def etas_to_gaussian_params(self, individual_etas: torch.Tensor) -> torch.Tensor:
+        """Compute individual (gaussian) parameters from random effects chains
+
+        Args:
+            individual_etas (torch.Tensor): Individual random effects samples. Size: (num_chains, nb_patients, nb_PDU)
+
+        Returns:
+            torch.Tensor: The individual parameters in gaussian (unconstrained) space. Size: (num_chains, nb_patients, nb_PDU)
+        """
+        assert individual_etas.shape == (self.num_chains, self.nb_patients, self.nb_PDU)
+        gaussian_params = (
+            self.full_design_matrix.expand(self.num_chains, -1, -1, -1)
+            @ self.population_betas
+            + individual_etas
+        )
+        return gaussian_params
+
+    @torch.compile
+    def gaussian_to_physical_params(self, psi: torch.Tensor) -> torch.Tensor:
+        """Transform gaussian parameters to physical parameters (thetas)
+
+        Args:
+            psi (torch.Tensor): Tensor of individual unconstrained parameter values. Size: (num_chains, nb_patients, nb_PDU)
+
+        Returns:
+            torch.Tensor: Tensor of individual physical parameter values. Both PDUs and MIs are included. Size: (num_chains, nb_patients, nb_PDU + nb_MI)
+        """
+        assert psi.shape == (self.num_chains, self.nb_patients, self.nb_PDU)
+        pdu = torch.exp(psi)
+        mi = torch.exp(self.log_MI).expand(self.num_chains, self.nb_patients, -1)
+        assert mi.shape == (self.num_chains, self.nb_patients, self.nb_MI)
+        # Todo: allow for different transformations of gaussian parameters (logit)
+        phi = torch.cat((pdu, mi), dim=-1)
+        return phi
+
+    @torch.compile
+    def assemble_individual_parameters(
         self,
-        individual_etas: torch.Tensor,
+        physical_params: torch.Tensor,
     ) -> torch.Tensor:
         """Compute individual patient parameters
 
@@ -448,28 +548,20 @@ class NlmeModel:
         Assumes log-normal distribution for individual parameters and covariate effects: theta_i[PDU] = mu_pop * exp(eta_i) * exp(covariates_i * cov_coeffs) where eta_i is from N(0, Omega) and theta_i[MI]=MI.
 
         Args:
-            individual_etas (torch.Tensor): one set of sampled random effects for each patient
-            ind_ids_for_etas (list[Union[str, int]]): list of individual ids corresponding to the sampled etas, used to fetch the design matrices
+            physical_params (Tensor): output from self.gaussian_to_physical_params. Transformed MI and PDU params
         Returns:
             torch.Tensor [nb_patients x nb_parameters]: One parameter set for each patient. Dim 0 corresponds to the patients, dim 1 is the parameters
         """
-        # Compute the individual PDU
-        log_thetas_PDU = (
-            self.full_design_matrix @ self.population_betas + individual_etas
-        )
-        # Gather the MI values, and expand them (same for each patient)
-        log_MI_expanded = self.log_MI.unsqueeze(0).repeat(self.nb_patients, 1)
 
-        # list the PDK values for each patient, and assemble them in a tensor
-        # This step is crucial: we need to ensure the parameters are stored in the correct order
-        # PDK, PDU, MI
+        # Assemble the thetas by adding the PDKs
         thetas = torch.cat(
             (
-                self.patients_pdk_full,
-                torch.exp(torch.cat((log_thetas_PDU, log_MI_expanded), dim=1)),
+                self.patients_pdk_full.expand(self.num_chains, -1, -1),
+                physical_params,
             ),
-            dim=1,
+            dim=-1,
         )
+        assert thetas.shape == (self.num_chains, self.nb_patients, self.nb_descriptors)
         return thetas
 
     @torch.compile
@@ -477,30 +569,42 @@ class NlmeModel:
         """Return model inputs for all patients
 
         Args:
-            thetas (torch.Tensor): Parameter values per patient (one by row)
+            thetas (torch.Tensor): Parameter values per patient. Theta may contain one parameter per chain
 
         Returns:
             torch.Tensor: the full inputs required to simulate all patients on all time steps
         """
+        # If theta was not provided in batch format, add a dummy dimension
+        inputs = thetas
+        if inputs.dim() < 3:
+            inputs = inputs.unsqueeze(0)
+        num_chains_local = inputs.shape[0]
+        assert inputs.shape == (
+            num_chains_local,
+            self.nb_patients,
+            self.nb_descriptors,
+        ), f"Wrong shape in theta to structural model inputs: {inputs.shape}"
 
         if not hasattr(self, "observations_tensors"):
             raise ValueError(
                 "Cannot compute patient predictions without an associated observations data frame."
             )
+
         # Order the columns of theta, and add a repeat dimension to cover time steps
         theta_expanded = (
-            thetas[:, self.model_input_to_descriptor]
-            .unsqueeze(1)
-            .repeat((1, self.nb_global_time_steps, 1))
+            inputs[:, :, self.model_input_to_descriptor]
+            .unsqueeze(-2)
+            .expand((-1, -1, self.nb_global_time_steps, -1))
         )
         full_inputs = torch.cat(
             (
                 theta_expanded,
-                self.global_time_steps_expanded,
+                self.global_time_steps_expanded.expand(num_chains_local, -1, -1, -1),
             ),
-            dim=2,
+            dim=-1,
         )
         assert full_inputs.shape == (
+            num_chains_local,
             self.nb_patients,
             self.nb_global_time_steps,
             self.nb_descriptors + 1,
@@ -512,14 +616,16 @@ class NlmeModel:
     ) -> tuple[torch.Tensor, torch.Tensor]:
         """Return model predictions for all patients
 
+        This function carries the number of chains in the batch dimension (0).
+
         Args:
-            thetas (torch.Tensor): Parameter values per patient (one by row)
+            thetas (torch.Tensor): Parameter values per patient. Size (num_chains | 1, nb_patients, nb_time_steps, nb_descriptors + 1)
 
         Returns:
             list[torch.Tensor]: a tensor of predictions for each patient
         """
         model_inputs = self.struc_model_inputs_from_theta(thetas)
-        # shape: [nb_patients, nb_time_steps, nb_params + 1]
+        # Shape: (nb_chains | 1, nb_patients, nb_global_time_steps, nb_descriptors + 1)
         pred_mean, pred_var = self.structural_model.simulate(
             model_inputs,
             self.prediction_index,
@@ -554,7 +660,10 @@ class NlmeModel:
             - `time`
             - `predicted_value`
         """
-        outputs_list = outputs.cpu().split(self.chunk_sizes)
+        assert (
+            outputs.shape[0] == 1
+        ), "Batched outputs cannot be converted to a dataframe."
+        outputs_list = outputs.squeeze(0).cpu().split(self.chunk_sizes)
         df_list = []
         for ind_idx, ind in enumerate(self.patients):
             time_steps = self.observations_tensors[ind]["time_steps"]
@@ -595,6 +704,10 @@ class NlmeModel:
         """
 
         log_priors: torch.Tensor = self.eta_distribution.log_prob(etas).to(device)
+        assert log_priors.shape == (
+            self.num_chains,
+            self.nb_patients,
+        ), "Unexpected prior shape"
         return log_priors
 
     def log_posterior_etas(
@@ -604,8 +717,6 @@ class NlmeModel:
         torch.Tensor,
         torch.Tensor,
         torch.Tensor,
-        torch.Tensor,
-        list,
     ]:
         """Compute the log-posterior of a list of random effects
 
@@ -615,49 +726,50 @@ class NlmeModel:
         Returns:
             tuple[torch.Tensor, list[torch.Tensor], DataFrame]:
             - log-posterior likelihood of etas
-            - current thetas
-            - log values of current pdu estimation (useful for SAEM)
-            - list of simulated values for each patient
+            - gaussian parameters corresponding to the etas
+            - list of simulated values for each patient on each chain
 
         """
+        assert etas.shape == (self.num_chains, self.nb_patients, self.nb_PDU)
         if not hasattr(self, "observations_tensors"):
             raise ValueError(
                 "Cannot compute log-posterior without an associated observations data frame."
             )
-        # Get individual parameters in a tensor
-        individual_params: torch.Tensor = self.individual_parameters(
-            individual_etas=etas,
+        gaussian_params_chains = self.etas_to_gaussian_params(etas)
+        physical_params_chains = self.gaussian_to_physical_params(
+            gaussian_params_chains
         )
-        # Run the surrogate model
-        full_pred, full_var = self.predict_outputs_from_theta(individual_params)
-        var_list = full_var.split(self.chunk_sizes)
+        # Get individual parameters in a tensor
+        theta_chains = self.assemble_individual_parameters(physical_params_chains)
+
+        # Run the structural model
+        full_pred, full_var = self.predict_outputs_from_theta(theta_chains)
+        # var_list = full_var.split(self.chunk_sizes)
         # Validate the variance magnitude
-        warnings = self.variance_level_check(var_list, self.pred_var_threshold)
-        flagged_patients = [individual_params[i, :].tolist() for i in warnings]
+        # warnings = self.variance_level_check(var_list, self.pred_var_threshold)
+        # flagged_patients = [individual_params[i, :].tolist() for i in warnings]
 
         # calculate log-prior of the random samples
         log_priors: torch.Tensor = self._log_prior_etas(etas)
+        assert log_priors.shape == (self.num_chains, self.nb_patients)
 
-        # group by individual and calculate log-likelihood for each
+        # Compute the log likelihood of observations
         log_likelihood_observations = self.log_likelihood_observation(full_pred)
+        assert log_likelihood_observations.shape == (self.num_chains, self.nb_patients)
 
         log_posterior = log_likelihood_observations + log_priors
-        current_log_pdu = torch.log(
-            individual_params[:, self.nb_PDK : self.nb_PDK + self.nb_PDU]
-        )
+        assert log_posterior.shape == (self.num_chains, self.nb_patients)
         return (
             log_posterior,
-            individual_params,
-            current_log_pdu,
+            gaussian_params_chains,
             full_pred,
-            flagged_patients,
         )
 
     @torch.compile
     def calculate_residuals(
         self, observed_data: torch.Tensor, predictions: torch.Tensor
     ) -> torch.Tensor:
-        """Calculates residuals based on the error model for a single patient
+        """Calculates residuals based on the error model
 
         Args:
             observed_data: Tensor of observations
@@ -666,6 +778,10 @@ class NlmeModel:
         Returns:
             torch.Tensor: a tensor of residual values
         """
+        assert (
+            predictions.shape == observed_data.shape
+        ), f"Non-matching shapes in `calculate_residuals`: {predictions.shape=}, {observed_data.shape=}"
+
         if self.error_model_type == "additive":
             return observed_data - predictions
         elif self.error_model_type == "proportional":
@@ -674,12 +790,28 @@ class NlmeModel:
             raise ValueError("Unsupported error model type.")
 
     @torch.compile
-    def sum_sq_residuals(self, prediction: torch.Tensor) -> torch.Tensor:
+    def sum_sq_residuals_chains(self, prediction: torch.Tensor) -> torch.Tensor:
+        """Compute the sum of squared residuals for current predictions on all chains
+
+        Args:
+            prediction (torch.Tensor): Predictions for all patients and all chains, Size (num_chains, nb_patients, nb_tot_obs)
+
+        Returns:
+            torch.Tensor: The sum of squared residuals for each output. Size (nb_outputs)
+        """
+        assert prediction.shape == (self.num_chains, self.nb_tot_obs)
         sq_residuals = torch.square(
-            self.calculate_residuals(self.full_obs_data, prediction)
+            self.calculate_residuals(
+                self.full_obs_data.expand(self.num_chains, -1), prediction
+            )
         )
-        sum_residuals = torch.zeros(self.nb_outputs, device=device)
-        sum_residuals.scatter_add_(0, self.full_output_indices, sq_residuals)
+        sum_residuals_per_chain = torch.zeros(
+            self.num_chains, self.nb_outputs, device=device
+        )
+        sum_residuals_per_chain.scatter_add_(
+            1, self.full_output_indices.expand(self.num_chains, -1), sq_residuals
+        )
+        sum_residuals = sum_residuals_per_chain.mean(dim=0)
         return sum_residuals
 
     @torch.compile
@@ -687,31 +819,39 @@ class NlmeModel:
         self,
         predictions: torch.Tensor,
     ) -> torch.Tensor:
+        """Compute the log-likelihood of observations across all chains
+
+        Args:
+            predictions (torch.Tensor): Tensor of predictions. Size (num_chains, nb_total_obs, 1)
+
+        Returns:
+            torch.Tensor: Log likelihood per patient and per chain. Size (num_chains, nb_patient)
         """
-        Calculates the log-likelihood of observations given predictions and error model, assuming errors follow N(0,sqrt(residual_error_var))
-        observed_data: torch.Tensor of observations for one individual
-        predictions: torch.Tensor of predictions for one individual organized in the same way as observed_data
-        residual_error_var: torch.Tensor of the error for each output, dim: [nb_outputs]
-        """
+        num_chains_local = predictions.shape[0]
         residuals: torch.Tensor = self.calculate_residuals(
-            self.full_obs_data, predictions
+            self.full_obs_data.expand(num_chains_local, -1), predictions
         )
-        res_error_var = self.residual_var.index_select(0, self.full_output_indices)
+        res_error_var = self.residual_var.expand(num_chains_local, -1).index_select(
+            1, self.full_output_indices
+        )
+        assert residuals.shape == res_error_var.shape
         # Log-likelihood of normal distribution
         if self.error_model_type == "additive":
-            log_lik_full = -0.5 * (
-                torch.log(2 * torch.pi * res_error_var) + (residuals**2 / res_error_var)
-            )
+            variance = res_error_var
         elif self.error_model_type == "proportional":
             variance = res_error_var * torch.square(predictions)
-            log_lik_full = -0.5 * (
-                torch.log(2 * torch.pi * variance) + (residuals**2 / variance)
-            )
         else:
             raise ValueError("Non supported error type.")
-        log_lik_per_patient = torch.zeros(self.nb_patients, device=device)
+        log_lik_full = -0.5 * (
+            torch.log(2 * torch.pi * variance) + (residuals**2 / variance)
+        )
+        log_lik_per_patient = torch.zeros(
+            (num_chains_local, self.nb_patients), device=device
+        )
         log_lik_per_patient.scatter_add_(
-            0, self.observation_to_patient_index, log_lik_full
+            1,
+            self.observation_to_patient_index.expand(num_chains_local, -1),
+            log_lik_full,
         )
         return log_lik_per_patient
 
@@ -720,8 +860,7 @@ class NlmeModel:
         current_etas: torch.Tensor,
         current_log_prob: torch.Tensor,
         current_pred: torch.Tensor,
-        current_pdu: torch.Tensor,
-        current_thetas: torch.Tensor,
+        current_gaussian_params: torch.Tensor,
         step_size: float,
         learning_rate: float,
         target_acceptance_rate: float = 0.234,
@@ -732,16 +871,14 @@ class NlmeModel:
         torch.Tensor,
         torch.Tensor,
         torch.Tensor,
-        torch.Tensor,
         float,
-        list,
     ]:
         """Perform one step of a Metropolis-Hastings transition kernel
 
         Args:
-            current_etas (torch.Tensor): values of the individual random effects for all patients
-            current_log_prob (torch.Tensor): log posterior likelihood of current random effects
-            current_pred (list[torch.Tensor]): associated model predictions with current random effects
+            current_etas (torch.Tensor): values of the individual random effects for all patients, on all chains. Size (num_chains, nb_patients, nb_PDU)
+            current_log_prob (torch.Tensor): log posterior likelihood of current random effects. Size (num_chains, nb_patients)
+            current_pred (torch.Tensor): associated model predictions with current random effects. Size (num_chains, nb_obs_total)
             step_size (torch.Tensor): current value of MH step size,
             learning_rate (float): current learning rate (defined by the optimization algorithm)
             target_acceptance_rate (float, optional): Target for the MCMC acceptance rate. Defaults to 0.234 [1].
@@ -758,70 +895,73 @@ class NlmeModel:
             - updated step size
             - a dict of warnings for all patients with predictive variance above threshold
         """
-
+        # Propose new etas
         proposal_noise = (
             torch.randn_like(current_etas, device=device) @ self.omega_pop_lower_chol
         )
         proposal_etas = current_etas + step_size * proposal_noise
+        # Compute their log posterior likelihood
         (
             proposal_log_prob,
-            proposal_theta,
-            proposal_log_pdus,
+            proposal_gaussian_params,
             proposal_pred,
-            warnings,
         ) = self.log_posterior_etas(proposal_etas)
+
+        assert proposal_log_prob.shape == current_log_prob.shape
+
+        # Define acceptance masks
         deltas: torch.Tensor = proposal_log_prob - current_log_prob
         log_u: torch.Tensor = torch.log(torch.rand_like(deltas, device=device))
         accept_mask: torch.Tensor = log_u < deltas
         accept_mask_parameters = accept_mask.unsqueeze(-1).expand(
-            -1, current_etas.shape[1]
+            -1, -1, current_etas.shape[-1]
         )
         accept_mask_predictions = accept_mask.index_select(
-            0, self.observation_to_patient_index
+            1, self.observation_to_patient_index
         )
+        # Accept the different variables using the masks
         new_etas = torch.where(accept_mask_parameters, proposal_etas, current_etas).to(
             device
         )
-        new_log_pdus = torch.where(
-            accept_mask_parameters, proposal_log_pdus, current_pdu
+        new_gaussian_params = torch.where(
+            accept_mask_parameters, proposal_gaussian_params, current_gaussian_params
         ).to(device)
         new_log_prob = torch.where(accept_mask, proposal_log_prob, current_log_prob).to(
             device
         )
-        new_complete_likelihood = -2 * new_log_prob.sum(dim=0)
+        # Compute the complete likelihood by averaging over chains and summing over patients
+        new_complete_likelihood = -2 * new_log_prob.mean(dim=0).sum(dim=0)
         new_pred = torch.where(accept_mask_predictions, proposal_pred, current_pred).to(
             device
         )
-        new_acceptance_rate: float = accept_mask.cpu().float().mean().item()
+        new_acceptance_rate: float = accept_mask.cpu().float().mean().mean().item()
         if verbose:
             print(f"  Acceptance rate: {new_acceptance_rate:.2f}")
         new_step_size: float = step_size * np.exp(
             learning_rate * (new_acceptance_rate - target_acceptance_rate)
         )
-        new_theta = torch.where(
-            accept_mask.unsqueeze(1).expand(-1, current_thetas.shape[1]),
-            proposal_theta,
-            current_thetas,
-        ).to(device)
         return (
             new_etas,
             new_log_prob,
             new_complete_likelihood,
             new_pred,
-            new_theta,
-            new_log_pdus,
+            new_gaussian_params,
             new_step_size,
-            warnings,
         )
 
     def map_estimates_descriptors(self) -> pd.DataFrame:
         theta = self.current_map_estimates
         if theta is None:
             raise ValueError("No estimation available yet. Run the algorithm first.")
-
+        assert theta.shape == (
+            self.nb_patients,
+            self.nb_descriptors,
+        ), f"Unexpected dimensions of MAP estimates: {theta.shape=}"
         map_per_patient = pd.DataFrame(
             data=theta.cpu().numpy(), columns=self.descriptors
         )
+        id_column = self.patients
+        map_per_patient["id"] = id_column
         return map_per_patient
 
     def map_estimates_predictions(self) -> pd.DataFrame:
