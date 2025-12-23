@@ -113,19 +113,17 @@ class PySaem:
         self.plot_columns = plot_columns
         self.plot_indiv_figsize = plot_indiv_figsize
 
-        # Initialize the random effects to 0
-        self.current_etas = self.model.current_eta_samples
+        # Initialize the random effects
+        self.current_etas = self.model.current_eta_samples_chains
 
-        # Initialize current estimation of patient parameters from the 0 random effects
+        # Initialize current estimation of patient parameters
         (
             self.current_log_prob,
-            self.current_thetas,
-            self.current_log_pdu,
+            self.current_gaussian_params,
             self.current_pred,
-            flagged_patients,
         ) = self.model.log_posterior_etas(self.current_etas)
-        self.current_complete_likelihood = torch.exp(
-            self.current_log_prob.sum(dim=0)
+        self.current_complete_likelihood = -2 * self.current_log_prob.mean(dim=0).sum(
+            dim=0
         ).to(device)
 
         # Initialize the optimizer history
@@ -135,7 +133,6 @@ class PySaem:
             self.model.log_MI,
             self.model.residual_var,
             self.current_complete_likelihood,
-            flagged_patients,
         )
         self.current_iteration: int = 0
 
@@ -147,25 +144,33 @@ class PySaem:
             "residual_error_var": self.model.residual_var,
         }
 
-        # pre-compute full design matrix once
-        self.X = torch.stack(
-            [self.model.design_matrices[ind] for ind in self.model.patients],
-            dim=0,
-        ).to(device)
-        # Precompute the gram matrix
+        # Store the full design matrix, with shape (num_chains, nb_patient, nb_PDU, nb_betas)
+        self.X = self.model.full_design_matrix
+        self.X_chains = self.X.expand(self.model.num_chains, -1, -1, -1)
+        # Precompute the batch gram matrix
+        # Gram = sum(X_i.T @ X_i, for i in patients)
         self.sufficient_stat_gram_matrix = (
-            torch.matmul(self.X.transpose(1, 2), self.X).sum(dim=0).to(device)
+            torch.matmul(self.X.transpose(-1, -2), self.X).sum(dim=0).to(device)
         )
 
         # Initialize sufficient statistics
         self.sufficient_stat_cross_product = (
-            (self.X.transpose(1, 2) @ self.current_log_pdu.unsqueeze(-1))
-            .sum(dim=0)
+            (
+                self.X_chains.transpose(-1, -2)
+                @ self.current_gaussian_params.unsqueeze(-1)
+            )
+            .sum(dim=1)
+            .mean(dim=0)
             .to(device)
         )
-        self.sufficient_stat_outer_product = torch.matmul(
-            self.current_log_pdu.transpose(0, 1), self.current_log_pdu
-        ).to(device)
+        self.sufficient_stat_outer_product = (
+            torch.matmul(
+                self.current_gaussian_params.transpose(-1, -2),
+                self.current_gaussian_params,
+            )
+            .mean(dim=0)
+            .to(device)
+        )
 
         self.true_log_MI = true_log_MI
         self.true_log_PDUs = true_log_PDU
@@ -196,14 +201,14 @@ class PySaem:
 
     def m_step_update(
         self,
-        log_pdu: torch.Tensor,
-        s_cross_product: torch.Tensor,
-        s_outer_product: torch.Tensor,
+        gaussian_params: torch.Tensor,
+        current_cross_product: torch.Tensor,
+        current_outer_product: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """Perform the M-step update
 
         Args:
-            log_pdu (torch.Tensor): Current estimation of the log-scaled parameters
+            gaussian_params (torch.Tensor): Current estimation of the gaussian parameters (over all chains)
             s_cross_product (torch.Tensor): Current sufficient statistics 1 - cross product
             s_outer_product (torch.Tensor): Current sufficient statistics 2 - outer product
 
@@ -214,33 +219,40 @@ class PySaem:
             - beta parameters
             - omega matrix
         """
-
-        assert log_pdu.shape[0] == self.X.shape[0]
+        assert gaussian_params.shape == (
+            self.model.num_chains,
+            self.model.nb_patients,
+            self.model.nb_PDU,
+        )
         cross_product = (
-            (self.X.transpose(1, 2) @ log_pdu.unsqueeze(-1)).sum(dim=0).to(device)
+            (self.X_chains.transpose(-1, -2) @ gaussian_params.unsqueeze(-1))
+            .sum(dim=1)
+            .mean(dim=0)
+            .to(device)
         )
         new_s_cross_product = self._stochastic_approximation(
-            s_cross_product, cross_product
+            current_cross_product, cross_product
         )
-        outer_product = torch.matmul(log_pdu.transpose(0, 1), log_pdu).to(device)
-        new_s_outer_product = self._stochastic_approximation(
-            s_outer_product, outer_product
-        )
-
         new_beta = torch.linalg.solve(
             self.sufficient_stat_gram_matrix, new_s_cross_product
         ).to(device)
 
-        new_log_pdu = torch.matmul(self.X, new_beta.unsqueeze(0)).squeeze(-1).to(device)
+        new_mu = torch.matmul(self.X, new_beta.unsqueeze(0)).squeeze(-1).to(device)
+        new_residuals = gaussian_params - new_mu.unsqueeze(0)
+        resid_unsq = new_residuals.unsqueeze(-1)
+        outer_product_centered = (
+            torch.matmul(resid_unsq, resid_unsq.transpose(-1, -2))
+            .sum(dim=1)
+            .mean(dim=0)
+            .to(device)
+        )
+        print(outer_product_centered.shape)
+        new_s_outer_product = self._stochastic_approximation(
+            current_outer_product, outer_product_centered
+        )
+
         # Propose a new value for omega
-        new_omega = (
-            1
-            / self.model.nb_patients
-            * (
-                new_s_outer_product
-                - torch.matmul(new_log_pdu.transpose(0, 1), new_log_pdu)
-            )
-        ).to(device)
+        new_omega = new_s_outer_product / self.model.nb_patients
         new_omega = self._clamp_eigen_values(new_omega)
 
         return (
@@ -348,7 +360,6 @@ class PySaem:
         log_mi: torch.Tensor,
         res_var: torch.Tensor,
         likelihood: torch.Tensor,
-        flagged_patients: list,
     ) -> None:
         # Initialize the history
         self.history = {}
@@ -376,7 +387,6 @@ class PySaem:
         for i, output in enumerate(self.model.outputs_names):
             self.history.update({output: [res_var[i].cpu()]})
         self.history.update({"complete_likelihood": [likelihood.cpu()]})
-        self.history.update({"flagged_patients": [flagged_patients]})
 
     def _append_history(
         self,
@@ -385,7 +395,6 @@ class PySaem:
         log_mi: torch.Tensor,
         res_var: torch.Tensor,
         complete_likelihood: torch.Tensor,
-        flagged_patients: list,
     ) -> None:
         # Update the history
         for i, pdu in enumerate(self.model.PDU_names):
@@ -405,7 +414,6 @@ class PySaem:
         for i, output in enumerate(self.model.outputs_names):
             self.history[output].append(res_var[i].cpu())
         self.history["complete_likelihood"].append(complete_likelihood.cpu())
-        self.history["flagged_patients"].append(flagged_patients)
 
     def one_iteration(self, k: int) -> bool:
         """Perform one iteration of SAEM
@@ -433,37 +441,40 @@ class PySaem:
                 f"  Current MCMC parameters: step-size={self.step_size:.2f}, adaptation rate={self.step_size_adaptation:.2f}"
             )
 
-        flagged_patients_iter = []
         for _ in range(current_iter_burn_in + self.mcmc_nb_transitions):
             (
-                self.current_etas,
-                self.current_log_prob,
+                self.current_etas_chains,
+                self.current_log_prob_chains,
                 self.current_complete_likelihood,
                 self.current_pred,
-                self.current_thetas,
-                self.current_log_pdu,
+                self.current_gaussian_params,
                 self.step_size,
-                flagged_patients,
             ) = self.model.mh_step(
                 current_etas=self.current_etas,
                 current_log_prob=self.current_log_prob,
                 current_pred=self.current_pred,
-                current_thetas=self.current_thetas,
-                current_pdu=self.current_log_pdu,
+                current_gaussian_params=self.current_gaussian_params,
                 step_size=self.step_size,
                 learning_rate=self.step_size_adaptation,
                 verbose=self.verbose,
             )
-            flagged_patients_iter += flagged_patients
-
         # Update the model's eta and thetas
         self.model.update_eta_samples(self.current_etas)
-        self.model.update_map_estimates(self.current_thetas)
+
+        # Compute the new MAP estimates by averaging over all chains
+        new_thetas_chains = self.model.gaussian_to_physical_params(
+            self.current_gaussian_params
+        )
+        new_thetas_map = new_thetas_chains.mean(dim=0)
+        self.model.update_map_estimates(new_thetas_map)
 
         # --- M-Step: Update Population Means, Omega and Residual variance ---
 
         # 1. Update residual error variances
         sum_sq_res = self.model.sum_sq_residuals(self.current_pred)
+        assert sum_sq_res.shape == (
+            self.model.nb_outputs,
+        ), f"Unexpected residual shape: {sum_sq_res.shape}"
         target_res_var: torch.Tensor = (
             sum_sq_res / self.model.n_tot_observations_per_output
         )
@@ -476,7 +487,6 @@ class PySaem:
         )
 
         self.model.update_res_var(new_residual_error_var)
-
         # 2. Update sufficient statistics with stochastic approximation
         (
             self.sufficient_stat_cross_product,
@@ -484,7 +494,7 @@ class PySaem:
             new_beta,
             new_omega,
         ) = self.m_step_update(
-            self.current_log_pdu,
+            self.current_gaussian_params,
             self.sufficient_stat_cross_product,
             self.sufficient_stat_outer_product,
         )
@@ -552,7 +562,6 @@ class PySaem:
             self.model.log_MI,
             self.model.residual_var,
             self.current_complete_likelihood,
-            flagged_patients_iter,
         )
 
         # update prev_params for the next iteration's convergence check
@@ -563,6 +572,7 @@ class PySaem:
         return is_converged
 
     def MI_objective_function(self, log_MI):
+        # TODO: repair
         log_MI_expanded = (
             torch.as_tensor(log_MI, device=device)
             .unsqueeze(0)
@@ -579,7 +589,7 @@ class PySaem:
                 torch.exp(
                     torch.cat(
                         (
-                            self.current_log_pdu,
+                            self.current_gaussian_params,
                             log_MI_expanded,
                         ),
                         dim=1,
@@ -730,7 +740,7 @@ class PySaem:
         nb_betas: int = self.model.nb_betas
         nb_omega_diag_params: int = self.model.nb_PDU
         nb_var_res_params: int = self.model.nb_outputs
-        nb_plots = nb_MI + nb_betas + nb_omega_diag_params + nb_var_res_params + 2
+        nb_plots = nb_MI + nb_betas + nb_omega_diag_params + nb_var_res_params + 1
         nb_cols = n_cols
         nb_rows = int(np.ceil(nb_plots / nb_cols))
         maxiter = self.nb_phase1_iterations + self.nb_phase2_iterations
@@ -873,19 +883,6 @@ class PySaem:
         ax.grid(True)
         self.traces.update({"convergence_ind": tr})
         plot_idx += 1
-        # Plot the number of out of bounds patients
-        row, col = plot_idx // nb_cols, plot_idx % nb_cols
-        ax = axes[row, col]
-        ax.set_xlim(0, maxiter)
-        ax.set_ylim(0, self.model.nb_patients)
-        oob_patients = [len(h) for h in history["flagged_patients"]]
-        (tr,) = ax.plot(
-            oob_patients,
-        )
-        ax.set_title(rf"Out-of-bounds patients")
-        ax.grid(True)
-        self.traces.update({"oob_patients": tr})
-        plot_idx += 1
 
         # Turn off extra subplots
         while plot_idx < nb_rows * nb_cols:
@@ -925,8 +922,6 @@ class PySaem:
             self.traces[res_name].set_data(new_xaxis, var_res_history)
         conv_ind = [h.item() for h in history["complete_likelihood"]]
         self.traces["convergence_ind"].set_data(new_xaxis, conv_ind)
-        oob_patients = [len(h) for h in history["flagged_patients"]]
-        self.traces["oob_patients"].set_data(new_xaxis, oob_patients)
         if not smoke_test:
             for ax in self.convergence_plot_axes.flatten():
                 ax.autoscale_view(scaley=True, scalex=False)
