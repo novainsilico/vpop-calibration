@@ -97,6 +97,10 @@ def check_surrogate_validity_gp(nlme_model: NlmeModel) -> tuple[dict, dict]:
                 ax.set_ylabel(param1)
             if k1 == len(pdus) - 1:
                 ax.set_xlabel(param2)
+
+    if not smoke_test:
+        plt.tight_layout()
+        plt.show()
     return diagnostics, recommended_ranges
 
 
