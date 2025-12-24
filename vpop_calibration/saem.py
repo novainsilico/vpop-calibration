@@ -113,18 +113,15 @@ class PySaem:
         self.plot_columns = plot_columns
         self.plot_indiv_figsize = plot_indiv_figsize
 
-        # Initialize the random effects
-        self.current_etas = self.model.current_eta_samples_chains
-
-        # Initialize current estimation of patient parameters
+        # Initialize the running variables for optimization
+        self.current_etas_chains = self.model.eta_samples_chains
         (
-            self.current_log_prob,
+            self.current_log_prob_chains,
             self.current_gaussian_params,
             self.current_pred,
-        ) = self.model.log_posterior_etas(self.current_etas)
-        self.current_complete_likelihood = -2 * self.current_log_prob.mean(dim=0).sum(
-            dim=0
-        ).to(device)
+        ) = self.model.log_posterior_etas(self.current_etas_chains)
+        # Initialize the complete likelihood to a dummy value to avoid messing with the plot scale
+        self.current_complete_likelihood = torch.Tensor([0])
 
         # Initialize the optimizer history
         self._init_history(
@@ -153,25 +150,12 @@ class PySaem:
             torch.matmul(self.X.transpose(-1, -2), self.X).sum(dim=0).to(device)
         )
 
-        # Initialize sufficient statistics
-        self.sufficient_stat_cross_product = (
-            (
-                self.X_chains.transpose(-1, -2)
-                @ self.current_gaussian_params.unsqueeze(-1)
-            )
-            .sum(dim=1)
-            .mean(dim=0)
-            .to(device)
-        )
-        self.sufficient_stat_outer_product = (
-            torch.matmul(
-                self.current_gaussian_params.transpose(-1, -2),
-                self.current_gaussian_params,
-            )
-            .mean(dim=0)
-            .to(device)
+        # Initialize sufficient statistics by performing one M-step update (without updating beta or omega)
+        self.sufficient_stat_cross_product, self.sufficient_stat_outer_product, _, _ = (
+            self.m_step_update(self.current_gaussian_params)
         )
 
+        # Store true NLME parameters, if provided
         self.true_log_MI = true_log_MI
         self.true_log_PDUs = true_log_PDU
         if true_covariates is not None:
@@ -202,8 +186,8 @@ class PySaem:
     def m_step_update(
         self,
         gaussian_params: torch.Tensor,
-        current_cross_product: torch.Tensor,
-        current_outer_product: torch.Tensor,
+        current_cross_product: Optional[torch.Tensor] = None,
+        current_outer_product: Optional[torch.Tensor] = None,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """Perform the M-step update
 
@@ -230,9 +214,12 @@ class PySaem:
             .mean(dim=0)
             .to(device)
         )
-        new_s_cross_product = self._stochastic_approximation(
-            current_cross_product, cross_product
-        )
+        if current_cross_product is None:
+            new_s_cross_product = cross_product
+        else:
+            new_s_cross_product = self._stochastic_approximation(
+                current_cross_product, cross_product
+            )
         new_beta = torch.linalg.solve(
             self.sufficient_stat_gram_matrix, new_s_cross_product
         ).to(device)
@@ -246,10 +233,12 @@ class PySaem:
             .mean(dim=0)
             .to(device)
         )
-        print(outer_product_centered.shape)
-        new_s_outer_product = self._stochastic_approximation(
-            current_outer_product, outer_product_centered
-        )
+        if current_outer_product is None:
+            new_s_outer_product = outer_product_centered
+        else:
+            new_s_outer_product = self._stochastic_approximation(
+                current_outer_product, outer_product_centered
+            )
 
         # Propose a new value for omega
         new_omega = new_s_outer_product / self.model.nb_patients
@@ -314,6 +303,7 @@ class PySaem:
         assert (
             previous.shape == new.shape
         ), f"Wrong shape in stochastic approximation: {previous.shape}, {new.shape}"
+
         stochastic_approx = (
             (1 - self.learning_rate_m_step) * previous + self.learning_rate_m_step * new
         ).to(device)
@@ -441,7 +431,8 @@ class PySaem:
                 f"  Current MCMC parameters: step-size={self.step_size:.2f}, adaptation rate={self.step_size_adaptation:.2f}"
             )
 
-        for _ in range(current_iter_burn_in + self.mcmc_nb_transitions):
+        # Perform the initial burn-in
+        for _ in range(current_iter_burn_in):
             (
                 self.current_etas_chains,
                 self.current_log_prob_chains,
@@ -450,8 +441,26 @@ class PySaem:
                 self.current_gaussian_params,
                 self.step_size,
             ) = self.model.mh_step(
-                current_etas=self.current_etas,
-                current_log_prob=self.current_log_prob,
+                current_etas=self.current_etas_chains,
+                current_log_prob=self.current_log_prob_chains,
+                current_pred=self.current_pred,
+                current_gaussian_params=self.current_gaussian_params,
+                step_size=self.step_size,
+                learning_rate=self.step_size_adaptation,
+                verbose=self.verbose,
+            )
+
+        for _ in range(self.mcmc_nb_transitions):
+            (
+                self.current_etas_chains,
+                self.current_log_prob_chains,
+                self.current_complete_likelihood,
+                self.current_pred,
+                self.current_gaussian_params,
+                self.step_size,
+            ) = self.model.mh_step(
+                current_etas=self.current_etas_chains,
+                current_log_prob=self.current_log_prob_chains,
                 current_pred=self.current_pred,
                 current_gaussian_params=self.current_gaussian_params,
                 step_size=self.step_size,
@@ -459,11 +468,11 @@ class PySaem:
                 verbose=self.verbose,
             )
         # Update the model's eta and thetas
-        self.model.update_eta_samples(self.current_etas)
+        self.model.update_eta_samples(self.current_etas_chains)
 
-        # Compute the new MAP estimates by averaging over all chains
-        new_thetas_chains = self.model.gaussian_to_physical_params(
-            self.current_gaussian_params
+        # Compute the new patient parameter estimates by averaging over all chains
+        new_thetas_chains = self.model.assemble_individual_parameters(
+            self.model.gaussian_to_physical_params(self.current_gaussian_params)
         )
         new_thetas_map = new_thetas_chains.mean(dim=0)
         self.model.update_map_estimates(new_thetas_map)
@@ -637,9 +646,8 @@ class PySaem:
         ) = self._build_convergence_plot(
             indiv_figsize=self.plot_indiv_figsize, n_cols=self.plot_columns
         )
-        for k in tqdm(range(1, self.nb_phase1_iterations)):
+        for k in tqdm(range(0, self.nb_phase1_iterations)):
             # Run iteration, do not check for convergence in the exploration phase
-            # Iteration 0 is in fact already done (initialization)
             _ = self.one_iteration(k)
             self.current_iteration = k
             if (self.live_plot) & (k % self.plot_frames == 0):
@@ -899,7 +907,7 @@ class PySaem:
 
     def _update_convergence_plot(self):
         history = self.history
-        new_xaxis = np.arange(self.current_iteration + 1)
+        new_xaxis = np.arange(self.current_iteration + 2)
         # Plot the MI parameters
         for mi_name in self.model.MI_names:
             MI_history = [h.item() for h in history[mi_name]]

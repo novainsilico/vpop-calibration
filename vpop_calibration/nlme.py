@@ -45,7 +45,7 @@ class NlmeModel:
 
         self.MI_names: list[str] = list(init_log_MI.keys())
         self.nb_MI: int = len(self.MI_names)
-        self.initial_log_MI = torch.tensor([val for _, val in init_log_MI.items()]).to(
+        self.init_log_MI = torch.tensor([val for _, val in init_log_MI.items()]).to(
             device
         )
         self.PDU_names: list[str] = list(init_PDU.keys())
@@ -179,22 +179,22 @@ class NlmeModel:
 
         # Initiate the NLME parameters
         self.num_chains = num_chains
-        self.log_MI = self.initial_log_MI
-        self.population_betas = self.initial_betas
-        self.omega_pop = self.init_omega
-        self.omega_pop_lower_chol = torch.linalg.cholesky(self.omega_pop).to(device)
-        self.residual_var = self.init_res_var
-        self.eta_distribution = torch.distributions.MultivariateNormal(
-            loc=torch.zeros(self.nb_PDU, device=device),
-            covariance_matrix=self.omega_pop,
-        ).expand((self.num_chains, self.nb_patients))
+        self.update_current_parameters(
+            omega=self.init_omega,
+            beta=self.initial_betas,
+            log_mi=self.init_log_MI,
+            res_var=self.init_res_var,
+        )
 
         # Initiate the patient parameters
-        self.current_eta_samples_chains = self.sample_etas_chains()
-        gaussian_params = self.etas_to_gaussian_params(self.current_eta_samples_chains)
+        self.init_etas = self.sample_etas_chains()
+        self.update_eta_samples(self.init_etas)
+        # Compute a first naive guess for the patient parameters on all chains
+        gaussian_params = self.etas_to_gaussian_params(self.eta_samples_chains)
         physical_params = self.gaussian_to_physical_params(gaussian_params)
-        # The initial guess for the individual parameters is obtained by averaging over all chains
-        self.current_map_estimates = physical_params.mean(dim=0)
+        # Average over the chains to estimate the current patient descriptors
+        theta = self.assemble_individual_parameters(physical_params).mean(dim=0)
+        self.update_map_estimates(theta)
 
     def _create_design_matrix(self, covariates: dict[str, float]) -> torch.Tensor:
         """
@@ -391,51 +391,106 @@ class NlmeModel:
         ]
 
     def update_omega(self, omega: torch.Tensor) -> None:
-        """Update the covariance matrix of the NLME model."""
+        """Update the covariance matrix of the NLME model and the distribution of random effects."""
+
+        if hasattr(self, "omega_pop"):
+            expected_shape = self.omega_pop.shape
+        else:
+            expected_shape = (self.nb_PDU, self.nb_PDU)
         assert (
-            self.omega_pop.shape == omega.shape
-        ), f"Wrong omega shape: {omega.shape}, expected: {self.omega_pop.shape}"
+            omega.shape == expected_shape
+        ), f"Wrong shape in omega update: {omega.shape}, expected: {expected_shape}"
+
         self.omega_pop = omega
         self.omega_pop_lower_chol = torch.linalg.cholesky(self.omega_pop).to(device)
         self.eta_distribution = torch.distributions.MultivariateNormal(
             loc=torch.zeros(self.nb_PDU, device=device),
             covariance_matrix=self.omega_pop,
-        )
+        ).expand([self.num_chains, self.nb_patients])
 
     def update_res_var(self, residual_var: torch.Tensor) -> None:
         """Update the residual variance of the NLME model, while ensuring it remains positive."""
+
+        if hasattr(self, "residual_var"):
+            expected_shape = self.residual_var.shape
+        else:
+            expected_shape = (self.nb_outputs,)
         assert (
-            self.residual_var.shape == residual_var.shape
-        ), f"Wrong res var shape: {residual_var.shape}, expected: {self.residual_var.shape}"
+            residual_var.shape == expected_shape
+        ), f"Wrong shape in residual variance update: {residual_var.shape}, expected: {expected_shape}"
+
         self.residual_var = residual_var.clamp(min=1e-6)
 
     def update_betas(self, betas: torch.Tensor) -> None:
         """Update the betas of the NLME model."""
+
+        if hasattr(self, "population_betas"):
+            expected_shape = self.population_betas.shape
+        else:
+            expected_shape = (self.nb_betas,)
         assert (
-            self.population_betas.shape == betas.shape
-        ), f"Wrong beta shape: {betas.shape}, expected: {self.population_betas.shape}"
+            betas.shape == expected_shape
+        ), f"Wrong shape in Betas update: {betas.shape}, expected: {expected_shape}"
+
         self.population_betas = betas
 
     def update_log_mi(self, log_MI: torch.Tensor) -> None:
         """Update the model intrinsic parameter values of the NLME model."""
+
+        if hasattr(self, "log_MI"):
+            expected_shape = self.log_MI.shape
+        else:
+            expected_shape = (self.nb_MI,)
         assert (
-            self.log_MI.shape == log_MI.shape
-        ), f"Wrong MI shape: {log_MI.shape}, expected: {self.log_MI.shape}"
+            log_MI.shape == expected_shape
+        ), f"Wrong shape in model intrinsic parameters update: {log_MI.shape}, expected: {expected_shape}"
+
         self.log_MI = log_MI
 
     def update_eta_samples(self, eta: torch.Tensor) -> None:
         """Update the model current individual random effect samples."""
+
+        if hasattr(self, "eta_samples_chains"):
+            expected_shape = self.eta_samples_chains.shape
+        else:
+            expected_shape = (self.num_chains, self.nb_patients, self.nb_PDU)
         assert (
-            self.current_eta_samples_chains.shape == eta.shape
-        ), f"Wrong individual samples shape: {eta.shape}, expected: {self.current_eta_samples_chains.shape}"
-        self.current_eta_samples_chains = eta
+            eta.shape == expected_shape
+        ), f"Wrong shape in eta samples update: {eta.shape}, expected: {expected_shape}"
+
+        self.eta_samples_chains = eta
 
     def update_map_estimates(self, theta: torch.Tensor) -> None:
-        """Update the model current maximum a posteriori estimates."""
+        """Update the model current maximum a posteriori estimates (PDK, PDU, MIs)."""
+
+        if hasattr(self, "current_map_estimates"):
+            expected_shape = self.current_map_estimates.shape
+        else:
+            expected_shape = (self.nb_patients, self.nb_descriptors)
         assert (
-            self.current_map_estimates.shape == theta.shape
-        ), f"Wrong individual parameters shape: {theta.shape}, expected: {self.current_map_estimates.shape}"
+            theta.shape == expected_shape
+        ), f"Wrong shape in theta estimates update: {theta.shape}, expected: {expected_shape}"
+
         self.current_map_estimates = theta
+
+    def update_current_parameters(
+        self,
+        omega: torch.Tensor,
+        beta: torch.Tensor,
+        log_mi: torch.Tensor,
+        res_var: torch.Tensor,
+    ):
+        """Update or initialize the current population parameter values
+
+        Args:
+            omega (torch.Tensor): The random effects covariance matrix
+            beta (torch.Tensor): The fixed effects vector (means and covariates)
+            log_mi (torch.Tensor): The model intrinsic parameters (log-transformed)
+        """
+        self.update_omega(omega)
+        self.update_betas(beta)
+        self.update_log_mi(log_mi)
+        self.update_res_var(res_var)
 
     def sample_etas_chains(self) -> torch.Tensor:
         """Sample individual random effects on all chains from the current estimate of Omega
@@ -521,9 +576,13 @@ class NlmeModel:
         """
         # If theta was not provided in batch format, add a dummy dimension
         if thetas.dim() < 3:
-            thetas.unsqueeze(0)
+            thetas.unsqueeze_(0)
         num_chains_local = thetas.shape[0]
-        assert thetas.shape == (num_chains_local, self.nb_patients, self.nb_descriptors)
+        assert thetas.shape == (
+            num_chains_local,
+            self.nb_patients,
+            self.nb_descriptors,
+        ), f"Wrong shape in theta to structural model inputs: {thetas.shape}"
 
         if not hasattr(self, "observations_tensors"):
             raise ValueError(
@@ -892,6 +951,8 @@ class NlmeModel:
         map_per_patient = pd.DataFrame(
             data=theta.cpu().numpy(), columns=self.descriptors
         )
+        id_column = self.patients
+        map_per_patient["id"] = id_column
         return map_per_patient
 
     def map_estimates_predictions(self) -> pd.DataFrame:
