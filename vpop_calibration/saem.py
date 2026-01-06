@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 from scipy.optimize import minimize
 from tqdm.notebook import tqdm
-from typing import Union, Optional
+from typing import Union, Optional, Callable
 from pandas import DataFrame
 import numpy as np
 from IPython.display import display, DisplayHandle
@@ -30,7 +30,7 @@ class PySaem:
         annealing_factor: float = 0.95,
         init_step_size: float = 0.5,  # stick to the 0.1 - 1 range
         verbose: bool = False,
-        optim_max_fun: int = 50,
+        optim_max_fun: int = 500,
         live_plot: bool = True,
         plot_frames: int = 20,
         plot_columns: int = 3,
@@ -528,8 +528,9 @@ class PySaem:
             self.current_gaussian_params_per_patient = (
                 self.current_gaussian_params.mean(dim=0)
             )
+            objective_fun = self.build_mi_objective_function()
             target_log_MI_np = minimize(
-                fun=self.MI_objective_function,
+                fun=objective_fun,
                 x0=self.model.log_MI.cpu().squeeze().numpy(),
                 method="L-BFGS-B",
                 options={"maxfun": self.optim_max_fun},
@@ -580,43 +581,46 @@ class PySaem:
             print("Iter done")
         return is_converged
 
-    def MI_objective_function(self, log_MI):
-        log_MI_expanded = (
-            torch.as_tensor(log_MI, device=device)
-            .unsqueeze(0)
-            .repeat((self.model.nb_patients, 1))
-        )
-        if hasattr(self.model, "patients_pdk"):
-            pdk_full = self.model.patients_pdk_full
-        else:
-            pdk_full = torch.empty((self.model.nb_patients, 0), device=device)
-        # Assemble the patient parameters in the right order: PDK, PDU, MI
-        new_thetas = torch.cat(
-            (
-                pdk_full,
-                torch.exp(
-                    torch.cat(
-                        (
-                            self.current_gaussian_params_per_patient,
-                            log_MI_expanded,
+    def build_mi_objective_function(self) -> Callable:
+        def mi_objective_function(log_MI):
+            log_MI_expanded = (
+                torch.as_tensor(log_MI, device=device)
+                .unsqueeze(0)
+                .repeat((self.model.nb_patients, 1))
+            )
+            if hasattr(self.model, "patients_pdk"):
+                pdk_full = self.model.patients_pdk_full
+            else:
+                pdk_full = torch.empty((self.model.nb_patients, 0), device=device)
+            # Assemble the patient parameters in the right order: PDK, PDU, MI
+            new_thetas = torch.cat(
+                (
+                    pdk_full,
+                    torch.exp(
+                        torch.cat(
+                            (
+                                self.current_gaussian_params_per_patient,
+                                log_MI_expanded,
+                            ),
+                            dim=-1,
                         ),
-                        dim=-1,
                     ),
                 ),
-            ),
-            dim=-1,
-        )
-        predictions, _ = self.model.predict_outputs_from_theta(new_thetas)
-        total_log_lik = (
-            self.model.log_likelihood_observation(
-                predictions,
+                dim=-1,
             )
-            .cpu()
-            .sum()
-            .item()
-        )
+            predictions, _ = self.model.predict_outputs_from_theta(new_thetas)
+            total_log_lik = (
+                self.model.log_likelihood_observation(
+                    predictions,
+                )
+                .cpu()
+                .sum()
+                .item()
+            )
 
-        return -total_log_lik
+            return -total_log_lik
+
+        return mi_objective_function
 
     def run(
         self,
@@ -787,7 +791,7 @@ class PySaem:
                         self.training_ranges[mi_name]["high"],
                         alpha=0.25,
                     )
-            ax.set_title("Model intrinsic {MI_name}")
+            ax.set_title(f"Model intrinsic {mi_name}")
             ax.grid(True)
             self.traces.update({mi_name: tr})
             plot_idx += 1
