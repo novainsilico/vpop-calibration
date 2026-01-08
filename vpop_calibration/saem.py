@@ -966,8 +966,9 @@ class PySaem:
                 beta_index = self.model.population_betas_names.index(pdu)
                 mu_val = self.model.population_betas[beta_index]
                 omega_val = self.model.omega_pop[i, i]
+                std_dev = (torch.exp(omega_val) - 1) * torch.exp(2 * mu_val + omega_val)
                 print(
-                    f"{pdu}: Mean {torch.exp(mu_val): .2f} (log: {mu_val:.2f}), sd: {omega_val:.2e}"
+                    f"{pdu}: mu: {torch.exp(mu_val): .2f} (log: {mu_val:.2f}), omega^2: {omega_val:.2e}, sd: {std_dev:.2f}"
                 )
         if self.model.nb_covariates > 0:
             print("------")
