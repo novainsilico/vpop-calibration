@@ -49,7 +49,7 @@ In practice, a certain number of transitions from an MCMC (Monte-Carlo Markov Ch
 \eta^{k+1} \sim p(\eta | \beta^k, \Omega^k, \psi^k, \sigma^k, \mathbf{y})
 ```
 
-The $\phi$ PDU parameters are updated simultaneously as the random effects $eta$, via the relationship
+The $\phi$ PDU parameters are updated simultaneously as the random effects $\eta$, via the relationship
 
 ```math
 \log \phi^{k+1} = X \times \beta^k + \eta^{k+1}
