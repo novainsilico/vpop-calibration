@@ -688,6 +688,7 @@ class PySaem:
                     self.consecutive_converged_iters = 0
         self._update_convergence_plot()
         plt.close(self.convergence_plot_fig)
+        self.print_estimates_console()
         return None
 
     def continue_iterating(self, nb_add_iters_ph1=0, nb_add_iters_ph2=0) -> None:
@@ -949,3 +950,34 @@ class PySaem:
             indiv_figsize=indiv_figsize, n_cols=n_cols
         )
         plt.close(fig)
+
+    def print_estimates_console(self) -> None:
+        print("Estimated values of population effects:\n")
+        if self.model.nb_MI > 0:
+            print("------")
+            print("Model intrinsic parameters:")
+            for i, mi in enumerate(self.model.MI_names):
+                val_log = self.model.log_MI[i]
+                print(f"{mi}: {torch.exp(val_log):.2f} (log: {val_log:.2f})")
+        if self.model.nb_PDU > 0:
+            print("------")
+            print("PDU parameters:")
+            for i, pdu in enumerate(self.model.PDU_names):
+                beta_index = self.model.population_betas_names.index(pdu)
+                mu_val = self.model.population_betas[beta_index]
+                omega_val = self.model.omega_pop[i, i]
+                print(
+                    f"{pdu}: Mean {torch.exp(mu_val): .2f} (log: {mu_val:.2f}), sd: {omega_val:.2e}"
+                )
+        if self.model.nb_covariates > 0:
+            print("------")
+            print("Covariate effect parameters:")
+            for i, coef in enumerate(self.model.covariate_coeffs_names):
+                beta_index = self.model.population_betas_names.index(coef)
+                coef_val = self.model.population_betas[beta_index]
+                print(f"{coef}: {coef_val:.2e}")
+        print("------")
+        print("Residual error model:")
+        for i, output in enumerate(self.model.outputs_names):
+            sigma = self.model.residual_var[i]
+            print(f"{output}: {sigma:.2e}")
