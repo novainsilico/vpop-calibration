@@ -19,4 +19,5 @@ __all__ = [
     "generate_vpop_from_ranges",
     "check_surrogate_validity_gp",
     "plot_map_estimates",
+    "plot_individual_map_estimates",
 ]
