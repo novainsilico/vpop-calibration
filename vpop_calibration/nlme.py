@@ -414,7 +414,7 @@ class NlmeModel:
         self.log_MI = log_MI
 
     def update_eta_samples(self, eta: torch.Tensor) -> None:
-        """Update the model current individual random effect sampels."""
+        """Update the model current individual random effect samples."""
         assert (
             self.current_eta_samples.shape == eta.shape
         ), f"Wrong individual samples shape: {eta.shape}, expected: {self.current_eta_samples.shape}"
