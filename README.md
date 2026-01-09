@@ -4,16 +4,19 @@
 
 A set of Python tools to allow for virtual population calibration, using a non-linear mixed effects (NLME) model approach, combined with surrogate models in order to speed up the simulation of QSP models.
 
+The approach was mainly inspired from [^Grenier2018].
+
 ### Currently available features
 
 - Surrogate modeling using gaussian processes, implemented using [GPyTorch](https://github.com/cornellius-gp/gpytorch)
 - Synthetic data generation using ODE models. The current implementation uses [scipy.integrate.solve_ivp](https://docs.scipy.org/doc/scipy/reference/generated/scipy.integrate.solve_ivp.html), parallelized with [multiprocessing](https://docs.python.org/3/library/multiprocessing.html)
-- Non-linear mixed effect models:
+- Non-linear mixed effect models, see the [dedicated doc](./docs/nlme_model.md):
   - Log-distributed parameters
   - Additive or multiplicative error model
   - Covariates handling
   - Known individual patient descriptors (i.e. covariates with no effect on other descriptors outside of the structural model)
-- SAEM: see the [dedicated doc](./docs/saem_implementation.md) for more details
+- SAEM: see the [dedicated doc](./docs/saem_implementation.md)
+  - Optimization of random and fixed effects using repeated longitudinal data
 
 ## Getting started
 
@@ -29,11 +32,16 @@ A set of Python tools to allow for virtual population calibration, using a non-l
 
 For any issue or comments, please reach out to paul.lemarre@novainsilico.ai, or feel free to open an issue in the repo directly.
 
-## Authors and acknowledgment
+## Authors
 
 - Paul Lemarre
 - Eléonore Dravet
+
+## Acknowledgements
+
 - Adeline Leclerq-Sampson
+- Eliott Tixier
+- Louis Philippe
 
 ## Roadmap
 
@@ -46,9 +54,8 @@ For any issue or comments, please reach out to paul.lemarre@novainsilico.ai, or 
 - Surrogate models:
   - Support additional surrogate models in PyTorch
 - Optimizer:
-  - Add SVGP for surrogate model optimization
+  - Add preconditioned Stochastic-Gradient-Descent (SGD) method for surrogate model optimization
 
 ## References
 
-- [Delyon et al. 99](https://doi.org/10.1214/aos/1018031103): Bernard Delyon. Marc Lavielle. Eric Moulines. "Convergence of a stochastic approximation version of the EM algorithm." Ann. Statist. 27 (1) 94 - 128, February 1999. https://doi.org/10.1214/aos/1018031103
-- [Grenier et al. 2018](https://doi.org/10.1007/s40314-016-0337-5): Grenier, E., Helbert, C., Louvet, V. et al. Population parametrization of costly black box models using iterations between SAEM algorithm and kriging. Comp. Appl. Math. 37, 161–173 (2018). https://doi.org/10.1007/s40314-016-0337-5
+[^Grenier2018]: [Grenier et al. 2018](https://doi.org/10.1007/s40314-016-0337-5): Grenier, E., Helbert, C., Louvet, V. et al. Population parametrization of costly black box models using iterations between SAEM algorithm and kriging. Comp. Appl. Math. 37, 161–173 (2018). https://doi.org/10.1007/s40314-016-0337-5
