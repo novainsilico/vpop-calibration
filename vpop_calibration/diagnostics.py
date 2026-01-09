@@ -164,3 +164,65 @@ def plot_map_estimates(nlme_model: NlmeModel) -> None:
     if not smoke_test:
         plt.tight_layout()
         plt.show()
+
+
+def plot_individual_map_estimates(nlme_model: NlmeModel, patient_num: int) -> None:
+    observed = nlme_model.observations_df
+    simulated_df = nlme_model.map_estimates_predictions()
+
+    n_cols = nlme_model.nb_outputs
+    n_rows = nlme_model.structural_model.nb_protocols
+    _, axes = plt.subplots(
+        n_rows, n_cols, figsize=(5 * n_cols, 4 * n_rows), squeeze=False
+    )
+
+    cmap = plt.get_cmap("Paired")
+    colors = cmap(np.linspace(0, 1, nlme_model.nb_patients))
+    for output_index, output_name in enumerate(nlme_model.outputs_names):
+        for protocol_index, protocol_arm in enumerate(
+            nlme_model.structural_model.protocols
+        ):
+            obs_loop = observed.loc[
+                (observed["output_name"] == output_name)
+                & (observed["protocol_arm"] == protocol_arm)
+            ]
+            pred_loop = simulated_df.loc[
+                (simulated_df["output_name"] == output_name)
+                & (simulated_df["protocol_arm"] == protocol_arm)
+            ]
+            ax = axes[protocol_index, output_index]
+            ax.set_xlabel("Time")
+            patients_protocol = obs_loop["id"].drop_duplicates().to_list()
+            patient_ind = patients_protocol[patient_num]
+            patient_num = nlme_model.patients.index(patient_ind)
+            patient_obs = obs_loop.loc[obs_loop["id"] == patient_ind]
+            patient_pred = pred_loop.loc[pred_loop["id"] == patient_ind]
+            time_vec = patient_obs["time"].values
+            sorted_indices = np.argsort(time_vec)
+            sorted_times = time_vec[sorted_indices]
+            obs_vec = patient_obs["value"].values[sorted_indices]
+            ax.plot(
+                sorted_times,
+                obs_vec,
+                "+",
+                color=colors[patient_num],
+                linewidth=2,
+                alpha=0.6,
+            )
+            if patient_pred.shape[0] > 0:
+                pred_vec = patient_pred["predicted_value"].values[sorted_indices]
+                ax.plot(
+                    sorted_times,
+                    pred_vec,
+                    "-",
+                    color=colors[patient_num],
+                    linewidth=2,
+                    alpha=0.5,
+                )
+
+            title = f"{output_name} in {protocol_arm}"  # More descriptive title
+            ax.set_title(title)
+
+    if not smoke_test:
+        plt.tight_layout()
+        plt.show()
