@@ -347,7 +347,11 @@ class GP:
             for i in epochs:
                 epoch_loss = 0.0
                 for batch_params, batch_outputs in tqdm(
-                    train_loader, desc="Batch progress", position=1, leave=False
+                    train_loader,
+                    desc="Batch progress",
+                    position=1,
+                    leave=False,
+                    disable=not mini_batching,
                 ):
                     optimizer.zero_grad()  # zero gradients from previous iteration
                     output = self.model(batch_params)  # recalculate the prediction
@@ -355,10 +359,11 @@ class GP:
                     loss.backward()  # compute the gradients of the parameters that can be changed
                     optimizer.step()
                     epoch_loss += loss.item()
+                epoch_loss = epoch_loss / len(train_loader)
                 self.training_losses.append(epoch_loss)
                 if scheduler is not None:
                     scheduler.step()
-                # In case we have a validatio ndata set
+                # In case we have a validation data set
                 if self.data.training_proportion < 1.0:
                     validation_loss = -cast(
                         torch.Tensor,
@@ -401,6 +406,7 @@ class GP:
                         np.array(self.training_losses),
                         np.array(self.validation_losses),
                     )
+                    plt.close(self.loss_plot.fig)
                     break
                 # Update loss plot at frame rate
                 if (i % self.plot_frame_rate == 0) | (i == self.nb_training_iter - 1):

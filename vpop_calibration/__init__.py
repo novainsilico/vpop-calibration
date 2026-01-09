@@ -1,6 +1,6 @@
 from .nlme import NlmeModel
 from .saem import PySaem
-from .structural_model import StructuralGp, StructuralOdeModel
+from .structural_model import StructuralGp, StructuralOdeModel, StructuralAnalytical
 from .model import *
 from .ode import OdeModel
 from .vpop import generate_vpop_from_ranges
@@ -12,6 +12,7 @@ __all__ = [
     "OdeModel",
     "StructuralGp",
     "StructuralOdeModel",
+    "StructuralAnalytical",
     "NlmeModel",
     "PySaem",
     "simulate_dataset_from_omega",
