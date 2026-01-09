@@ -17,7 +17,7 @@ In order to run SAEM, the following elements are necessary
 
 The SAEM iteration is composed of the following steps:
 
-- E-step: new random effects are sampeld by performing transitions of a MCMC kernel
+- E-step: new random effects are sampled by performing transitions of a MCMC kernel
 - M-step: the sufficient statistics are updated, as well as the residual error variance, with stochastic approximation
 
 The algorithm execution is divided in two phases: the **exploratory** phase, during which the learning rate is set to 1 (no stochastic approximation), and the **smoothing** phase, during which the learning rate gradually decays to 0, to ensure convergence of the Markov chains.

@@ -47,7 +47,7 @@ The patient descriptors $\theta_i$ are divided in 4 groups:
 The PDUs are assumed to follow a multivariate log-normal distribution
 
 ```math
-\log \psi_i = \beta X_i + \eta_i, \\
+\log \phi_i = \beta X_i + \eta_i, \\
 \eta \sim \mathcal{N}(0, \Omega)
 ```
 
@@ -55,7 +55,7 @@ where $\beta$ is the vector of population parameters, containing the means and t
 
 ##### Covariates
 
-Considering that $n_{PDU}$ PDU parameters are described, and for each PDU $k$, the covariates $c_{k,1}, \dots, c_{k,n_k}$ have an influence, the total number of $\beta$ values is $n_\beta = \sum_{k=1}^{n_{PDU}} n_k$.
+Considering that $n_{PDU}$ PDU parameters are described, and for each PDU $k$, the covariates $c_{k,1}, \dots, c_{k,n_k}$ have an influence, the total number of $\beta$ values is $n_\beta = \sum_{k=1}^{n_{PDU}} n_k$. For each covariate $c_{k,j}$ which has an influence on PDU $k$, the associated covariation coefficient is denoted as $\rho_{c_{k,j} \rightarrow \mu_k}$ (coefficient of the influence of $c_{k,j}$ on $\mu_k$). The vector of fixed effects $\beta$ and the design matrices $X_i$ are thus formulated as:
 
 ```math
 \beta = \begin{pmatrix}
