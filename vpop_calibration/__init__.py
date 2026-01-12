@@ -9,6 +9,7 @@ from .diagnostics import (
     check_surrogate_validity_gp,
     plot_map_estimates,
     plot_individual_map_estimates,
+    plot_all_individual_map_estimates,
 )
 
 __all__ = [
@@ -25,4 +26,5 @@ __all__ = [
     "check_surrogate_validity_gp",
     "plot_map_estimates",
     "plot_individual_map_estimates",
+    "plot_all_individual_map_estimates",
 ]
