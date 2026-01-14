@@ -66,6 +66,14 @@ class StructuralGp(StructuralModel):
             gp_model.data.task_idx_to_protocol,
         )
         self.gp_model = gp_model
+        self.training_ranges = {}
+        training_samples = self.gp_model.data.full_df_raw[self.parameter_names]
+        train_min = training_samples.min(axis=0)
+        train_max = training_samples.max(axis=0)
+        for param in self.parameter_names:
+            self.training_ranges.update(
+                {param: {"low": train_min[param], "high": train_max[param]}}
+            )
 
     def simulate(
         self,
