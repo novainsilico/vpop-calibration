@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-
+import random as rand
 from .nlme import NlmeModel
 from .saem import PySaem
 from .model.gp import GP
@@ -104,14 +104,19 @@ def check_surrogate_validity_gp(nlme_model: NlmeModel) -> tuple[dict, dict]:
     return diagnostics, recommended_ranges
 
 
-def plot_map_estimates(nlme_model: NlmeModel) -> None:
+def plot_map_estimates(
+    nlme_model: NlmeModel, facet_width: int = 5, facet_height: int = 4
+) -> None:
     observed = nlme_model.observations_df
     simulated_df = nlme_model.map_estimates_predictions()
 
     n_cols = nlme_model.nb_outputs
     n_rows = nlme_model.structural_model.nb_protocols
     _, axes = plt.subplots(
-        n_rows, n_cols, figsize=(5 * n_cols, 4 * n_rows), squeeze=False
+        n_rows,
+        n_cols,
+        figsize=(facet_width * n_cols, facet_height * n_rows),
+        squeeze=False,
     )
 
     cmap = plt.get_cmap("Spectral")
@@ -166,62 +171,79 @@ def plot_map_estimates(nlme_model: NlmeModel) -> None:
         plt.show()
 
 
-def plot_individual_map_estimates(nlme_model: NlmeModel, patient_num: int) -> None:
-    observed = nlme_model.observations_df
-    simulated_df = nlme_model.map_estimates_predictions()
+def plot_individual_map_estimates(
+    nlme_model: NlmeModel,
+    patient_num: int | None = None,
+    facet_width: int = 5,
+    facet_height: int = 4,
+) -> None:
 
+    # Plot a random patient as default
+    if patient_num == None:
+        total_patient_num = len(nlme_model.patients)
+        patient_num = rand.randrange(1, total_patient_num)
+
+    # Filter datasets for the selected patient
+    observed_df = nlme_model.observations_df
+    simulated_df = nlme_model.map_estimates_predictions()
+    patient_ind = nlme_model.patients[patient_num]
+    patient_obs = observed_df.loc[(observed_df["id"] == patient_ind)]
+    patient_pred = simulated_df.loc[(simulated_df["id"] == patient_ind)]
+
+    # Initialize subplots
     n_cols = nlme_model.nb_outputs
     n_rows = 1
-    _, axes = plt.subplots(
-        n_rows, n_cols, figsize=(5 * n_cols, 4 * n_rows), squeeze=False
+    fig, axes = plt.subplots(
+        n_rows,
+        n_cols,
+        figsize=(facet_width * n_cols, facet_height * n_rows),
+        squeeze=False,
     )
+    fig.suptitle(f"Outputs for patient {patient_num}")
 
-    cmap = plt.get_cmap("Paired")
-    colors = cmap(np.linspace(0, 1, nlme_model.nb_patients))
+    # Initialize colormap according to outputs
+    cmap = plt.get_cmap("brg")
+    colors = cmap(np.linspace(0, 1, len(nlme_model.outputs_names)))
+
     for output_index, output_name in enumerate(nlme_model.outputs_names):
-        for protocol_index, protocol_arm in enumerate(
-            nlme_model.structural_model.protocols
-        ):
-            obs_loop = observed.loc[
-                (observed["output_name"] == output_name)
-                & (observed["protocol_arm"] == protocol_arm)
-            ]
-            pred_loop = simulated_df.loc[
-                (simulated_df["output_name"] == output_name)
-                & (simulated_df["protocol_arm"] == protocol_arm)
-            ]
-            ax = axes[protocol_index, output_index]
-            ax.set_xlabel("Time")
-            patients_protocol = obs_loop["id"].drop_duplicates().to_list()
-            patient_ind = patients_protocol[patient_num]
-            patient_num = nlme_model.patients.index(patient_ind)
-            patient_obs = obs_loop.loc[obs_loop["id"] == patient_ind]
-            patient_pred = pred_loop.loc[pred_loop["id"] == patient_ind]
-            time_vec = patient_obs["time"].values
-            sorted_indices = np.argsort(time_vec)
-            sorted_times = time_vec[sorted_indices]
-            obs_vec = patient_obs["value"].values[sorted_indices]
+        # Filter dataset on current output
+        patient_obs_output = patient_obs.loc[
+            (patient_obs["output_name"] == output_name)
+        ]
+        patient_pred_output = patient_pred.loc[
+            (patient_pred["output_name"] == output_name)
+        ]
+
+        # Sort dataset w.r.t time
+        time_vec = patient_obs_output["time"].values
+        sorted_indices = np.argsort(time_vec)
+        sorted_times = time_vec[sorted_indices]
+        obs_vec = patient_obs_output["value"].values[sorted_indices]
+
+        # Plot observed and predicted vectors
+        ax = axes[0, output_index]
+        ax.set_xlabel("Time")
+        ax.plot(
+            sorted_times,
+            obs_vec,
+            "+",
+            color=colors[output_index],
+            linewidth=2,
+            alpha=0.6,
+        )
+        if patient_pred_output.shape[0] > 0:
+            pred_vec = patient_pred_output["predicted_value"].values[sorted_indices]
             ax.plot(
                 sorted_times,
-                obs_vec,
-                "+",
-                color=colors[patient_num],
+                pred_vec,
+                "-",
+                color=colors[output_index],
                 linewidth=2,
-                alpha=0.6,
+                alpha=0.5,
             )
-            if patient_pred.shape[0] > 0:
-                pred_vec = patient_pred["predicted_value"].values[sorted_indices]
-                ax.plot(
-                    sorted_times,
-                    pred_vec,
-                    "-",
-                    color=colors[patient_num],
-                    linewidth=2,
-                    alpha=0.5,
-                )
 
-            title = f"{output_name} in {protocol_arm}"  # More descriptive title
-            ax.set_title(title)
+        title = f"{output_name}"
+        ax.set_title(title)
 
     if not smoke_test:
         plt.tight_layout()
@@ -229,45 +251,58 @@ def plot_individual_map_estimates(nlme_model: NlmeModel, patient_num: int) -> No
 
 
 def plot_all_individual_map_estimates(
-    nlme_model: NlmeModel, n_rows: int, n_cols: int, n_patients_to_plot: int
+    nlme_model: NlmeModel,
+    n_rows: int = 1,
+    n_cols: int = 5,
+    n_patients_to_plot: int | None = None,
+    facet_width: int = 5,
+    facet_height: int = 4,
 ) -> None:
-    observed = nlme_model.observations_df
+
+    observed_df = nlme_model.observations_df
     simulated_df = nlme_model.map_estimates_predictions()
 
     total_patient_num = len(nlme_model.patients)
     print(f"There are {total_patient_num} patients to plot.")
 
-    if n_patients_to_plot > n_rows * n_cols:
-        raise ValueError(
-            f"{total_patient_num} patients cannot be plotted in a {n_rows}x{n_cols} grid."
-        )
-
-    if n_patients_to_plot > total_patient_num:
+    # Plot all patients by default
+    if n_patients_to_plot == None or n_patients_to_plot > total_patient_num:
         n_patients_to_plot = total_patient_num
 
-    cmap = plt.get_cmap("Paired")
-    colors = cmap(np.linspace(0, 1, nlme_model.nb_patients))
+    # Raise an error if too many patients for the grid
+    if n_patients_to_plot > n_rows * n_cols:
+        raise ValueError(
+            f"{total_patient_num} patients cannot be plotted in a {n_rows}x{n_cols} grid. Enter a n_patients_to_plot value under {n_rows*n_cols} or use a larger grid."
+        )
 
-    patients_protocol = observed["id"].drop_duplicates().to_list()
+    cmap = plt.get_cmap("brg")
+    colors = cmap(np.linspace(0, 1, len(nlme_model.outputs_names)))
 
     # One plot for each output, containing all individual patients subplots for this output
-    for output_name in nlme_model.outputs_names:
+    for output_index, output_name in enumerate(nlme_model.outputs_names):
         fig, axes = plt.subplots(
-            n_rows, n_cols, figsize=(5 * n_cols, 4 * n_rows), squeeze=False
+            n_rows,
+            n_cols,
+            figsize=(facet_width * n_cols, facet_height * n_rows),
+            squeeze=False,
         )
-        fig.suptitle(f"{output_name}")
-        obs_loop = observed.loc[(observed["output_name"] == output_name)]
+        fig.suptitle(f"Output: {output_name}")
+
+        obs_loop = observed_df.loc[(observed_df["output_name"] == output_name)]
         pred_loop = simulated_df.loc[(simulated_df["output_name"] == output_name)]
+
         for k in range(0, n_patients_to_plot):
             # Change indexing from 1d to 2d
             i = k // n_cols
             j = k % n_cols
             ax = axes[i, j]
             ax.set_xlabel("Time")
-            patient_ind = patients_protocol[k]
-            patient_num = nlme_model.patients.index(patient_ind)
+
+            # Filter dataset for current patient
+            patient_ind = nlme_model.patients[k]
             patient_obs = obs_loop.loc[obs_loop["id"] == patient_ind]
             patient_pred = pred_loop.loc[pred_loop["id"] == patient_ind]
+
             time_vec = patient_obs["time"].values
             sorted_indices = np.argsort(time_vec)
             sorted_times = time_vec[sorted_indices]
@@ -276,7 +311,7 @@ def plot_all_individual_map_estimates(
                 sorted_times,
                 obs_vec,
                 "+",
-                color=colors[patient_num],
+                color=colors[output_index],
                 linewidth=2,
                 alpha=0.6,
             )
@@ -286,12 +321,12 @@ def plot_all_individual_map_estimates(
                     sorted_times,
                     pred_vec,
                     "-",
-                    color=colors[patient_num],
+                    color=colors[output_index],
                     linewidth=2,
                     alpha=0.5,
                 )
 
-            title = f"patient {patient_num}"  # More descriptive title
+            title = f"patient {k}"
             ax.set_title(title)
             plt.tight_layout()
 
