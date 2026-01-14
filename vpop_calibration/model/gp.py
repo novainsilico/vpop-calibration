@@ -318,7 +318,7 @@ class GP:
         self.training_losses = []
         self.validation_losses = []
 
-        self.loss_plot = LossPlot(self.nb_training_iter)
+        self.loss_plot = LossPlot()
 
         epochs = tqdm(range(self.nb_training_iter), desc="Epochs", position=0)
         with gpytorch.settings.observation_nan_policy("fill"):
