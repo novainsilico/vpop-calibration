@@ -229,7 +229,7 @@ def plot_individual_map_estimates(nlme_model: NlmeModel, patient_num: int) -> No
 
 
 def plot_all_individual_map_estimates(
-    nlme_model: NlmeModel, n_rows: int, n_cols: int
+    nlme_model: NlmeModel, n_rows: int, n_cols: int, n_patients_to_plot: int
 ) -> None:
     observed = nlme_model.observations_df
     simulated_df = nlme_model.map_estimates_predictions()
@@ -237,28 +237,33 @@ def plot_all_individual_map_estimates(
     total_patient_num = len(nlme_model.patients)
     print(f"There are {total_patient_num} patients to plot.")
 
-    if total_patient_num > n_rows * n_cols:
+    if n_patients_to_plot > n_rows * n_cols:
         raise ValueError(
             f"{total_patient_num} patients cannot be plotted in a {n_rows}x{n_cols} grid."
         )
 
+    if n_patients_to_plot > total_patient_num:
+        n_patients_to_plot = total_patient_num
+
     cmap = plt.get_cmap("Paired")
     colors = cmap(np.linspace(0, 1, nlme_model.nb_patients))
-    # One plot for each output, containing all individual patients plots for this output
+
+    patients_protocol = observed["id"].drop_duplicates().to_list()
+
+    # One plot for each output, containing all individual patients subplots for this output
     for output_name in nlme_model.outputs_names:
         fig, axes = plt.subplots(
             n_rows, n_cols, figsize=(5 * n_cols, 4 * n_rows), squeeze=False
         )
         fig.suptitle(f"{output_name}")
-        for k in range(0, total_patient_num):
+        obs_loop = observed.loc[(observed["output_name"] == output_name)]
+        pred_loop = simulated_df.loc[(simulated_df["output_name"] == output_name)]
+        for k in range(0, n_patients_to_plot):
             # Change indexing from 1d to 2d
             i = k // n_cols
             j = k % n_cols
-            obs_loop = observed.loc[(observed["output_name"] == output_name)]
-            pred_loop = simulated_df.loc[(simulated_df["output_name"] == output_name)]
             ax = axes[i, j]
             ax.set_xlabel("Time")
-            patients_protocol = obs_loop["id"].drop_duplicates().to_list()
             patient_ind = patients_protocol[k]
             patient_num = nlme_model.patients.index(patient_ind)
             patient_obs = obs_loop.loc[obs_loop["id"] == patient_ind]
@@ -286,9 +291,9 @@ def plot_all_individual_map_estimates(
                     alpha=0.5,
                 )
 
-            title = f"patient {patient_ind}"  # More descriptive title
+            title = f"patient {patient_num}"  # More descriptive title
             ax.set_title(title)
+            plt.tight_layout()
 
     if not smoke_test:
-        plt.tight_layout()
         plt.show()
