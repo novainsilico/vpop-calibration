@@ -179,9 +179,9 @@ def plot_individual_map_estimates(
 ) -> None:
 
     # Plot a random patient as default
-    if patient_num == None:
+    if patient_num is None:
         total_patient_num = len(nlme_model.patients)
-        patient_num = rand.randrange(1, total_patient_num)
+        patient_num = rand.randrange(0, total_patient_num)
 
     # Filter datasets for the selected patient
     observed_df = nlme_model.observations_df
@@ -218,19 +218,22 @@ def plot_individual_map_estimates(
         time_vec = patient_obs_output["time"].values
         sorted_indices = np.argsort(time_vec)
         sorted_times = time_vec[sorted_indices]
-        obs_vec = patient_obs_output["value"].values[sorted_indices]
 
-        # Plot observed and predicted vectors
         ax = axes[0, output_index]
         ax.set_xlabel("Time")
-        ax.plot(
-            sorted_times,
-            obs_vec,
-            "+",
-            color=colors[output_index],
-            linewidth=2,
-            alpha=0.6,
-        )
+
+        # Plot observed and predicted vectors
+        if patient_obs_output.shape[0] > 0:
+            obs_vec = patient_obs_output["value"].values[sorted_indices]
+            ax.plot(
+                sorted_times,
+                obs_vec,
+                "+",
+                color=colors[output_index],
+                linewidth=2,
+                alpha=0.6,
+            )
+
         if patient_pred_output.shape[0] > 0:
             pred_vec = patient_pred_output["predicted_value"].values[sorted_indices]
             ax.plot(
@@ -244,10 +247,11 @@ def plot_individual_map_estimates(
 
         title = f"{output_name}"
         ax.set_title(title)
+        plt.tight_layout()
 
     if not smoke_test:
-        plt.tight_layout()
         plt.show()
+        plt.close(fig)
 
 
 def plot_all_individual_map_estimates(
@@ -266,13 +270,13 @@ def plot_all_individual_map_estimates(
     print(f"There are {total_patient_num} patients to plot.")
 
     # Plot all patients by default
-    if n_patients_to_plot == None or n_patients_to_plot > total_patient_num:
+    if n_patients_to_plot is None or n_patients_to_plot > total_patient_num:
         n_patients_to_plot = total_patient_num
 
     # Raise an error if too many patients for the grid
     if n_patients_to_plot > n_rows * n_cols:
         raise ValueError(
-            f"{total_patient_num} patients cannot be plotted in a {n_rows}x{n_cols} grid. Enter a n_patients_to_plot value under {n_rows*n_cols} or use a larger grid."
+            f"{n_patients_to_plot} patients cannot be plotted in a {n_rows}x{n_cols} grid. Enter a n_patients_to_plot value under {n_rows*n_cols} or use a larger grid."
         )
 
     cmap = plt.get_cmap("brg")
@@ -288,8 +292,12 @@ def plot_all_individual_map_estimates(
         )
         fig.suptitle(f"Output: {output_name}")
 
-        obs_loop = observed_df.loc[(observed_df["output_name"] == output_name)]
-        pred_loop = simulated_df.loc[(simulated_df["output_name"] == output_name)]
+        patient_obs_output = observed_df.loc[
+            (observed_df["output_name"] == output_name)
+        ]
+        patient_pred_output = simulated_df.loc[
+            (simulated_df["output_name"] == output_name)
+        ]
 
         for k in range(0, n_patients_to_plot):
             # Change indexing from 1d to 2d
@@ -300,21 +308,27 @@ def plot_all_individual_map_estimates(
 
             # Filter dataset for current patient
             patient_ind = nlme_model.patients[k]
-            patient_obs = obs_loop.loc[obs_loop["id"] == patient_ind]
-            patient_pred = pred_loop.loc[pred_loop["id"] == patient_ind]
+            patient_obs = patient_obs_output.loc[
+                patient_obs_output["id"] == patient_ind
+            ]
+            patient_pred = patient_pred_output.loc[
+                patient_pred_output["id"] == patient_ind
+            ]
 
             time_vec = patient_obs["time"].values
             sorted_indices = np.argsort(time_vec)
             sorted_times = time_vec[sorted_indices]
-            obs_vec = patient_obs["value"].values[sorted_indices]
-            ax.plot(
-                sorted_times,
-                obs_vec,
-                "+",
-                color=colors[output_index],
-                linewidth=2,
-                alpha=0.6,
-            )
+
+            if patient_obs.shape[0] > 0:
+                obs_vec = patient_obs["value"].values[sorted_indices]
+                ax.plot(
+                    sorted_times,
+                    obs_vec,
+                    "+",
+                    color=colors[output_index],
+                    linewidth=2,
+                    alpha=0.6,
+                )
             if patient_pred.shape[0] > 0:
                 pred_vec = patient_pred["predicted_value"].values[sorted_indices]
                 ax.plot(
@@ -332,3 +346,71 @@ def plot_all_individual_map_estimates(
 
     if not smoke_test:
         plt.show()
+        plt.close(fig)
+
+
+def plot_map_estimates_gof(
+    nlme_model: NlmeModel, facet_width: int = 8, facet_height: int = 8
+) -> None:
+
+    observed_df = nlme_model.observations_df
+    simulated_df = nlme_model.map_estimates_predictions()
+    sim_vs_obs_df = simulated_df.merge(observed_df, on=["time", "id", "output_name"])
+
+    unique_outputs = sim_vs_obs_df["output_name"].unique()
+    num_plots = len(unique_outputs)
+    fig, axes = plt.subplots(
+        1, num_plots, figsize=(facet_width * num_plots, facet_height), squeeze=False
+    )
+
+    fig.suptitle(f"Observed vs. simulated plot")
+
+    for output_index, output_name in enumerate(nlme_model.outputs_names):
+
+        ax = axes[0, output_index]
+        gof_df = sim_vs_obs_df.loc[(sim_vs_obs_df["output_name"] == output_name)]
+        # Plot (obs,pred) points
+        ax.scatter(
+            x=gof_df["value"],
+            y=gof_df["predicted_value"],
+            alpha=0.7,
+            s=50,
+            edgecolors="w",
+        )
+
+        # Plot 2x interval
+        all_vals = gof_df[["value", "predicted_value"]]
+        min_val = all_vals.min().min()
+        max_val = all_vals.max().max()
+        margin = (max_val - min_val) * 0.05
+        range_val = [min_val - margin, max_val + margin]
+        ax.plot(range_val, range_val, color="red", linestyle="-", linewidth=1.5)
+        ax.plot(
+            range_val,
+            [i * 2 for i in range_val],
+            color="red",
+            linestyle="--",
+            linewidth=1.5,
+        )
+        ax.plot(
+            range_val,
+            [i / 2 for i in range_val],
+            color="red",
+            linestyle="--",
+            linewidth=1.5,
+        )
+
+        ax.set_xlim(range_val)
+        ax.set_ylim(range_val)
+        ax.grid(True, linestyle=":", alpha=0.6)
+
+        ax.set_xlabel("observed", fontsize=12)
+        ax.set_ylabel("simulated", fontsize=12)
+
+        title = f"Output: {output_name}"
+        ax.set_title(title)
+        plt.tight_layout()
+
+    if smoke_test:
+        plt.show()
+        plt.close(fig)

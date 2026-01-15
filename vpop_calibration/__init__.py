@@ -10,6 +10,7 @@ from .diagnostics import (
     plot_map_estimates,
     plot_individual_map_estimates,
     plot_all_individual_map_estimates,
+    plot_map_estimates_gof,
 )
 
 __all__ = [
@@ -27,4 +28,5 @@ __all__ = [
     "plot_map_estimates",
     "plot_individual_map_estimates",
     "plot_all_individual_map_estimates",
+    "plot_map_estimates_gof",
 ]
