@@ -1,5 +1,5 @@
 import torch
-from typing import Union, Optional
+from typing import Union, Optional, Callable
 import pandas as pd
 import numpy as np
 
@@ -19,6 +19,7 @@ class NlmeModel:
         error_model_type: str = "additive",
         pred_var_threshold: float = 1e-2,
         num_chains: int = 3,
+        constraints: Optional[dict[str, dict]] = None,
     ):
         """Create a non-linear mixed effects model
 
@@ -39,6 +40,8 @@ class NlmeModel:
                 }
             error_model_type (str): either `additive` or `proportional` error model
             pred_var_threshold (float): Threshold of predictive variance that will issue a warning. Default 1e-2.
+            num_chains (int): Number of parallel chains to track for each patient
+            constraints (dict): Box constraints for each random parameter. Should be a map that associates `pdu_name: {low: value|None, high: value|None}`. Any unspecified constraint will default to `{low: 0, high: Inf}` and result in exponential transformation of the associated gaussian parameter.
         """
         self.structural_model: StructuralModel = structural_model
         self.pred_var_threshold = pred_var_threshold
@@ -186,12 +189,80 @@ class NlmeModel:
             res_var=self.init_res_var,
         )
 
+        self.pdu_transforms = {"exp": [], "sigmoid": []}
+        self.pdu_shift = torch.zeros(1, 1, self.nb_PDU)
+        self.pdu_scale = torch.ones(1, 1, self.nb_PDU)
+
+        self.mi_transforms = {"exp": [], "sigmoid": []}
+        self.mi_shift = torch.zeros(self.nb_MI)
+        self.mi_scale = torch.ones(self.nb_MI)
+
+        if constraints is not None:
+            for pdu_index, pdu in enumerate(self.PDU_names):
+                if pdu in constraints:
+                    # Constraints are specified for this PDU
+                    bounds = constraints[pdu]
+                    if bounds["low"] is not None:
+                        # A lower bound is specified. Include it in the shift
+                        self.pdu_shift[0, 0, pdu_index] = bounds["low"]
+                        # If no shift is specified, a 0 shift is kept
+                    if bounds["high"] is not None:
+                        # A high bound is specified: need to include the PDU in the sigmoid transformation group
+                        self.pdu_transforms["sigmoid"].append(pdu_index)
+                        # Compute the scaling factor
+                        self.pdu_scale[0, 0, pdu_index] = (
+                            bounds["high"] - self.pdu_shift[0, 0, pdu_index]
+                        )
+                    else:
+                        # No high bound specified -> the exp transformation will be used
+                        self.pdu_transforms["exp"].append(pdu_index)
+                else:
+                    # No constraints specified for this pdu -> the 0 shift and exp transformation will be used
+                    self.pdu_transforms["exp"].append(pdu_index)
+            print(
+                "Successfully loaded the following PDU constraints and transformations:"
+            )
+            print(self.pdu_transforms)
+            print(f"Shift: {self.pdu_shift[0, 0, :]}, scale: {self.pdu_scale[0, 0, :]}")
+            for mi_index, mi in enumerate(self.MI_names):
+                if mi in constraints:
+                    # Constraints are specified for this MI
+                    bounds = constraints[mi]
+                    if bounds["low"] is not None:
+                        # A lower bound is specified. Include it in the shift
+                        self.mi_shift[mi_index] = bounds["low"]
+                        # If no shift is specified, a 0 shift is kept
+                    if bounds["high"] is not None:
+                        # A high bound is specified: need to include the MI in the sigmoid transformation group
+                        self.mi_transforms["sigmoid"].append(mi_index)
+                        # Compute the scaling factor
+                        self.mi_scale[mi_index] = (
+                            bounds["high"] - self.mi_shift[mi_index]
+                        )
+                    else:
+                        # No high bound specified -> the exp transformation will be used
+                        self.mi_transforms["exp"].append(mi_index)
+
+                else:
+                    # No constraints specified for this MI -> the 0 shift and exp transformation will be used
+                    self.mi_transforms["exp"].append(mi_index)
+
+            print(
+                "Successfully loaded the following MI constraints and transformations:"
+            )
+            print(self.mi_transforms)
+            print(f"Shift: {self.mi_shift}, scale: {self.mi_scale}")
+        else:
+            # No constraints specified at all: 0 shift and exp transformation for all params
+            self.pdu_transforms["exp"] = list(np.arange(self.nb_PDU))
+            self.mi_transforms["exp"] = list(np.arange(self.nb_MI))
+
         # Initiate the patient parameters
         self.init_etas = self.sample_etas_chains()
         self.update_eta_samples(self.init_etas)
         # Compute a first naive guess for the patient parameters on all chains
         gaussian_params = self.etas_to_gaussian_params(self.eta_samples_chains)
-        physical_params = self.gaussian_to_physical_params(gaussian_params)
+        physical_params = self.gaussian_to_physical_params(gaussian_params, self.log_MI)
         # Average over the chains to estimate the current patient descriptors
         theta = self.assemble_individual_parameters(physical_params).mean(dim=0)
         self.update_map_estimates(theta)
@@ -519,8 +590,10 @@ class NlmeModel:
         )
         return gaussian_params
 
-    @torch.compile
-    def gaussian_to_physical_params(self, psi: torch.Tensor) -> torch.Tensor:
+    # @torch.compile
+    def gaussian_to_physical_params(
+        self, psi: torch.Tensor, log_mi: torch.Tensor
+    ) -> torch.Tensor:
         """Transform gaussian parameters to physical parameters (thetas)
 
         Args:
@@ -530,8 +603,27 @@ class NlmeModel:
             torch.Tensor: Tensor of individual physical parameter values. Both PDUs and MIs are included. Size: (num_chains, nb_patients, nb_PDU + nb_MI)
         """
         assert psi.shape == (self.num_chains, self.nb_patients, self.nb_PDU)
-        pdu = torch.exp(psi)
-        mi = torch.exp(self.log_MI).expand(self.num_chains, self.nb_patients, -1)
+        pdu = torch.zeros_like(psi, device=device)
+        # Apply exp transform
+        pdu[:, :, self.pdu_transforms["exp"]] = torch.exp(
+            psi[:, :, self.pdu_transforms["exp"]]
+        )
+        # Apply sigmoid transform
+        pdu[:, :, self.pdu_transforms["sigmoid"]] = torch.sigmoid(
+            psi[:, :, self.pdu_transforms["sigmoid"]]
+        )
+        # Shift the PDU
+        pdu = self.pdu_shift + self.pdu_scale * pdu
+
+        mi = torch.zeros_like(log_mi, device=device)
+        # Apply the exp transform
+        mi[self.mi_transforms["exp"]] = torch.exp(log_mi[self.mi_transforms["exp"]])
+        # Apply sigmoid transform
+        mi[self.mi_transforms["sigmoid"]] = torch.sigmoid(
+            log_mi[self.mi_transforms["sigmoid"]]
+        )
+        mi = self.mi_shift + self.mi_scale * mi
+        mi = mi.expand(self.num_chains, self.nb_patients, -1)
         assert mi.shape == (self.num_chains, self.nb_patients, self.nb_MI)
         # Todo: allow for different transformations of gaussian parameters (logit)
         phi = torch.cat((pdu, mi), dim=-1)
@@ -737,7 +829,7 @@ class NlmeModel:
             )
         gaussian_params_chains = self.etas_to_gaussian_params(etas)
         physical_params_chains = self.gaussian_to_physical_params(
-            gaussian_params_chains
+            gaussian_params_chains, self.log_MI
         )
         # Get individual parameters in a tensor
         theta_chains = self.assemble_individual_parameters(physical_params_chains)

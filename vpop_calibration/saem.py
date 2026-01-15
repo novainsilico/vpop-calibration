@@ -169,20 +169,6 @@ class PySaem:
                 self.model.outputs_names[k]: val for k, val in enumerate(true_res_var)
             }
 
-        if isinstance(self.model.structural_model, StructuralGp):
-            self.training_ranges = {}
-            training_samples = np.log(
-                self.model.structural_model.gp_model.data.full_df_raw[
-                    self.model.PDU_names + self.model.MI_names
-                ]
-            )
-            train_min = training_samples.min(axis=0)
-            train_max = training_samples.max(axis=0)
-            for param in self.model.PDU_names + self.model.MI_names:
-                self.training_ranges.update(
-                    {param: {"low": train_min[param], "high": train_max[param]}}
-                )
-
     def m_step_update(
         self,
         gaussian_params: torch.Tensor,
@@ -472,7 +458,9 @@ class PySaem:
 
         # Compute the new patient parameter estimates by averaging over all chains
         new_thetas_chains = self.model.assemble_individual_parameters(
-            self.model.gaussian_to_physical_params(self.current_gaussian_params)
+            self.model.gaussian_to_physical_params(
+                self.current_gaussian_params, self.model.log_MI
+            )
         )
         new_thetas_map = new_thetas_chains.mean(dim=0)
         self.model.update_map_estimates(new_thetas_map)
@@ -582,32 +570,13 @@ class PySaem:
         return is_converged
 
     def build_mi_objective_function(self) -> Callable:
-        def mi_objective_function(log_MI):
-            log_MI_expanded = (
-                torch.as_tensor(log_MI, device=device)
-                .unsqueeze(0)
-                .repeat((self.model.nb_patients, 1))
+        def mi_objective_function(log_MI: np.ndarray):
+            mi_tensor = torch.from_numpy(log_MI).to(device)
+            # Assemble the patient parameters
+            new_physical_params = self.model.gaussian_to_physical_params(
+                self.current_gaussian_params, mi_tensor
             )
-            if hasattr(self.model, "patients_pdk"):
-                pdk_full = self.model.patients_pdk_full
-            else:
-                pdk_full = torch.empty((self.model.nb_patients, 0), device=device)
-            # Assemble the patient parameters in the right order: PDK, PDU, MI
-            new_thetas = torch.cat(
-                (
-                    pdk_full,
-                    torch.exp(
-                        torch.cat(
-                            (
-                                self.current_gaussian_params_per_patient,
-                                log_MI_expanded,
-                            ),
-                            dim=-1,
-                        ),
-                    ),
-                ),
-                dim=-1,
-            )
+            new_thetas = self.model.assemble_individual_parameters(new_physical_params)
             predictions, _ = self.model.predict_outputs_from_theta(new_thetas)
             total_log_lik = (
                 self.model.log_likelihood_observation(
@@ -784,14 +753,6 @@ class PySaem:
                         y=self.true_log_MI[mi_name],
                         linestyle="--",
                     )
-            if hasattr(self, "training_ranges"):
-                if self.training_ranges is not None:
-                    ax.fill_between(
-                        [0, maxiter],
-                        self.training_ranges[mi_name]["low"],
-                        self.training_ranges[mi_name]["high"],
-                        alpha=0.25,
-                    )
             ax.set_title(f"Model intrinsic {mi_name}")
             ax.grid(True)
             self.traces.update({mi_name: tr})
@@ -810,14 +771,6 @@ class PySaem:
                     ax.axhline(
                         y=self.true_log_PDUs[pdu]["mean"],
                         linestyle="--",
-                    )
-            if hasattr(self, "training_ranges"):
-                if self.training_ranges is not None:
-                    ax.fill_between(
-                        [0, maxiter],
-                        self.training_ranges[pdu]["low"],
-                        self.training_ranges[pdu]["high"],
-                        alpha=0.25,
                     )
             ax.set_title(rf"{pdu}: $\mu$ (log)")
             ax.set_xlabel("")

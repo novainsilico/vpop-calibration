@@ -24,6 +24,7 @@ def test_analytical_saem(np_rng):
     init_log_pdu = {
         "lambda1": {"mean": 0.0, "sd": 0.5},
     }
+    constraints = {"lambda1": {"low": 0.0, "high": 300}}
     covariate_map = None
     init_res_var = [100.0]
     nlme_model = NlmeModel(
@@ -35,6 +36,7 @@ def test_analytical_saem(np_rng):
         init_res_var=init_res_var,
         error_model_type="additive",
         num_chains=1,
+        constraints=constraints,
     )
 
     optimizer = PySaem(nlme_model, df)
