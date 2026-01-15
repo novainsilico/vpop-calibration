@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from sklearn.metrics import r2_score
 import random as rand
 from .nlme import NlmeModel
 from .saem import PySaem
@@ -215,7 +216,7 @@ def plot_individual_map_estimates(
         ]
 
         # Sort dataset w.r.t time
-        time_vec = patient_obs_output["time"].values
+        time_vec = patient_obs_output["time"].to_numpy()
         sorted_indices = np.argsort(time_vec)
         sorted_times = time_vec[sorted_indices]
 
@@ -251,7 +252,8 @@ def plot_individual_map_estimates(
 
     if not smoke_test:
         plt.show()
-        plt.close(fig)
+
+    plt.close(fig)
 
 
 def plot_all_individual_map_estimates(
@@ -261,23 +263,32 @@ def plot_all_individual_map_estimates(
     n_patients_to_plot: int | None = None,
     facet_width: int = 5,
     facet_height: int = 4,
+    randomize: bool = False,
 ) -> None:
 
     observed_df = nlme_model.observations_df
     simulated_df = nlme_model.map_estimates_predictions()
 
     total_patient_num = len(nlme_model.patients)
-    print(f"There are {total_patient_num} patients to plot.")
 
     # Plot all patients by default
     if n_patients_to_plot is None or n_patients_to_plot > total_patient_num:
         n_patients_to_plot = total_patient_num
+
+    print(
+        f"There are {total_patient_num} patients in total. {n_patients_to_plot} will be plotted."
+    )
 
     # Raise an error if too many patients for the grid
     if n_patients_to_plot > n_rows * n_cols:
         raise ValueError(
             f"{n_patients_to_plot} patients cannot be plotted in a {n_rows}x{n_cols} grid. Enter a n_patients_to_plot value under {n_rows*n_cols} or use a larger grid."
         )
+
+    if randomize:
+        ind_to_plot = rand.sample(range(total_patient_num), n_patients_to_plot)
+    else:
+        ind_to_plot = np.linspace(0, n_patients_to_plot, n_patients_to_plot)
 
     cmap = plt.get_cmap("brg")
     colors = cmap(np.linspace(0, 1, len(nlme_model.outputs_names)))
@@ -307,7 +318,7 @@ def plot_all_individual_map_estimates(
             ax.set_xlabel("Time")
 
             # Filter dataset for current patient
-            patient_ind = nlme_model.patients[k]
+            patient_ind = nlme_model.patients[ind_to_plot[k]]
             patient_obs = patient_obs_output.loc[
                 patient_obs_output["id"] == patient_ind
             ]
@@ -315,7 +326,7 @@ def plot_all_individual_map_estimates(
                 patient_pred_output["id"] == patient_ind
             ]
 
-            time_vec = patient_obs["time"].values
+            time_vec = patient_obs["time"].to_numpy()
             sorted_indices = np.argsort(time_vec)
             sorted_times = time_vec[sorted_indices]
 
@@ -340,13 +351,14 @@ def plot_all_individual_map_estimates(
                     alpha=0.5,
                 )
 
-            title = f"patient {k}"
+            title = f"patient {ind_to_plot[k]}"
             ax.set_title(title)
             plt.tight_layout()
 
     if not smoke_test:
         plt.show()
-        plt.close(fig)
+
+    plt.close(fig)
 
 
 def plot_map_estimates_gof(
@@ -369,6 +381,12 @@ def plot_map_estimates_gof(
 
         ax = axes[0, output_index]
         gof_df = sim_vs_obs_df.loc[(sim_vs_obs_df["output_name"] == output_name)]
+
+        # Compute R² and RMSE
+        r2 = r2_score(gof_df["value"], gof_df["predicted_value"])
+        rmse = np.sqrt(np.mean((gof_df["value"] - gof_df["predicted_value"]) ** 2))
+        metrics_text = f"$R^2 = {r2:.3f}$\n$RMSE= {rmse:.3f}$"
+
         # Plot (obs,pred) points
         ax.scatter(
             x=gof_df["value"],
@@ -407,10 +425,25 @@ def plot_map_estimates_gof(
         ax.set_xlabel("observed", fontsize=12)
         ax.set_ylabel("simulated", fontsize=12)
 
+        ax.text(
+            0.95,
+            0.05,
+            metrics_text,
+            transform=ax.transAxes,
+            verticalalignment="bottom",
+            horizontalalignment="right",
+            bbox=dict(
+                boxstyle="round", facecolor="white", alpha=0.7, edgecolor="lightgray"
+            ),
+            fontsize=11,
+        )
+
         title = f"Output: {output_name}"
         ax.set_title(title)
         plt.tight_layout()
 
-    if smoke_test:
+    if not smoke_test:
         plt.show()
-        plt.close(fig)
+        print("ok")
+
+    plt.close(fig)
