@@ -41,7 +41,7 @@ class NlmeModel:
             error_model_type (str): either `additive` or `proportional` error model
             pred_var_threshold (float): Threshold of predictive variance that will issue a warning. Default 1e-2.
             num_chains (int): Number of parallel chains to track for each patient
-            constraints (dict): Box constriants for each random parameter. Should be a map that associates `pdu_name: {low: 0|value, high: value|Inf}`. Any unspecified constraint will default to `{low: 0, high: Inf}` and result in exponential transformation of the associated gaussian parameter.
+            constraints (dict): Box constraints for each random parameter. Should be a map that associates `pdu_name: {low: value|None, high: value|None}`. Any unspecified constraint will default to `{low: 0, high: Inf}` and result in exponential transformation of the associated gaussian parameter.
         """
         self.structural_model: StructuralModel = structural_model
         self.pred_var_threshold = pred_var_threshold
