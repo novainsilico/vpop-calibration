@@ -30,7 +30,7 @@ def plot_all_solutions(
 
     n_cols = nb_outputs
     n_rows = nb_protocol_arms
-    _, axes = plt.subplots(
+    fig, axes = plt.subplots(
         n_rows,
         n_cols,
         figsize=(fig_scaling[0] * n_cols, fig_scaling[1] * n_rows),
@@ -76,6 +76,7 @@ def plot_all_solutions(
     if not smoke_test:
         plt.tight_layout()
         plt.show()
+    plt.close(fig)
 
 
 def plot_individual_solution(
@@ -91,7 +92,7 @@ def plot_individual_solution(
     patient_id = patients[0]
     ncols = nb_outputs
     nrows = nb_protocol_arms
-    _, axes = plt.subplots(
+    fig, axes = plt.subplots(
         nrows,
         ncols,
         figsize=(fig_scaling[0] * nrows, fig_scaling[1] * ncols),
@@ -158,6 +159,7 @@ def plot_individual_solution(
     if not smoke_test:
         plt.tight_layout()
         plt.show()
+    plt.close(fig)
 
 
 def plot_obs_vs_predicted(
@@ -175,7 +177,7 @@ def plot_obs_vs_predicted(
 
     n_cols = nb_outputs
     n_rows = nb_protocol_arms
-    _, axes = plt.subplots(
+    fig, axes = plt.subplots(
         n_rows,
         n_cols,
         figsize=(fig_scaling[0] * n_cols, fig_scaling[1] * n_rows),
@@ -234,10 +236,11 @@ def plot_obs_vs_predicted(
     if not smoke_test:
         plt.tight_layout()
         plt.show()
+    plt.close(fig)
 
 
 class LossPlot:
-    def __init__(self, nb_iter_max: int):
+    def __init__(self):
         self.fig, self.ax = plt.subplots(ncols=1, nrows=1)
         (tr1,) = plt.plot([0], [0], label="Training")
         (tr2,) = plt.plot([0], [0], label="Validation")
