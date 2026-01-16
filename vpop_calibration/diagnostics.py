@@ -10,7 +10,9 @@ from .structural_model import StructuralGp
 from .utils import smoke_test
 
 
-def check_surrogate_validity_gp(nlme_model: NlmeModel) -> tuple[dict, dict]:
+def check_surrogate_validity_gp(
+    nlme_model: NlmeModel, scaling_indiv_plot: int = 3, scaling_2by2_plot: int = 2
+) -> tuple[dict, dict]:
     pdus = nlme_model.descriptors
     gp_model_struct = nlme_model.structural_model
     assert isinstance(
@@ -27,12 +29,11 @@ def check_surrogate_validity_gp(nlme_model: NlmeModel) -> tuple[dict, dict]:
     n_cols = 3
     n_rows = int(np.ceil(n_plots / n_cols))
 
-    scaling_indiv_plots = 3
     _, axes1 = plt.subplots(
         n_rows,
         n_cols,
         squeeze=False,
-        figsize=[scaling_indiv_plots * n_cols, scaling_indiv_plots * n_rows],
+        figsize=[scaling_indiv_plot * n_cols, scaling_indiv_plot * n_rows],
     )
     diagnostics = {}
     recommended_ranges = {}
@@ -73,12 +74,11 @@ def check_surrogate_validity_gp(nlme_model: NlmeModel) -> tuple[dict, dict]:
         ax.axvline(train_max, linestyle="dashed", color="black")
         ax.set_title(f"{param}")
 
-    scaling_2by2_plots = 2
     _, axes2 = plt.subplots(
         n_plots,
         n_plots,
         squeeze=False,
-        figsize=[scaling_2by2_plots * n_plots, scaling_2by2_plots * n_plots],
+        figsize=[scaling_2by2_plot * n_plots, scaling_2by2_plot * n_plots],
         sharex="col",
         sharey="row",
     )
