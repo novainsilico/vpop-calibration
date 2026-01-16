@@ -177,6 +177,7 @@ def plot_individual_map_estimates(
     patient_num: int | None = None,
     facet_width: int = 5,
     facet_height: int = 4,
+    verbose: bool = False,
 ) -> None:
 
     # Plot a random patient as default
@@ -190,6 +191,11 @@ def plot_individual_map_estimates(
     patient_ind = nlme_model.patients[patient_num]
     patient_obs = observed_df.loc[(observed_df["id"] == patient_ind)]
     patient_pred = simulated_df.loc[(simulated_df["id"] == patient_ind)]
+
+    # Print patient parameters if verbose selected
+    if verbose:
+        patient_params = nlme_model.map_estimates_descriptors()
+        print(patient_params.loc[patient_params["id"] == patient_ind])
 
     # Initialize subplots
     n_cols = nlme_model.nb_outputs
