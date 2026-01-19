@@ -41,3 +41,7 @@ def test_analytical_saem(np_rng):
 
     optimizer = PySaem(nlme_model, df)
     optimizer.run()
+
+    plot_individual_map_estimates(nlme_model)
+    plot_all_individual_map_estimates(nlme_model)
+    plot_map_estimates_gof(nlme_model)

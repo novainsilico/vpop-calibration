@@ -11,7 +11,9 @@ from .utils import smoke_test
 
 
 def check_surrogate_validity_gp(
-    nlme_model: NlmeModel, scaling_indiv_plot: int = 3, scaling_2by2_plot: int = 2
+    nlme_model: NlmeModel,
+    scaling_indiv_plot: float = 3.0,
+    scaling_2by2_plot: float = 2.0,
 ) -> tuple[dict, dict]:
     pdus = nlme_model.descriptors
     gp_model_struct = nlme_model.structural_model
@@ -106,7 +108,7 @@ def check_surrogate_validity_gp(
 
 
 def plot_map_estimates(
-    nlme_model: NlmeModel, facet_width: int = 5, facet_height: int = 4
+    nlme_model: NlmeModel, facet_width: float = 5.0, facet_height: float = 4.0
 ) -> None:
     observed = nlme_model.observations_df
     simulated_df = nlme_model.map_estimates_predictions()
@@ -175,15 +177,15 @@ def plot_map_estimates(
 def plot_individual_map_estimates(
     nlme_model: NlmeModel,
     patient_num: int | None = None,
-    facet_width: int = 5,
-    facet_height: int = 4,
+    facet_width: float = 5.0,
+    facet_height: float = 4.0,
     verbose: bool = False,
 ) -> None:
 
     # Plot a random patient as default
     if patient_num is None:
         total_patient_num = len(nlme_model.patients)
-        patient_num = rand.randrange(0, total_patient_num)
+        patient_num = rand.randrange(total_patient_num)
 
     # Filter datasets for the selected patient
     observed_df = nlme_model.observations_df
@@ -267,8 +269,8 @@ def plot_all_individual_map_estimates(
     n_rows: int = 1,
     n_cols: int = 5,
     n_patients_to_plot: int | None = None,
-    facet_width: int = 5,
-    facet_height: int = 4,
+    facet_width: float = 5.0,
+    facet_height: float = 4.0,
     randomize: bool = False,
 ) -> None:
 
@@ -294,7 +296,7 @@ def plot_all_individual_map_estimates(
     if randomize:
         ind_to_plot = rand.sample(range(total_patient_num), n_patients_to_plot)
     else:
-        ind_to_plot = np.linspace(0, n_patients_to_plot, n_patients_to_plot)
+        ind_to_plot = list(range(n_patients_to_plot))
 
     cmap = plt.get_cmap("brg")
     colors = cmap(np.linspace(0, 1, len(nlme_model.outputs_names)))
@@ -368,7 +370,7 @@ def plot_all_individual_map_estimates(
 
 
 def plot_map_estimates_gof(
-    nlme_model: NlmeModel, facet_width: int = 8, facet_height: int = 8
+    nlme_model: NlmeModel, facet_width: float = 8.0, facet_height: float = 8.0
 ) -> None:
 
     observed_df = nlme_model.observations_df
