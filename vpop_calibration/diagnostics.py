@@ -362,11 +362,10 @@ def plot_all_individual_map_estimates(
             title = f"patient {ind_to_plot[k]}"
             ax.set_title(title)
             plt.tight_layout()
+        if not smoke_test:
+            plt.show()
 
-    if not smoke_test:
-        plt.show()
-
-    plt.close(fig)
+        plt.close(fig)
 
 
 def plot_map_estimates_gof(
