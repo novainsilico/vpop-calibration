@@ -11,6 +11,8 @@ from .diagnostics import (
     plot_individual_map_estimates,
     plot_all_individual_map_estimates,
     plot_map_estimates_gof,
+    plot_iwres,
+    plot_pwres_in_time,
 )
 
 __all__ = [
@@ -29,4 +31,6 @@ __all__ = [
     "plot_individual_map_estimates",
     "plot_all_individual_map_estimates",
     "plot_map_estimates_gof",
+    "plot_iwres",
+    "plot_pwres_in_time",
 ]
