@@ -8,6 +8,8 @@ from .saem import PySaem
 from .model.gp import GP
 from .structural_model import StructuralGp
 from .utils import smoke_test
+import torch
+import scipy.stats as stats
 
 
 def check_surrogate_validity_gp(
@@ -451,6 +453,101 @@ def plot_map_estimates_gof(
 
     if not smoke_test:
         plt.show()
-        print("ok")
 
     plt.close(fig)
+
+
+def plot_iwres(
+    nlme_model: NlmeModel,
+) -> None:
+
+    iwres = nlme_model.compute_iwres()
+
+    iwres_flat = iwres.detach().cpu().numpy().flatten()
+    fig, ax = plt.subplots(1, 2, figsize=(10, 5))
+
+    ax[0].hist(
+        iwres_flat, bins=30, density=True, alpha=0.6, color="skyblue", edgecolor="black"
+    )
+    mu, std = 0, 1
+    x = torch.linspace(min(iwres_flat), max(iwres_flat), 100)
+    p = stats.norm.pdf(x, mu, std)
+    ax[0].plot(x, p, "r", linewidth=2, label=r"$\mathcal{N}(0,1)$")
+    ax[0].set_title("IWRES distribution")
+    ax[0].set_xlabel("Residual values")
+    ax[0].set_ylabel("Density")
+    ax[0].legend()
+
+    stats.probplot(iwres_flat, dist="norm", plot=ax[1])
+    ax[1].set_title("IWRES Q-Q Plot")
+
+    plt.tight_layout()
+
+    if not smoke_test:
+        plt.show()
+
+    plt.close(fig)
+
+
+def plot_pwres_in_time(nlme_model: NlmeModel, num_samples: int = 100) -> None:
+
+    pwres_results = nlme_model.compute_pwres(num_samples)
+
+    all_pwres = np.concatenate([p["pwres"] for p in pwres_results.values()])
+    all_times = np.concatenate([p["time"] for p in pwres_results.values()])
+
+    all_pwres = all_pwres.flatten()
+    all_times = all_times.flatten()
+
+    sort_idx = np.argsort(all_times)
+    all_times_sorted = all_times[sort_idx]
+    all_pwres_sorted = all_pwres[sort_idx]
+
+    fig, ax = plt.subplots(figsize=(11, 7))
+
+    ax.grid(True, linestyle="--", alpha=0.6, which="both")
+    ax.set_facecolor("#fdfdfd")
+
+    ax.scatter(
+        all_times,
+        all_pwres,
+        alpha=0.5,
+        color="#2c3e50",
+        edgecolors="white",
+        s=45,
+        label="Individual PWRES",
+        zorder=3,
+    )
+
+    ax.axhline(y=0, color="black", linestyle="-", linewidth=1.5, zorder=4)
+    ax.axhline(
+        y=1.96,
+        color="#e74c3c",
+        linestyle="--",
+        linewidth=1.3,
+        label=r"95% CI Limit ($\pm 1.96$)",
+    )
+    ax.axhline(y=-1.96, color="#e74c3c", linestyle="--", linewidth=1.3)
+
+    if len(all_times_sorted) > 5:
+        z = np.polyfit(all_times_sorted, all_pwres_sorted, 3)
+        p_poly = np.poly1d(z)
+        ax.plot(
+            all_times_sorted,
+            p_poly(all_times_sorted),
+            color="#e67e22",
+            linewidth=3,
+            label="Trend Line",
+            zorder=5,
+        )
+
+    ax.set_xlabel("Time", fontsize=12)
+    ax.set_ylabel("Weighted Residual (Standard Deviations)", fontsize=12)
+
+    ax.set_ylim(min(all_pwres), max(all_pwres))
+
+    # Légende
+    ax.legend(loc="upper right", frameon=True, facecolor="white", framealpha=0.9)
+
+    plt.tight_layout()
+    plt.show()
