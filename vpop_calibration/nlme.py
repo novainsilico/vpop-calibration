@@ -933,13 +933,13 @@ class NlmeModel:
 
     def compute_iwres(
         self,
-    ) -> torch.Tensor:
+    ) -> dict:
         """Compute Individual Weighted RESiduals, following the formula :
 
         IWRES_(ij) = ( y_ij - f(t_ij, psi_i) ) / g(t_ij, psi_i)
 
         Returns:
-            torch.Tensor: IWRES, size (1, nb_total_obs)
+            dict: IWRES with patientId as key, with IWRES and timesteps for each patient
         """
 
         # Gather observations tensor
@@ -954,7 +954,23 @@ class NlmeModel:
         variance = self.compute_error_variance(simulated_tensor)
 
         iwres = residuals / variance
-        return iwres
+        print(iwres.shape, self.chunk_sizes)
+        iwres_list = torch.split(iwres, self.chunk_sizes, dim=1)
+        iwres_results = {}
+
+        # Separate IWRES per patient in a dict
+        for i, patient_id in enumerate(self.patients):
+            iwres_patient = iwres_list[i]
+            time_steps_patient = self.observations_tensors[patient_id]["time_steps"]
+            iwres_results.update(
+                {
+                    patient_id: {
+                        "iwres": iwres_patient.squeeze().cpu().numpy(),
+                        "time": time_steps_patient.cpu().numpy(),
+                    }
+                }
+            )
+        return iwres_results
 
     def compute_pwres(self, num_samples: int) -> dict:
         """Compute Population Weighted RESiduals, following the formula :
