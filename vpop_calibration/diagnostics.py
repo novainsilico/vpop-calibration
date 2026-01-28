@@ -462,22 +462,21 @@ def plot_weighted_residuals(
 ) -> None:
 
     if res_type == "population":
-
-        # Avoid a large MC simulation if testing
-        if smoke_test:
-            num_samples_pwres = 2
-
-        wres_results = nlme_model.compute_pwres(num_samples_pwres)
+        if not hasattr(nlme_model, "pwres"):
+            if smoke_test:
+                num_samples_pwres = 2
+            nlme_model.compute_pwres(num_samples_pwres)
+        wres_results = nlme_model.pwres
         wres_name = "pwres"
 
     else:
-
-        wres_results = nlme_model.compute_iwres()
+        if not hasattr(nlme_model, "iwres"):
+            nlme_model.compute_iwres()
+        wres_results = nlme_model.iwres
         wres_name = "iwres"
 
     all_wres = np.concatenate([p[wres_name] for p in wres_results.values()])
     all_times = np.concatenate([p["time"] for p in wres_results.values()])
-    all_predictions = nlme_model.map_estimates_predictions()
 
     all_wres = all_wres.flatten()
     all_times = all_times.flatten()
@@ -488,7 +487,7 @@ def plot_weighted_residuals(
 
     fig, ax = plt.subplots(2, 2, figsize=(20, 10))
 
-    # Histogram plot
+    ## Histogram plot
     ax[0, 0].hist(
         all_wres, bins=30, density=True, alpha=0.6, color="skyblue", edgecolor="black"
     )
@@ -501,11 +500,11 @@ def plot_weighted_residuals(
     ax[0, 0].set_ylabel("Density")
     ax[0, 0].legend()
 
-    # Q-Q plot
+    ## Q-Q plot
     stats.probplot(all_wres, dist="norm", plot=ax[1, 0])
     ax[1, 0].set_title(f"{wres_name.upper()} Q-Q Plot")
 
-    # Plot vs. time
+    ## Plot vs. time
     sort_idx = np.argsort(all_times)
     all_times_sorted = all_times[sort_idx]
     all_wres_sorted = all_wres[sort_idx]
@@ -532,8 +531,7 @@ def plot_weighted_residuals(
     )
     ax[0, 1].axhline(y=-1.96, color="#e74c3c", linestyle="--", linewidth=1.3)
     if len(all_times_sorted) > 5:
-        z = np.polyfit(all_times_sorted, all_wres_sorted, 3)
-        p_poly = np.poly1d(z)
+        p_poly = np.polynomial.Polynomial.fit(all_times_sorted, all_wres_sorted, deg=2)
         ax[0, 1].plot(
             all_times_sorted,
             p_poly(all_times_sorted),
@@ -544,18 +542,32 @@ def plot_weighted_residuals(
         )
     ax[0, 1].set_xlabel("Time", fontsize=12)
     ax[0, 1].set_ylabel("Weighted Residual (Standard Deviations)", fontsize=12)
-    ax[0, 1].set_ylim(-max(abs(all_wres)), max(abs(all_wres)))
+    ax[0, 1].set_ylim(-1.1 * max(abs(all_wres)), 1.1 * max(abs(all_wres)))
     ax[0, 1].legend(loc="upper right", frameon=True, facecolor="white", framealpha=0.9)
     ax[0, 1].set_title(f"{wres_name.upper()} vs. Time")
 
-    # Plot vs. predictions
-    all_predictions = all_predictions.sort_values(by="time")
-    all_pred_sorted = all_predictions["predicted_value"].values
+    ## Plot vs. predictions
+    all_predictions = nlme_model.map_estimates_predictions()
 
+    # Transform WRES dict into a dataframe
+    rows = []
+    for patient_id, content in wres_results.items():
+        for wres, time in zip(content[wres_name], content["time"]):
+            rows.append({"id": patient_id, wres_name: wres, "time": time})
+
+    wres_df = pd.DataFrame(rows)
+
+    # Merge WRES with predictions, mathcing patientID and time
+    vs_pred_plot_df = pd.merge(
+        wres_df, all_predictions[["id", "time", "predicted_value"]], on=["id", "time"]
+    )
+
+    wres_to_plot = vs_pred_plot_df[wres_name]
+    pred_to_plot = vs_pred_plot_df["predicted_value"]
     ax[1, 1].set_facecolor("#fdfdfd")
     ax[1, 1].scatter(
-        all_pred_sorted,
-        all_wres,
+        pred_to_plot,
+        wres_to_plot,
         alpha=0.5,
         color="#2c3e50",
         edgecolors="white",
@@ -573,8 +585,7 @@ def plot_weighted_residuals(
     )
     ax[1, 1].axhline(y=-1.96, color="#e74c3c", linestyle="--", linewidth=1.3)
     if len(all_times_sorted) > 5:
-        z = np.polyfit(all_times_sorted, all_wres_sorted, 3)
-        p_poly = np.poly1d(z)
+        p_poly = np.polynomial.Polynomial.fit(all_times_sorted, all_wres_sorted, deg=2)
         ax[0, 1].plot(
             all_times_sorted,
             p_poly(all_times_sorted),
@@ -585,7 +596,7 @@ def plot_weighted_residuals(
         )
     ax[1, 1].set_xlabel("Predictions", fontsize=12)
     ax[1, 1].set_ylabel("Weighted Residual (Standard Deviations)", fontsize=12)
-    ax[1, 1].set_ylim(-max(abs(all_wres)), max(abs(all_wres)))
+    ax[1, 1].set_ylim(-1.1 * max(abs(wres_to_plot)), 1.1 * max(abs(wres_to_plot)))
     ax[1, 1].legend(loc="upper right", frameon=True, facecolor="white", framealpha=0.9)
     ax[1, 1].set_title(f"{wres_name.upper()} vs. Predictions")
 
