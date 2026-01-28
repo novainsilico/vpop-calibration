@@ -466,6 +466,7 @@ def plot_iwres(
     all_iwres = np.concatenate([p["iwres"] for p in iwres_results.values()])
     all_times = np.concatenate([p["time"] for p in iwres_results.values()])
     all_predictions = nlme_model.map_estimates_predictions()
+
     all_iwres = all_iwres.flatten()
     all_times = all_times.flatten()
 
@@ -535,11 +536,14 @@ def plot_iwres(
     ax[0, 1].set_title("IWRES vs. Time")
 
     # Plot vs. predictions
+    all_predictions = all_predictions.sort_values(by="time")
+    all_pred_sorted = all_predictions["predicted_value"].values
+
     ax[1, 1].grid(True, linestyle="--", alpha=0.6, which="both")
     ax[1, 1].set_facecolor("#fdfdfd")
     ax[1, 1].scatter(
+        all_pred_sorted,
         all_iwres,
-        all_iwres,  # Replace by predictions !
         alpha=0.5,
         color="#2c3e50",
         edgecolors="white",
@@ -588,6 +592,7 @@ def plot_pwres(nlme_model: NlmeModel, num_samples: int = 100) -> None:
     all_pwres = np.concatenate([p["pwres"] for p in pwres_results.values()])
     all_times = np.concatenate([p["time"] for p in pwres_results.values()])
     all_predictions = nlme_model.map_estimates_predictions()
+
     all_pwres = all_pwres.flatten()
     all_times = all_times.flatten()
 
@@ -658,10 +663,14 @@ def plot_pwres(nlme_model: NlmeModel, num_samples: int = 100) -> None:
     ax[0, 1].set_title("PWRES vs. Time")
 
     # Plot vs. predictions
+
+    all_predictions = all_predictions.sort_values(by="time")
+    all_pred_sorted = all_predictions["predicted_value"].values
+
     ax[1, 1].set_facecolor("#fdfdfd")
     ax[1, 1].scatter(
+        all_pred_sorted,
         all_pwres,
-        all_pwres,  # Replace by predictions !
         alpha=0.5,
         color="#2c3e50",
         edgecolors="white",

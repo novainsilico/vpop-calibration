@@ -953,8 +953,8 @@ class NlmeModel:
         residuals = self.calculate_residuals(observed_tensor, simulated_tensor)
         variance = self.compute_error_variance(simulated_tensor)
 
-        iwres = residuals / variance
-        print(iwres.shape, self.chunk_sizes)
+        iwres = residuals / torch.sqrt(variance)
+
         iwres_list = torch.split(iwres, self.chunk_sizes, dim=1)
         iwres_results = {}
 
