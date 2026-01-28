@@ -933,7 +933,7 @@ class NlmeModel:
 
     def compute_iwres(
         self,
-    ) -> dict:
+    ) -> None:
         """Compute Individual Weighted RESiduals, following the formula :
 
         IWRES_(ij) = ( y_ij - f(t_ij, psi_i) ) / g(t_ij, psi_i)
@@ -970,7 +970,7 @@ class NlmeModel:
                     }
                 }
             )
-        return iwres_results
+        self.iwres = iwres_results
 
     def compute_pwres(self, num_samples: int) -> dict:
         """Compute Population Weighted RESiduals, following the formula :
@@ -1037,7 +1037,7 @@ class NlmeModel:
                 }
             )
 
-        return pwres_results
+        self.pwres = pwres_results
 
     @torch.compile
     def log_likelihood_observation(
