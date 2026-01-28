@@ -457,183 +457,69 @@ def plot_map_estimates_gof(
     plt.close(fig)
 
 
-def plot_iwres(
-    nlme_model: NlmeModel,
+def plot_weighted_residuals(
+    nlme_model: NlmeModel, res_type: str, num_samples_pwres: int = 100
 ) -> None:
 
-    iwres_results = nlme_model.compute_iwres()
+    if res_type == "population":
 
-    all_iwres = np.concatenate([p["iwres"] for p in iwres_results.values()])
-    all_times = np.concatenate([p["time"] for p in iwres_results.values()])
+        # Avoid a large MC simulation if testing
+        if smoke_test:
+            num_samples_pwres = 2
+
+        wres_results = nlme_model.compute_pwres(num_samples_pwres)
+        wres_name = "pwres"
+
+    else:
+
+        wres_results = nlme_model.compute_iwres()
+        wres_name = "iwres"
+
+    all_wres = np.concatenate([p[wres_name] for p in wres_results.values()])
+    all_times = np.concatenate([p["time"] for p in wres_results.values()])
     all_predictions = nlme_model.map_estimates_predictions()
 
-    all_iwres = all_iwres.flatten()
+    all_wres = all_wres.flatten()
     all_times = all_times.flatten()
 
     sort_idx = np.argsort(all_times)
     all_times_sorted = all_times[sort_idx]
-    all_iwres_sorted = all_iwres[sort_idx]
+    all_wres_sorted = all_wres[sort_idx]
 
     fig, ax = plt.subplots(2, 2, figsize=(20, 10))
 
     # Histogram plot
     ax[0, 0].hist(
-        all_iwres, bins=30, density=True, alpha=0.6, color="skyblue", edgecolor="black"
+        all_wres, bins=30, density=True, alpha=0.6, color="skyblue", edgecolor="black"
     )
     mu, std = 0, 1
-    x = torch.linspace(min(all_iwres), max(all_iwres), 100)
+    x = torch.linspace(min(all_wres), max(all_wres), 100)
     p = stats.norm.pdf(x, mu, std)
     ax[0, 0].plot(x, p, "r", linewidth=2, label=r"$\mathcal{N}(0,1)$")
-    ax[0, 0].set_title("IWRES distribution")
+    ax[0, 0].set_title(f"{wres_name.upper()} distribution")
     ax[0, 0].set_xlabel("Residual values")
     ax[0, 0].set_ylabel("Density")
     ax[0, 0].legend()
 
     # Q-Q plot
-    stats.probplot(all_iwres, dist="norm", plot=ax[1, 0])
-    ax[1, 0].set_title("IWRES Q-Q Plot")
+    stats.probplot(all_wres, dist="norm", plot=ax[1, 0])
+    ax[1, 0].set_title(f"{wres_name.upper()} Q-Q Plot")
 
     # Plot vs. time
     sort_idx = np.argsort(all_times)
     all_times_sorted = all_times[sort_idx]
-    all_iwres_sorted = all_iwres[sort_idx]
-
-    ax[0, 1].set_facecolor("#fdfdfd")
-    ax[0, 1].scatter(
-        all_times,
-        all_iwres,
-        alpha=0.5,
-        color="#2c3e50",
-        edgecolors="white",
-        s=45,
-        label="Individual IWRES",
-        zorder=3,
-    )
-    ax[0, 1].axhline(y=0, color="black", linestyle="-", linewidth=1.5, zorder=4)
-    ax[0, 1].axhline(
-        y=1.96,
-        color="#e74c3c",
-        linestyle="--",
-        linewidth=1.3,
-        label=r"95% CI Limit ($\pm 1.96$)",
-    )
-    ax[0, 1].axhline(y=-1.96, color="#e74c3c", linestyle="--", linewidth=1.3)
-    if len(all_times_sorted) > 5:
-        z = np.polyfit(all_times_sorted, all_iwres_sorted, 3)
-        p_poly = np.poly1d(z)
-        ax[0, 1].plot(
-            all_times_sorted,
-            p_poly(all_times_sorted),
-            color="#e67e22",
-            linewidth=3,
-            label="Trend Line",
-            zorder=5,
-        )
-    ax[0, 1].set_xlabel("Time", fontsize=12)
-    ax[0, 1].set_ylabel("Weighted Residual (Standard Deviations)", fontsize=12)
-    ax[0, 1].set_ylim(min(all_iwres), max(all_iwres))
-    ax[0, 1].legend(loc="upper right", frameon=True, facecolor="white", framealpha=0.9)
-    ax[0, 1].set_title("IWRES vs. Time")
-
-    # Plot vs. predictions
-    all_predictions = all_predictions.sort_values(by="time")
-    all_pred_sorted = all_predictions["predicted_value"].values
-
-    ax[1, 1].grid(True, linestyle="--", alpha=0.6, which="both")
-    ax[1, 1].set_facecolor("#fdfdfd")
-    ax[1, 1].scatter(
-        all_pred_sorted,
-        all_iwres,
-        alpha=0.5,
-        color="#2c3e50",
-        edgecolors="white",
-        s=45,
-        label="Individual IWRES",
-        zorder=3,
-    )
-    ax[1, 1].axhline(y=0, color="black", linestyle="-", linewidth=1.5, zorder=4)
-    ax[1, 1].axhline(
-        y=1.96,
-        color="#e74c3c",
-        linestyle="--",
-        linewidth=1.3,
-        label=r"95% CI Limit ($\pm 1.96$)",
-    )
-    ax[1, 1].axhline(y=-1.96, color="#e74c3c", linestyle="--", linewidth=1.3)
-    if len(all_times_sorted) > 5:
-        z = np.polyfit(all_times_sorted, all_iwres_sorted, 3)
-        p_poly = np.poly1d(z)
-        ax[0, 1].plot(
-            all_times_sorted,
-            p_poly(all_times_sorted),
-            color="#e67e22",
-            linewidth=3,
-            label="Trend Line",
-            zorder=5,
-        )
-    ax[1, 1].set_xlabel("Predictions", fontsize=12)
-    ax[1, 1].set_ylabel("Weighted Residual (Standard Deviations)", fontsize=12)
-    ax[1, 1].set_ylim(min(all_iwres), max(all_iwres))
-    ax[1, 1].legend(loc="upper right", frameon=True, facecolor="white", framealpha=0.9)
-    ax[1, 1].set_title("IWRES vs. Predictions")
-
-    plt.tight_layout()
-
-    if not smoke_test:
-        plt.show()
-
-    plt.close(fig)
-
-
-def plot_pwres(nlme_model: NlmeModel, num_samples: int = 100) -> None:
-
-    pwres_results = nlme_model.compute_pwres(num_samples)
-
-    all_pwres = np.concatenate([p["pwres"] for p in pwres_results.values()])
-    all_times = np.concatenate([p["time"] for p in pwres_results.values()])
-    all_predictions = nlme_model.map_estimates_predictions()
-
-    all_pwres = all_pwres.flatten()
-    all_times = all_times.flatten()
-
-    sort_idx = np.argsort(all_times)
-    all_times_sorted = all_times[sort_idx]
-    all_pwres_sorted = all_pwres[sort_idx]
-
-    fig, ax = plt.subplots(2, 2, figsize=(20, 10))
-
-    # Histogram plot
-    ax[0, 0].hist(
-        all_pwres, bins=30, density=True, alpha=0.6, color="skyblue", edgecolor="black"
-    )
-    mu, std = 0, 1
-    x = torch.linspace(min(all_pwres), max(all_pwres), 100)
-    p = stats.norm.pdf(x, mu, std)
-    ax[0, 0].plot(x, p, "r", linewidth=2, label=r"$\mathcal{N}(0,1)$")
-    ax[0, 0].set_title("PWRES distribution")
-    ax[0, 0].set_xlabel("Residual values")
-    ax[0, 0].set_ylabel("Density")
-    ax[0, 0].legend()
-
-    # Q-Q plot
-    stats.probplot(all_pwres, dist="norm", plot=ax[1, 0])
-    ax[1, 0].set_title("PWRES Q-Q Plot")
-
-    # Plot vs. time
-    sort_idx = np.argsort(all_times)
-    all_times_sorted = all_times[sort_idx]
-    all_pwres_sorted = all_pwres[sort_idx]
+    all_wres_sorted = all_wres[sort_idx]
 
     ax[0, 1].grid(True, linestyle="--", alpha=0.6, which="both")
     ax[0, 1].set_facecolor("#fdfdfd")
     ax[0, 1].scatter(
         all_times,
-        all_pwres,
+        all_wres,
         alpha=0.5,
         color="#2c3e50",
         edgecolors="white",
         s=45,
-        label="Individual PWRES",
+        label=f"Individual {wres_name.upper()}",
         zorder=3,
     )
     ax[0, 1].axhline(y=0, color="black", linestyle="-", linewidth=1.5, zorder=4)
@@ -646,7 +532,7 @@ def plot_pwres(nlme_model: NlmeModel, num_samples: int = 100) -> None:
     )
     ax[0, 1].axhline(y=-1.96, color="#e74c3c", linestyle="--", linewidth=1.3)
     if len(all_times_sorted) > 5:
-        z = np.polyfit(all_times_sorted, all_pwres_sorted, 3)
+        z = np.polyfit(all_times_sorted, all_wres_sorted, 3)
         p_poly = np.poly1d(z)
         ax[0, 1].plot(
             all_times_sorted,
@@ -658,24 +544,23 @@ def plot_pwres(nlme_model: NlmeModel, num_samples: int = 100) -> None:
         )
     ax[0, 1].set_xlabel("Time", fontsize=12)
     ax[0, 1].set_ylabel("Weighted Residual (Standard Deviations)", fontsize=12)
-    ax[0, 1].set_ylim(min(all_pwres), max(all_pwres))
+    ax[0, 1].set_ylim(-max(abs(all_wres)), max(abs(all_wres)))
     ax[0, 1].legend(loc="upper right", frameon=True, facecolor="white", framealpha=0.9)
-    ax[0, 1].set_title("PWRES vs. Time")
+    ax[0, 1].set_title(f"{wres_name.upper()} vs. Time")
 
     # Plot vs. predictions
-
     all_predictions = all_predictions.sort_values(by="time")
     all_pred_sorted = all_predictions["predicted_value"].values
 
     ax[1, 1].set_facecolor("#fdfdfd")
     ax[1, 1].scatter(
         all_pred_sorted,
-        all_pwres,
+        all_wres,
         alpha=0.5,
         color="#2c3e50",
         edgecolors="white",
         s=45,
-        label="Individual PWRES",
+        label=f"Individual {wres_name.upper()}",
         zorder=3,
     )
     ax[1, 1].axhline(y=0, color="black", linestyle="-", linewidth=1.5, zorder=4)
@@ -688,7 +573,7 @@ def plot_pwres(nlme_model: NlmeModel, num_samples: int = 100) -> None:
     )
     ax[1, 1].axhline(y=-1.96, color="#e74c3c", linestyle="--", linewidth=1.3)
     if len(all_times_sorted) > 5:
-        z = np.polyfit(all_times_sorted, all_pwres_sorted, 3)
+        z = np.polyfit(all_times_sorted, all_wres_sorted, 3)
         p_poly = np.poly1d(z)
         ax[0, 1].plot(
             all_times_sorted,
@@ -700,9 +585,9 @@ def plot_pwres(nlme_model: NlmeModel, num_samples: int = 100) -> None:
         )
     ax[1, 1].set_xlabel("Predictions", fontsize=12)
     ax[1, 1].set_ylabel("Weighted Residual (Standard Deviations)", fontsize=12)
-    ax[1, 1].set_ylim(min(all_pwres), max(all_pwres))
+    ax[1, 1].set_ylim(-max(abs(all_wres)), max(abs(all_wres)))
     ax[1, 1].legend(loc="upper right", frameon=True, facecolor="white", framealpha=0.9)
-    ax[1, 1].set_title("PWRES vs. Predictions")
+    ax[1, 1].set_title(f"{wres_name.upper()} vs. Predictions")
 
     plt.tight_layout()
 
