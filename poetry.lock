@@ -2238,7 +2238,7 @@ description = "Python package for creating and manipulating graphs and networks"
 optional = false
 python-versions = ">=3.11"
 groups = ["main", "dev"]
-markers = "python_version >= \"3.14\""
+markers = "python_version == \"3.14\""
 files = [
     {file = "networkx-3.6-py3-none-any.whl", hash = "sha256:cdb395b105806062473d3be36458d8f1459a4e4b98e236a66c3a48996e07684f"},
     {file = "networkx-3.6.tar.gz", hash = "sha256:285276002ad1f7f7da0f7b42f004bcba70d381e936559166363707fdad3d72ad"},
@@ -3842,13 +3842,13 @@ test = ["pytest", "ruff"]
 
 [[package]]
 name = "torch"
-version = "2.9.0+cpu"
+version = "2.10.0+cpu"
 description = "Tensors and Dynamic neural networks in Python with strong GPU acceleration"
 optional = false
 python-versions = ">=3.10"
 groups = ["main", "dev"]
 files = [
-    {file = "torch-2.9.0+cpu-cp313-cp313-manylinux_2_28_x86_64.whl", hash = "sha256:6c9b217584400963d5b4daddb3711ec7a3778eab211e18654fba076cce3b8682"},
+    {file = "torch-2.10.0+cpu-cp313-cp313-manylinux_2_28_x86_64.whl", hash = "sha256:8d316e5bf121f1eab1147e49ad0511a9d92e4c45cc357d1ab0bee440da71a095"},
 ]
 
 [package.dependencies]
@@ -3867,7 +3867,7 @@ pyyaml = ["pyyaml"]
 
 [package.source]
 type = "url"
-url = "https://download.pytorch.org/whl/cpu/torch-2.9.0%2Bcpu-cp313-cp313-manylinux_2_28_x86_64.whl#sha256=6c9b217584400963d5b4daddb3711ec7a3778eab211e18654fba076cce3b8682"
+url = "https://download.pytorch.org/whl/cpu/torch-2.10.0%2Bcpu-cp313-cp313-manylinux_2_28_x86_64.whl"
 
 [[package]]
 name = "tornado"
@@ -4101,5 +4101,5 @@ files = [
 
 [metadata]
 lock-version = "2.1"
-python-versions = ">=3.12,<4.0"
-content-hash = "dc6fd28f08bf3bfd89bc1efe3dad4c4a456849dcee53c2279a67b9895f476e6c"
+python-versions = ">=3.12,<3.15"
+content-hash = "ccf0323614dad9b9eb7a987123a90c51a47355c91358e8cd934c9291dce6dfff"
