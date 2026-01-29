@@ -992,22 +992,22 @@ class NlmeModel:
         if hasattr(self, "pwres"):
             return self.pwres
 
-        ## Sample new etas, in order to approximate mean E(y_i) and variance V_i
+        # Sample new etas, in order to approximate mean E(y_i) and variance V_i
         mc_etas = self.sample_etas(num_samples)
 
-        ## Compute gaussian parameters
+        # Compute gaussian parameters
         mc_gaussian = self.etas_to_gaussian_params(mc_etas)
 
-        ## Compute physical parameters
+        # Compute physical parameters
         mc_physical = self.gaussian_to_physical_params(mc_gaussian, self.log_MI)
 
-        ## Assemble individual parameters
+        # Assemble individual parameters
         mc_thetas = self.assemble_individual_parameters(mc_physical)
 
-        ## Simulate outputs
+        # Simulate outputs
         simulated_tensor, _ = self.predict_outputs_from_theta(mc_thetas)
 
-        ## Compute PWRES per patient
+        # Compute PWRES per patient
 
         # list_sim_per_patient shape: n_patients items of shape nb_samples * n_obs_patient
         list_sim_per_patient = torch.split(simulated_tensor, self.chunk_sizes, dim=1)
@@ -1050,6 +1050,58 @@ class NlmeModel:
 
         self.pwres = pwres_results
         return pwres_results
+
+    def compute_npde(self, num_samples: int = 100) -> dict:
+
+        # Avoid computing if already computed residuals
+        if hasattr(self, "npde"):
+            return self.npde
+
+        # Sample new etas
+        mc_etas = self.sample_etas(num_samples)
+
+        # Compute gaussian parameters
+        mc_gaussian = self.etas_to_gaussian_params(mc_etas)
+
+        # Compute physical parameters
+        mc_physical = self.gaussian_to_physical_params(mc_gaussian, self.log_MI)
+
+        # Assemble individual parameters
+        mc_thetas = self.assemble_individual_parameters(mc_physical)
+
+        # Simulate outputs
+        simulated_tensor, _ = self.predict_outputs_from_theta(mc_thetas)
+
+        # Expand observation tensor to match simulated tensor
+        observed_tensor = self.full_obs_data.expand(100, -1)
+
+        print(simulated_tensor.shape, observed_tensor.shape)
+
+        # Compute indicator function in NPDE formula
+        mc_F = simulated_tensor <= observed_tensor
+        mc_F = mc_F.to(torch.float)
+
+        # Average on MC samples
+        mean_F = mc_F.mean(dim=0)
+        mean_F_per_patient = torch.split(mean_F, self.chunk_sizes, dim=0)
+
+        npde_results = {}
+
+        for i, patient_id in enumerate(self.patients):
+
+            npde_patient = mean_F_per_patient[i]
+            time_steps_patient = self.observations_tensors[patient_id]["time_steps"]
+            npde_results.update(
+                {
+                    patient_id: {
+                        "npde": npde_patient.squeeze(-1).cpu().numpy(),
+                        "time": time_steps_patient.cpu().numpy(),
+                    }
+                }
+            )
+
+        self.npde = npde_results
+        return npde_results
 
     @torch.compile
     def log_likelihood_observation(
@@ -1211,19 +1263,19 @@ class NlmeModel:
         Returns simulated dataframe for null etas, i.e. without individual individual random effects but keeping the covariables effects.
         """
 
-        ## Sample new etas, in order to approximate mean E(y_i) and variance V_i
+        # Sample new etas, in order to approximate mean E(y_i) and variance V_i
         null_etas = torch.zeros([1, self.nb_patients, self.nb_PDU])
 
-        ## Compute gaussian parameters
+        # Compute gaussian parameters
         physical_params = self.etas_to_gaussian_params(null_etas)
 
-        ## Compute physical parameters
+        # Compute physical parameters
         physical_params = self.gaussian_to_physical_params(physical_params, self.log_MI)
 
-        ## Assemble individual parameters
+        # Assemble individual parameters
         thetas = self.assemble_individual_parameters(physical_params)
 
-        ## Simulate outputs
+        # Simulate outputs
         simulated_tensor, _ = self.predict_outputs_from_theta(thetas)
 
         simulated_df = self.outputs_to_df(simulated_tensor)
