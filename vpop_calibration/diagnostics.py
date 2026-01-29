@@ -469,22 +469,17 @@ def plot_weighted_residuals(
             if smoke_test:
                 num_samples_pwres = 2
             wres_results = nlme_model.compute_pwres(num_samples_pwres)
+            compare_to_pop_pred = True
             wres_name = "pwres"
         case "individual":
             wres_results = nlme_model.compute_iwres()
             wres_name = "iwres"
+            compare_to_pop_pred = False
         case _:
             raise ValueError(f"Not implemented residual type: {res_type}")
 
-    all_wres = np.concatenate([p[wres_name] for p in wres_results.values()])
-    all_times = np.concatenate([p["time"] for p in wres_results.values()])
-
-    all_wres = all_wres.flatten()
-    all_times = all_times.flatten()
-
-    sort_idx = np.argsort(all_times)
-    all_times_sorted = all_times[sort_idx]
-    all_wres_sorted = all_wres[sort_idx]
+    all_wres = np.concatenate([p[wres_name] for p in wres_results.values()]).flatten()
+    all_times = np.concatenate([p["time"] for p in wres_results.values()]).flatten()
 
     fig, ax = plt.subplots(2, 2, figsize=(facet_width, facet_height))
 
@@ -506,10 +501,6 @@ def plot_weighted_residuals(
     ax[1, 0].set_title(f"{wres_name.upper()} Q-Q Plot")
 
     ## Plot vs. time
-    sort_idx = np.argsort(all_times)
-    all_times_sorted = all_times[sort_idx]
-    all_wres_sorted = all_wres[sort_idx]
-
     ax[0, 1].grid(True, linestyle="--", alpha=0.6, which="both")
     ax[0, 1].set_facecolor("#fdfdfd")
     ax[0, 1].scatter(
@@ -519,7 +510,6 @@ def plot_weighted_residuals(
         color="#2c3e50",
         edgecolors="white",
         s=45,
-        label=f"Individual {wres_name.upper()}",
         zorder=3,
     )
     ax[0, 1].axhline(y=0, color="black", linestyle="-", linewidth=1.5, zorder=4)
@@ -538,7 +528,11 @@ def plot_weighted_residuals(
     ax[0, 1].set_title(f"{wres_name.upper()} vs. Time")
 
     ## Plot vs. predictions
-    all_predictions = nlme_model.map_estimates_predictions()
+
+    if compare_to_pop_pred:
+        all_predictions = nlme_model.map_predictions_eta_zero()
+    else:
+        all_predictions = nlme_model.map_estimates_predictions()
 
     # Transform WRES dict into a dataframe
     rows = []
@@ -563,7 +557,6 @@ def plot_weighted_residuals(
         color="#2c3e50",
         edgecolors="white",
         s=45,
-        label=f"Individual {wres_name.upper()}",
         zorder=3,
     )
     ax[1, 1].axhline(y=0, color="black", linestyle="-", linewidth=1.5, zorder=4)
@@ -576,8 +569,8 @@ def plot_weighted_residuals(
     )
     ax[1, 1].axhline(y=-1.96, color="#e74c3c", linestyle="--", linewidth=1.3)
 
-    ax[1, 1].set_xlabel("Predictions", fontsize=12)
-    ax[1, 1].set_ylabel("Weighted Residual (Standard Deviations)", fontsize=12)
+    ax[1, 1].set_xlabel("Population Predictions")
+    ax[1, 1].set_ylabel("Weighted Residual (Standard Deviations)")
     ax[1, 1].set_ylim(-1.1 * max(abs(wres_to_plot)), 1.1 * max(abs(wres_to_plot)))
     ax[1, 1].legend(loc="upper right", frameon=True, facecolor="white", framealpha=0.9)
     ax[1, 1].set_title(f"{wres_name.upper()} vs. Predictions")

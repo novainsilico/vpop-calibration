@@ -1206,6 +1206,29 @@ class NlmeModel:
         simulated_df = self.outputs_to_df(simulated_tensor)
         return simulated_df
 
+    def map_predictions_eta_zero(self) -> pd.DataFrame:
+        """
+        Returns simulated dataframe for null etas, i.e. without individual individual random effects but keeping the covariables effects.
+        """
+
+        ## Sample new etas, in order to approximate mean E(y_i) and variance V_i
+        null_etas = torch.zeros([1, self.nb_patients, self.nb_PDU])
+
+        ## Compute gaussian parameters
+        physical_params = self.etas_to_gaussian_params(null_etas)
+
+        ## Compute physical parameters
+        physical_params = self.gaussian_to_physical_params(physical_params, self.log_MI)
+
+        ## Assemble individual parameters
+        thetas = self.assemble_individual_parameters(physical_params)
+
+        ## Simulate outputs
+        simulated_tensor, _ = self.predict_outputs_from_theta(thetas)
+
+        simulated_df = self.outputs_to_df(simulated_tensor)
+        return simulated_df
+
     def variance_level_check(
         self, var_list: tuple[torch.Tensor, ...], threshold: float
     ) -> list:
