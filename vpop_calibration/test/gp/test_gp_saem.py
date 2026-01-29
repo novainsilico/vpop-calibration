@@ -46,3 +46,5 @@ def test_gp_saem(np_rng):
     optimizer.run()
     check_surrogate_validity_gp(nlme_model)
     plot_map_estimates(nlme_model)
+    plot_weighted_residuals(nlme_model, "individual")
+    plot_weighted_residuals(nlme_model, "population")

@@ -914,6 +914,7 @@ class NlmeModel:
         sum_residuals = sum_residuals_per_chain.mean(dim=0)
         return sum_residuals
 
+    @torch.compile
     def compute_error_variance(
         self,
         predictions: torch.Tensor,
@@ -933,7 +934,7 @@ class NlmeModel:
 
     def compute_iwres(
         self,
-    ) -> None:
+    ) -> dict:
         """Compute Individual Weighted RESiduals, following the formula :
 
         IWRES_(ij) = ( y_ij - f(t_ij, psi_i) ) / g(t_ij, psi_i)
@@ -941,6 +942,10 @@ class NlmeModel:
         Returns:
             dict: IWRES with patientId as key, with IWRES and timesteps for each patient
         """
+
+        # Avoid computing if already computed residuals
+        if hasattr(self, "iwres"):
+            return self.iwres
 
         # Gather observations tensor
         observed_tensor = self.full_obs_data.view(1, -1)
@@ -970,7 +975,9 @@ class NlmeModel:
                     }
                 }
             )
+
         self.iwres = iwres_results
+        return iwres_results
 
     def compute_pwres(self, num_samples: int) -> dict:
         """Compute Population Weighted RESiduals, following the formula :
@@ -980,6 +987,10 @@ class NlmeModel:
         Returns:
             dict: PWRES with patientId as key, with PWRES and timesteps for each patient
         """
+
+        # Avoid computing if already computed residuals
+        if hasattr(self, "pwres"):
+            return self.pwres
 
         ## Sample new etas, in order to approximate mean E(y_i) and variance V_i
         mc_etas = self.sample_etas(num_samples)
@@ -1038,6 +1049,7 @@ class NlmeModel:
             )
 
         self.pwres = pwres_results
+        return pwres_results
 
     @torch.compile
     def log_likelihood_observation(
@@ -1061,12 +1073,7 @@ class NlmeModel:
         )
         assert residuals.shape == res_error_var.shape
         # Log-likelihood of normal distribution
-        if self.error_model_type == "additive":
-            variance = res_error_var
-        elif self.error_model_type == "proportional":
-            variance = res_error_var * torch.square(predictions)
-        else:
-            raise ValueError("Non supported error type.")
+        variance = self.compute_error_variance(predictions)
         log_lik_full = -0.5 * (
             torch.log(2 * torch.pi * variance) + (residuals**2 / variance)
         )

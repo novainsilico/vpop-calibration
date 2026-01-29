@@ -8,7 +8,6 @@ from .saem import PySaem
 from .model.gp import GP
 from .structural_model import StructuralGp
 from .utils import smoke_test
-import torch
 import scipy.stats as stats
 
 
@@ -458,22 +457,24 @@ def plot_map_estimates_gof(
 
 
 def plot_weighted_residuals(
-    nlme_model: NlmeModel, res_type: str, num_samples_pwres: int = 100
+    nlme_model: NlmeModel,
+    res_type: str,
+    num_samples_pwres: int = 100,
+    facet_width: int = 10,
+    facet_height: int = 10,
 ) -> None:
 
-    if res_type == "population":
-        if not hasattr(nlme_model, "pwres"):
+    match res_type:
+        case "population":
             if smoke_test:
                 num_samples_pwres = 2
-            nlme_model.compute_pwres(num_samples_pwres)
-        wres_results = nlme_model.pwres
-        wres_name = "pwres"
-
-    else:
-        if not hasattr(nlme_model, "iwres"):
-            nlme_model.compute_iwres()
-        wres_results = nlme_model.iwres
-        wres_name = "iwres"
+            wres_results = nlme_model.compute_pwres(num_samples_pwres)
+            wres_name = "pwres"
+        case "individual":
+            wres_results = nlme_model.compute_iwres()
+            wres_name = "iwres"
+        case _:
+            raise ValueError(f"Not implemented residual type: {res_type}")
 
     all_wres = np.concatenate([p[wres_name] for p in wres_results.values()])
     all_times = np.concatenate([p["time"] for p in wres_results.values()])
@@ -485,14 +486,14 @@ def plot_weighted_residuals(
     all_times_sorted = all_times[sort_idx]
     all_wres_sorted = all_wres[sort_idx]
 
-    fig, ax = plt.subplots(2, 2, figsize=(20, 10))
+    fig, ax = plt.subplots(2, 2, figsize=(facet_width, facet_height))
 
     ## Histogram plot
     ax[0, 0].hist(
         all_wres, bins=30, density=True, alpha=0.6, color="skyblue", edgecolor="black"
     )
     mu, std = 0, 1
-    x = torch.linspace(min(all_wres), max(all_wres), 100)
+    x = np.linspace(min(all_wres), max(all_wres), 100)
     p = stats.norm.pdf(x, mu, std)
     ax[0, 0].plot(x, p, "r", linewidth=2, label=r"$\mathcal{N}(0,1)$")
     ax[0, 0].set_title(f"{wres_name.upper()} distribution")
@@ -530,16 +531,6 @@ def plot_weighted_residuals(
         label=r"95% CI Limit ($\pm 1.96$)",
     )
     ax[0, 1].axhline(y=-1.96, color="#e74c3c", linestyle="--", linewidth=1.3)
-    if len(all_times_sorted) > 5:
-        p_poly = np.polynomial.Polynomial.fit(all_times_sorted, all_wres_sorted, deg=2)
-        ax[0, 1].plot(
-            all_times_sorted,
-            p_poly(all_times_sorted),
-            color="#e67e22",
-            linewidth=3,
-            label="Trend Line",
-            zorder=5,
-        )
     ax[0, 1].set_xlabel("Time", fontsize=12)
     ax[0, 1].set_ylabel("Weighted Residual (Standard Deviations)", fontsize=12)
     ax[0, 1].set_ylim(-1.1 * max(abs(all_wres)), 1.1 * max(abs(all_wres)))
@@ -557,7 +548,7 @@ def plot_weighted_residuals(
 
     wres_df = pd.DataFrame(rows)
 
-    # Merge WRES with predictions, mathcing patientID and time
+    # Merge WRES with predictions, matching patientID and time
     vs_pred_plot_df = pd.merge(
         wres_df, all_predictions[["id", "time", "predicted_value"]], on=["id", "time"]
     )
@@ -584,16 +575,7 @@ def plot_weighted_residuals(
         label=r"95% CI Limit ($\pm 1.96$)",
     )
     ax[1, 1].axhline(y=-1.96, color="#e74c3c", linestyle="--", linewidth=1.3)
-    if len(all_times_sorted) > 5:
-        p_poly = np.polynomial.Polynomial.fit(all_times_sorted, all_wres_sorted, deg=2)
-        ax[0, 1].plot(
-            all_times_sorted,
-            p_poly(all_times_sorted),
-            color="#e67e22",
-            linewidth=3,
-            label="Trend Line",
-            zorder=5,
-        )
+
     ax[1, 1].set_xlabel("Predictions", fontsize=12)
     ax[1, 1].set_ylabel("Weighted Residual (Standard Deviations)", fontsize=12)
     ax[1, 1].set_ylim(-1.1 * max(abs(wres_to_plot)), 1.1 * max(abs(wres_to_plot)))
