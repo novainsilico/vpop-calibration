@@ -2,7 +2,6 @@ import torch
 from typing import Union, Optional, Callable
 import pandas as pd
 import numpy as np
-
 from .structural_model import StructuralModel
 from .utils import device
 
@@ -1073,23 +1072,27 @@ class NlmeModel:
         simulated_tensor, _ = self.predict_outputs_from_theta(mc_thetas)
 
         # Expand observation tensor to match simulated tensor
-        observed_tensor = self.full_obs_data.expand(100, -1)
-
-        print(simulated_tensor.shape, observed_tensor.shape)
+        observed_tensor = self.full_obs_data.expand(num_samples, -1)
 
         # Compute indicator function in NPDE formula
         mc_F = simulated_tensor <= observed_tensor
         mc_F = mc_F.to(torch.float)
 
-        # Average on MC samples
+        # Average on MC samples, avoiding 0 and 1 values
         mean_F = mc_F.mean(dim=0)
-        mean_F_per_patient = torch.split(mean_F, self.chunk_sizes, dim=0)
+        eps = 1.0 / simulated_tensor.shape[0]
+        mean_F_clamped = torch.clamp(mean_F, min=eps, max=1.0 - eps)
+
+        # Apply normal inverse CDF to compare NPDE with N(0,1)
+        normal_dist = torch.distributions.Normal(0, 1)
+        npde = normal_dist.icdf(mean_F_clamped)
+        npde_per_patient = torch.split(npde, self.chunk_sizes, dim=0)
 
         npde_results = {}
 
         for i, patient_id in enumerate(self.patients):
 
-            npde_patient = mean_F_per_patient[i]
+            npde_patient = npde_per_patient[i]
             time_steps_patient = self.observations_tensors[patient_id]["time_steps"]
             npde_results.update(
                 {

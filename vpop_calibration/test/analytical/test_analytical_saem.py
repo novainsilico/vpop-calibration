@@ -45,5 +45,6 @@ def test_analytical_saem(np_rng):
     plot_individual_map_estimates(nlme_model)
     plot_all_individual_map_estimates(nlme_model)
     plot_map_estimates_gof(nlme_model)
-    plot_weighted_residuals(nlme_model, "individual")
-    plot_weighted_residuals(nlme_model, "population")
+    plot_weighted_residuals(nlme_model, "iwres")
+    plot_weighted_residuals(nlme_model, "pwres")
+    plot_weighted_residuals(nlme_model, "npde")

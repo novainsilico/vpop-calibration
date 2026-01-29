@@ -459,26 +459,29 @@ def plot_map_estimates_gof(
 def plot_weighted_residuals(
     nlme_model: NlmeModel,
     res_type: str,
-    num_samples_pwres: int = 100,
+    num_samples: int = 100,
     facet_width: int = 10,
     facet_height: int = 10,
 ) -> None:
 
     match res_type:
-        case "population":
+        case "pwres":
             if smoke_test:
-                num_samples_pwres = 2
-            wres_results = nlme_model.compute_pwres(num_samples_pwres)
+                num_samples = 2
+            wres_results = nlme_model.compute_pwres(num_samples)
             compare_to_pop_pred = True
-            wres_name = "pwres"
-        case "individual":
+        case "iwres":
             wres_results = nlme_model.compute_iwres()
-            wres_name = "iwres"
             compare_to_pop_pred = False
+        case "npde":
+            if smoke_test:
+                num_samples = 2
+            wres_results = nlme_model.compute_npde(num_samples)
+            compare_to_pop_pred = True
         case _:
             raise ValueError(f"Not implemented residual type: {res_type}")
 
-    all_wres = np.concatenate([p[wres_name] for p in wres_results.values()]).flatten()
+    all_wres = np.concatenate([p[res_type] for p in wres_results.values()]).flatten()
     all_times = np.concatenate([p["time"] for p in wres_results.values()]).flatten()
 
     fig, ax = plt.subplots(2, 2, figsize=(facet_width, facet_height))
@@ -491,14 +494,14 @@ def plot_weighted_residuals(
     x = np.linspace(min(all_wres), max(all_wres), 100)
     p = stats.norm.pdf(x, mu, std)
     ax[0, 0].plot(x, p, "r", linewidth=2, label=r"$\mathcal{N}(0,1)$")
-    ax[0, 0].set_title(f"{wres_name.upper()} distribution")
+    ax[0, 0].set_title(f"{res_type.upper()} distribution")
     ax[0, 0].set_xlabel("Residual values")
     ax[0, 0].set_ylabel("Density")
     ax[0, 0].legend()
 
     ## Q-Q plot
     stats.probplot(all_wres, dist="norm", plot=ax[1, 0])
-    ax[1, 0].set_title(f"{wres_name.upper()} Q-Q Plot")
+    ax[1, 0].set_title(f"{res_type.upper()} Q-Q Plot")
 
     ## Plot vs. time
     ax[0, 1].grid(True, linestyle="--", alpha=0.6, which="both")
@@ -525,7 +528,7 @@ def plot_weighted_residuals(
     ax[0, 1].set_ylabel("Weighted Residual (Standard Deviations)", fontsize=12)
     ax[0, 1].set_ylim(-1.1 * max(abs(all_wres)), 1.1 * max(abs(all_wres)))
     ax[0, 1].legend(loc="upper right", frameon=True, facecolor="white", framealpha=0.9)
-    ax[0, 1].set_title(f"{wres_name.upper()} vs. Time")
+    ax[0, 1].set_title(f"{res_type.upper()} vs. Time")
 
     ## Plot vs. predictions
 
@@ -537,8 +540,8 @@ def plot_weighted_residuals(
     # Transform WRES dict into a dataframe
     rows = []
     for patient_id, content in wres_results.items():
-        for wres, time in zip(content[wres_name], content["time"]):
-            rows.append({"id": patient_id, wres_name: wres, "time": time})
+        for wres, time in zip(content[res_type], content["time"]):
+            rows.append({"id": patient_id, res_type: wres, "time": time})
 
     wres_df = pd.DataFrame(rows)
 
@@ -547,7 +550,7 @@ def plot_weighted_residuals(
         wres_df, all_predictions[["id", "time", "predicted_value"]], on=["id", "time"]
     )
 
-    wres_to_plot = vs_pred_plot_df[wres_name]
+    wres_to_plot = vs_pred_plot_df[res_type]
     pred_to_plot = vs_pred_plot_df["predicted_value"]
     ax[1, 1].set_facecolor("#fdfdfd")
     ax[1, 1].scatter(
@@ -569,11 +572,15 @@ def plot_weighted_residuals(
     )
     ax[1, 1].axhline(y=-1.96, color="#e74c3c", linestyle="--", linewidth=1.3)
 
-    ax[1, 1].set_xlabel("Population Predictions")
+    if compare_to_pop_pred:
+        ax[1, 1].set_xlabel("Population Predictions")
+    else:
+        ax[1, 1].set_xlabel("Individual Predictions")
+
     ax[1, 1].set_ylabel("Weighted Residual (Standard Deviations)")
     ax[1, 1].set_ylim(-1.1 * max(abs(wres_to_plot)), 1.1 * max(abs(wres_to_plot)))
     ax[1, 1].legend(loc="upper right", frameon=True, facecolor="white", framealpha=0.9)
-    ax[1, 1].set_title(f"{wres_name.upper()} vs. Predictions")
+    ax[1, 1].set_title(f"{res_type.upper()} vs. Predictions")
 
     plt.tight_layout()
 

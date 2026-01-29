@@ -36,6 +36,7 @@ For any issue or comments, please reach out to paul.lemarre@novainsilico.ai, or 
 
 - Paul Lemarre
 - Eléonore Dravet
+- Hugo Alves
 
 ## Acknowledgements
 
