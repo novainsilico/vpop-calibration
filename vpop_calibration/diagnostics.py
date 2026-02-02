@@ -8,6 +8,7 @@ from .saem import PySaem
 from .model.gp import GP
 from .structural_model import StructuralGp
 from .utils import smoke_test
+import scipy.stats as stats
 
 
 def check_surrogate_validity_gp(
@@ -451,6 +452,139 @@ def plot_map_estimates_gof(
 
     if not smoke_test:
         plt.show()
-        print("ok")
+
+    plt.close(fig)
+
+
+def plot_weighted_residuals(
+    nlme_model: NlmeModel,
+    res_type: str,
+    num_samples: int = 100,
+    facet_width: int = 10,
+    facet_height: int = 10,
+) -> None:
+
+    match res_type:
+        case "pwres":
+            if smoke_test:
+                num_samples = 2
+            wres_results = nlme_model.compute_pwres(num_samples)
+            compare_to_pop_pred = True
+        case "iwres":
+            wres_results = nlme_model.compute_iwres()
+            compare_to_pop_pred = False
+        case "npde":
+            if smoke_test:
+                num_samples = 2
+            wres_results = nlme_model.compute_npde(num_samples)
+            compare_to_pop_pred = True
+        case _:
+            raise ValueError(f"Not implemented residual type: {res_type}")
+
+    all_wres = np.concatenate([p[res_type] for p in wres_results.values()]).flatten()
+    all_times = np.concatenate([p["time"] for p in wres_results.values()]).flatten()
+
+    fig, ax = plt.subplots(2, 2, figsize=(facet_width, facet_height))
+
+    ## Histogram plot
+    ax[0, 0].hist(
+        all_wres, bins=30, density=True, alpha=0.6, color="skyblue", edgecolor="black"
+    )
+    mu, std = 0, 1
+    x = np.linspace(min(all_wres), max(all_wres), 100)
+    p = stats.norm.pdf(x, mu, std)
+    ax[0, 0].plot(x, p, "r", linewidth=2, label=r"$\mathcal{N}(0,1)$")
+    ax[0, 0].set_title(f"{res_type.upper()} distribution")
+    ax[0, 0].set_xlabel("Residual values")
+    ax[0, 0].set_ylabel("Density")
+    ax[0, 0].legend()
+
+    ## Q-Q plot
+    stats.probplot(all_wres, dist="norm", plot=ax[1, 0])
+    ax[1, 0].set_title(f"{res_type.upper()} Q-Q Plot")
+
+    ## Plot vs. time
+    ax[0, 1].grid(True, linestyle="--", alpha=0.6, which="both")
+    ax[0, 1].set_facecolor("#fdfdfd")
+    ax[0, 1].scatter(
+        all_times,
+        all_wres,
+        alpha=0.5,
+        color="#2c3e50",
+        edgecolors="white",
+        s=45,
+        zorder=3,
+    )
+    ax[0, 1].axhline(y=0, color="black", linestyle="-", linewidth=1.5, zorder=4)
+    ax[0, 1].axhline(
+        y=1.96,
+        color="#e74c3c",
+        linestyle="--",
+        linewidth=1.3,
+        label=r"95% CI Limit ($\pm 1.96$)",
+    )
+    ax[0, 1].axhline(y=-1.96, color="#e74c3c", linestyle="--", linewidth=1.3)
+    ax[0, 1].set_xlabel("Time", fontsize=12)
+    ax[0, 1].set_ylabel("Weighted Residual (Standard Deviations)", fontsize=12)
+    ax[0, 1].set_ylim(-1.1 * max(abs(all_wres)), 1.1 * max(abs(all_wres)))
+    ax[0, 1].legend(loc="upper right", frameon=True, facecolor="white", framealpha=0.9)
+    ax[0, 1].set_title(f"{res_type.upper()} vs. Time")
+
+    ## Plot vs. predictions
+
+    if compare_to_pop_pred:
+        all_predictions = nlme_model.map_predictions_eta_zero()
+    else:
+        all_predictions = nlme_model.map_estimates_predictions()
+
+    # Transform WRES dict into a dataframe
+    rows = []
+    for patient_id, content in wres_results.items():
+        for wres, time in zip(content[res_type], content["time"]):
+            rows.append({"id": patient_id, res_type: wres, "time": time})
+
+    wres_df = pd.DataFrame(rows)
+
+    # Merge WRES with predictions, matching patientID and time
+    vs_pred_plot_df = pd.merge(
+        wres_df, all_predictions[["id", "time", "predicted_value"]], on=["id", "time"]
+    )
+
+    wres_to_plot = vs_pred_plot_df[res_type]
+    pred_to_plot = vs_pred_plot_df["predicted_value"]
+    ax[1, 1].set_facecolor("#fdfdfd")
+    ax[1, 1].scatter(
+        pred_to_plot,
+        wres_to_plot,
+        alpha=0.5,
+        color="#2c3e50",
+        edgecolors="white",
+        s=45,
+        zorder=3,
+    )
+    ax[1, 1].axhline(y=0, color="black", linestyle="-", linewidth=1.5, zorder=4)
+    ax[1, 1].axhline(
+        y=1.96,
+        color="#e74c3c",
+        linestyle="--",
+        linewidth=1.3,
+        label=r"95% CI Limit ($\pm 1.96$)",
+    )
+    ax[1, 1].axhline(y=-1.96, color="#e74c3c", linestyle="--", linewidth=1.3)
+
+    if compare_to_pop_pred:
+        ax[1, 1].set_xlabel("Population Predictions")
+    else:
+        ax[1, 1].set_xlabel("Individual Predictions")
+
+    ax[1, 1].set_ylabel("Weighted Residual (Standard Deviations)")
+    ax[1, 1].set_ylim(-1.1 * max(abs(wres_to_plot)), 1.1 * max(abs(wres_to_plot)))
+    ax[1, 1].legend(loc="upper right", frameon=True, facecolor="white", framealpha=0.9)
+    ax[1, 1].set_title(f"{res_type.upper()} vs. Predictions")
+
+    plt.tight_layout()
+
+    if not smoke_test:
+        plt.show()
 
     plt.close(fig)
