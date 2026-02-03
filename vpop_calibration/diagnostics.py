@@ -613,3 +613,85 @@ def plot_weighted_residuals(
         plt.show()
 
     plt.close(fig)
+
+
+def plot_map_vs_posterior(
+    nlme_model: NlmeModel, nb_samples: int, n_patients_to_plot: int
+):
+
+    # Sample new etas, compute physical
+    init_etas = nlme_model.sample_etas(1)
+    sample_etas = nlme_model.sample_conditional_distribution(nb_samples, init_etas)
+    sample_gaussian = nlme_model.etas_to_gaussian_params(sample_etas)
+    sample_physical = nlme_model.gaussian_to_physical_params(
+        sample_gaussian, nlme_model.log_MI
+    )
+
+    # Get MAP estimates for descriptors
+    map_theta = nlme_model.map_estimates_descriptors()
+
+    nb_samples, nb_patients, nb_params = sample_physical.shape
+
+    # Sample random patient indices to plot
+    patient_indices = rand.sample(
+        range(nb_patients), min(n_patients_to_plot, nb_patients)
+    )
+
+    for patient_index in patient_indices:
+        patient_samples = sample_physical[:, patient_index, :].detach().cpu().numpy()
+
+        # Adapt rows to columns
+        n_cols = 3
+        n_rows = (nb_params + n_cols - 1) // n_cols
+        _, axes = plt.subplots(n_rows, n_cols, figsize=(15, 4 * n_rows))
+        axes = np.atleast_1d(axes).flatten()
+
+        # Plot distribution and MAP for each PDU
+        for i in range(len(axes)):
+            ax = axes[i]
+            if i < nb_params:
+                param_data = patient_samples[:, i]
+
+                if np.unique(param_data).size > 1:
+                    kde = stats.gaussian_kde(param_data)
+                    x_range = np.linspace(param_data.min(), param_data.max(), 200)
+                    ax.plot(
+                        x_range, kde(x_range), color="blue", lw=1.5, label="PDF (KDE)"
+                    )
+
+                map_val = map_theta[nlme_model.PDU_names[i]][patient_index]
+
+                ax.axvline(
+                    map_val,
+                    color="red",
+                    linewidth=1.5,
+                    linestyle="dashed",
+                    label=f"MAP estimate: {map_val:.2f}",
+                )
+
+                ax.axvline(
+                    param_data.mean(),
+                    color="blue",
+                    linewidth=1.5,
+                    linestyle="dashed",
+                    label=f"Conditional mean: {param_data.mean():.2f}",
+                )
+
+                ci_low, ci_high = np.percentile(param_data, [2.5, 97.5])
+                ax.axvspan(
+                    ci_low,
+                    ci_high,
+                    color="gray",
+                    alpha=0.2,
+                    label=f"95% CI: [{ci_low:.2f}, {ci_high:.2f}]",
+                )
+
+                ax.set_title(f"Patient {patient_index} - {nlme_model.PDU_names[i]}")
+                ax.legend(fontsize="small")
+
+            else:
+                # Hide plot if empty
+                ax.set_visible(False)
+
+        plt.tight_layout()
+        plt.show()

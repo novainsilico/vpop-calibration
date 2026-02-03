@@ -12,6 +12,7 @@ from .diagnostics import (
     plot_all_individual_map_estimates,
     plot_map_estimates_gof,
     plot_weighted_residuals,
+    plot_map_vs_posterior,
 )
 
 __all__ = [
@@ -31,4 +32,5 @@ __all__ = [
     "plot_all_individual_map_estimates",
     "plot_map_estimates_gof",
     "plot_weighted_residuals",
+    "plot_map_vs_posterior",
 ]

@@ -1293,3 +1293,35 @@ class NlmeModel:
             if var > threshold:
                 warnings.append(i)
         return warnings
+
+    def sample_conditional_distribution(self, nb_samples: int, init_etas: torch.Tensor):
+
+        (current_log_prob, current_gaussian_params, current_pred) = (
+            self.log_posterior_etas(init_etas)
+        )
+        current_etas = init_etas
+        sample_list = []
+
+        for i in range(nb_samples):
+            (
+                current_etas,
+                current_log_prob,
+                _,
+                current_pred,
+                current_gaussian_params,
+                _,
+            ) = self.mh_step(
+                current_etas,
+                current_log_prob,
+                current_pred,
+                current_gaussian_params,
+                step_size=0.1,
+                learning_rate=0.1,
+            )
+
+            sample_list.append(current_etas)
+
+        sample_tensor = torch.stack(sample_list)
+        etas_samples = torch.squeeze(sample_tensor)
+
+        return etas_samples
