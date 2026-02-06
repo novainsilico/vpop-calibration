@@ -852,7 +852,7 @@ class NlmeModel:
         if self.error_model_type == "additive":
             new_out = outputs + noise
         elif self.error_model_type == "proportional":
-            new_out = outputs * noise
+            new_out = outputs + outputs * noise
         else:
             raise ValueError(f"Non-implemented error model {self.error_model_type}")
         return new_out

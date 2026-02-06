@@ -6,8 +6,10 @@ from vpop_calibration import *
 
 
 def test_ode_saem(np_rng):
+    variable_names = ["A0", "A1", "A2"]
+    parameter_names = ["k_a", "k_12", "k_21", "k_el", "dose"]
 
-    def equations(t, y, k_a, k_12, k_21, k_el):
+    def equations(t, y, k_a, k_12, k_21, k_el, dose):
         # y[0] is A_absorption, y[1] is A_central, y[2] is A_peripheral
         A_absorption, A_central, A_peripheral = y[0], y[1], y[2]
         dA_absorption_dt = -k_a * A_absorption
@@ -22,16 +24,16 @@ def test_ode_saem(np_rng):
         ydot = [dA_absorption_dt, dA_central_dt, dA_peripheral_dt]
         return ydot
 
-    variable_names = ["A0", "A1", "A2"]
-    parameter_names = ["k_a", "k_12", "k_21", "k_el"]
-
-    initial_conditions = np.array([10.0, 0.0, 0.0])
+    def init_assignment(k_a, k_12, k_21, k_el, dose):
+        return [dose, 0.0, 0.0]
 
     protocol_design = pd.DataFrame(
-        {"protocol_arm": ["arm-A", "arm-B"], "k_el": [0.5, 10.0]}
+        {"protocol_arm": ["arm-A", "arm-B"], "dose": [0.5, 10.0]}
     )
 
-    pk_two_compartments_model = OdeModel(equations, variable_names, parameter_names)
+    pk_two_compartments_model = OdeModel(
+        equations, init_assignment, variable_names, parameter_names
+    )
 
     # Parameter definitions
     error_model_type = "additive"
@@ -59,17 +61,17 @@ def test_ode_saem(np_rng):
     init_log_MI = {"k_12": -1.0}
     init_log_PDU = {
         "k_21": {"mean": -1.0, "sd": 0.2},
+        "k_el": {"mean": -1.0, "sd": 0.2},
     }
     error_model_type = "additive"
     init_res_var = [0.1, 0.05, 0.5]
     init_covariate_map = {
         "k_21": {"foo": {"coef": "cov_foo_k12", "value": 0.1}},
+        "k_el": {},
     }
 
     # Create a structural model
-    structural_ode = StructuralOdeModel(
-        pk_two_compartments_model, protocol_design, initial_conditions
-    )
+    structural_ode = StructuralOdeModel(pk_two_compartments_model, protocol_design)
     # Create a NLME moedl
     nlme = NlmeModel(
         structural_ode,

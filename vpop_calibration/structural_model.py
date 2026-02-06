@@ -107,7 +107,6 @@ class StructuralOdeModel(StructuralModel):
         self,
         ode_model: OdeModel,
         protocol_design: pd.DataFrame,
-        init_conditions: np.ndarray,
     ):
         self.ode_model = ode_model
         protocol_arms = protocol_design["protocol_arm"].drop_duplicates().to_list()
@@ -155,10 +154,6 @@ class StructuralOdeModel(StructuralModel):
             task_idx_to_protocol,
         )
 
-        self.init_cond_df = pd.DataFrame(
-            data=[init_conditions], columns=self.ode_model.initial_cond_names
-        )
-
     def simulate(
         self,
         X: torch.Tensor,
@@ -169,19 +164,28 @@ class StructuralOdeModel(StructuralModel):
         patient_index_full, rows_full, tasks_full = prediction_index
         list_rows = torch.split(rows_full, chunks)
         list_tasks = torch.split(tasks_full, chunks)
+        list_id = [id[0].item for id in torch.split(patient_index_full, chunks)]
 
         output_list = []
         for chain_X in X:  # iterate through the individual chains
             # Separate the individual patients
-            list_X = [ind_X for ind_X in chain_X]
-
+            list_X = chain_X.split(1, dim=0)
             input_df_list = []
-            for ind_X, ind_rows, ind_tasks in zip(list_X, list_rows, list_tasks):
+            # Iterate through patients
+            for patient_descriptors, patient_rows, patient_tasks, p_id in zip(
+                list_X, list_rows, list_tasks, list_id
+            ):
                 temp_id = str(uuid.uuid4())
                 # Extract the parameters and time values
-                params = ind_X.index_select(0, ind_rows).cpu().detach().numpy()
+                params = (
+                    patient_descriptors.squeeze(0)
+                    .index_select(0, patient_rows)
+                    .cpu()
+                    .detach()
+                    .numpy()
+                )
                 # Extract the task order
-                task_index = ind_tasks.cpu().detach().numpy()
+                task_index = patient_tasks.cpu().detach().numpy()
                 # Format the data inputs
                 # This step is where the order of parameters is implicit
                 input_df_temp = pd.DataFrame(
@@ -189,7 +193,7 @@ class StructuralOdeModel(StructuralModel):
                 )
                 # The passed params include the _global_ time steps
                 # Filter the time steps that we actually want for this patient
-                input_df_temp = input_df_temp.iloc[ind_rows.cpu().numpy()]
+                input_df_temp = input_df_temp.iloc[patient_rows.cpu().numpy()]
                 # Add the task index as a temporary column
                 input_df_temp["task_index"] = task_index
                 # Deduce protocol arm and output name from task index
@@ -206,17 +210,21 @@ class StructuralOdeModel(StructuralModel):
                 if self.nb_protocol_overrides > 0:
                     input_df_temp = input_df_temp.merge(
                         self.protocol_design, how="left", on=["protocol_arm"]
-                    )
-                # Add the initial conditions
-                input_df_temp = input_df_temp.merge(self.init_cond_df, how="cross")
-                input_df_list.append(input_df_temp)
-
+                    ).reset_index(drop=True)
+                input_df_list.append(input_df_temp.reset_index(drop=True))
             full_input = pd.concat(input_df_list)
             # Simulate the ODE model
-            output_df = self.ode_model.simulate_model(full_input)
+            output_df = self.ode_model.simulate_model(full_input).reset_index(drop=True)
+            # Place the simulated results in the right rows
+            id_cols = ["id", "protocol_arm", "time", "output_name"]
+            output_ordered = full_input[id_cols].merge(
+                output_df[[*id_cols, "predicted_value"]],
+                on=id_cols,
+            )
             # Convert back to tensor
             out_tensor = torch.as_tensor(
-                output_df["predicted_value"].values, device=device
+                output_ordered["predicted_value"].values,
+                device=device,
             )
             output_list.append(out_tensor)
         out_full = torch.stack(output_list, dim=0).to(device)
