@@ -11,6 +11,7 @@ class OdeModel:
     def __init__(
         self,
         equations: Callable,
+        init: Callable,
         variable_names: list[str],
         param_names: list[str],
         tol: Optional[float] = 1e-6,
@@ -21,11 +22,13 @@ class OdeModel:
         Create a computational model given a set of equations.
 
         Args:
-            equations (callable): A function describing the right hand side of the ODE system
+            equations (callable): A function describing the right hand side of the ODE system. Signature [t, y, *param_names]
+            init (callable): A function describing how to assign initial conditions. Signature [*param_names]
             variable_names (list[str]): The names of the outputs of the system
             param_names (list[str]): The name of the parameters of the system
         """
         self.equations = equations
+        self.init_assignment = init
         self.variable_names = variable_names
         self.nb_outputs = len(variable_names)
 
@@ -57,9 +60,11 @@ class OdeModel:
         tasks: list[Any] = []
         for _, ind_df in input_data.groupby("id"):
             for _, filtered_df in ind_df.groupby("protocol_arm"):
-                params = filtered_df[self.param_names].iloc[0].values
-                initial_conditions = filtered_df[self.initial_cond_names].iloc[0].values
-                input_df = filtered_df[["id", "protocol_arm", "output_name", "time"]]
+                params = filtered_df[self.param_names].iloc[0].to_list()
+                initial_conditions = self.init_assignment(*params)
+                input_df = filtered_df[
+                    ["id", "protocol_arm", "output_name", "time"]
+                ].reset_index(drop=True)
                 indiv_task = {
                     "patient_inputs": input_df,
                     "initial_conditions": initial_conditions,
@@ -74,13 +79,14 @@ class OdeModel:
                 all_solutions: list[pd.DataFrame] = pool.map(_simulate_patient, tasks)
         else:
             all_solutions: list[pd.DataFrame] = list(map(_simulate_patient, tasks))
+        for df in all_solutions:
+            df.reset_index(drop=True)
         output_data = pd.concat(all_solutions)
         return output_data
 
     def run_trial(
         self,
         vpop: pd.DataFrame,
-        initial_conditions: np.ndarray,
         protocol_design: Optional[pd.DataFrame],
         time_steps: np.ndarray,
     ) -> pd.DataFrame:
@@ -110,10 +116,6 @@ class OdeModel:
 
         # list the requested time steps for each output (here we use same solving times for all outputs)
         time_steps_df = pd.DataFrame({"time": time_steps})
-        # Assemble the initial conditions in a dataframe
-        init_cond_df = pd.DataFrame(
-            data=[initial_conditions], columns=self.initial_cond_names
-        )
         if protocol_design is None:
             protocol_design_to_use = pd.DataFrame({"protocol_arm": "identity"})
         else:
@@ -122,8 +124,6 @@ class OdeModel:
         # Merge the data frames together
         # Add time steps and output names for all patients
         full_input_data = vpop.merge(time_steps_df, how="cross")
-        # Add initial conditions for all patients
-        full_input_data = full_input_data.merge(init_cond_df, how="cross")
         # Add protocol arm info by merging the protocol design
         full_input_data = full_input_data.merge(
             protocol_design_to_use, how="left", on="protocol_arm"
@@ -157,7 +157,7 @@ def _simulate_patient(args: dict) -> pd.DataFrame:
             tol (float): solver tolerance
 
     Returns:
-        list(dict): A list of model result entries
+        dataframe: same as `args[patient_inputs]`, with an additional `predicted_value` column
     """
 
     # extract args
@@ -196,8 +196,8 @@ def _simulate_patient(args: dict) -> pd.DataFrame:
         value_vars=list(output_names),
         var_name="output_name",
         value_name="predicted_value",
-    )
+    ).reset_index(drop=True)
     full_output = input_df.merge(
         simulation_outputs_df, how="left", on=["output_name", "time"]
-    )
+    ).reset_index(drop=True)
     return full_output

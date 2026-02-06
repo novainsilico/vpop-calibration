@@ -20,13 +20,19 @@ The approach was mainly inspired from [^Grenier2018].
 
 ## Getting started
 
-- [Tutorial](./examples/saem_gp_model.ipynb): this notebook demonstrates step-by-step how to create and train a surrogate model, using a reference ODE model and a GP surrogate model. It then showcases how to optimize the surrogate model on synthetic data using SAEM
-- Other available examples:
-  - [Data generation using Sobol sequences](./examples/generate_data_ranges.ipynb)
-  - [Data generation using a reference NLME model](./examples/generate_data_nlme.ipynb)
-  - [Training and exporting a GP using synthetic data](./examples/train_gp.ipynb)
-  - [Running SAEM on a reference ODE model](./examples/saem_ode_model.ipynb). Note: the current implementation is notably under-optimized for running SAEM directly on an ODE structural model. This is implemented for testing purposes mostly
-  - [Training a GP with a deep kernel](./examples/train_deep_kernel.ipynb)
+- [Tutorial](./examples/saem/saem_gp_model.ipynb): this notebook demonstrates step-by-step how to create and train a surrogate model, using a reference ODE model and a GP surrogate model. It then showcases how to optimize the surrogate model on synthetic data using SAEM
+
+### In-depth examples
+- Surrogate model training
+  - [Data generation using Sobol sequences](./examples/surrogate_model/generate_data_ranges.ipynb)
+  - [Data generation using a reference NLME model](./examples/surrogate_model/generate_data_nlme.ipynb)
+  - [Training and exporting a GP using synthetic data](./examples/surrogate_model/train_gp.ipynb)
+  - [Training a GP with a deep kernel](./examples/surrogate_model/train_deep_kernel.ipynb)
+- Running SAEM without surrogate model
+  - [Running SAEM on a reference ODE model](./examples/saem/saem_ode_model.ipynb). Note: the current implementation is notably under-optimized for running SAEM directly on an ODE structural model. This is implemented for testing purposes mostly
+- Benchmarking examples
+  - [Orange trees](./examples/benchmarking/benchmark_orange_trees.ipynb)
+  - [Theophylline](./examples/benchmarking/benchmark_theophylline.ipynb)
 
 ## Support
 
