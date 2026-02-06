@@ -121,6 +121,11 @@ class OdeModel:
         else:
             protocol_design_to_use = protocol_design
 
+        nb_protocols = len(
+            protocol_design_to_use["protocol_arm"].drop_duplicates().to_list()
+        )
+        nb_patients = len(vpop["id"].drop_duplicates().to_list())
+
         # Merge the data frames together
         # Add time steps and output names for all patients
         full_input_data = vpop.merge(time_steps_df, how="cross")
@@ -129,6 +134,9 @@ class OdeModel:
             protocol_design_to_use, how="left", on="protocol_arm"
         )
         # Run the model
+        print(
+            f"Simulating a virtual population of {nb_patients} patients on {nb_protocols} protocol arms."
+        )
         output = self.simulate_model(full_input_data)
 
         merged_df = pd.merge(
