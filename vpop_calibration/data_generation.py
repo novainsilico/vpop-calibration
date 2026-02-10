@@ -163,7 +163,7 @@ def simulate_dataset_from_omega(
         error_model,
         num_chains=1,
     )
-    etas = nlme_model.sample_etas(nlme_model.num_chains)
+    etas = nlme_model.sample_etas(nlme_model.num_chains, nlme_model.nb_patients)
     phi = nlme_model.etas_to_gaussian_params(etas)
     pdu = nlme_model.gaussian_to_physical_params(phi, nlme_model.log_MI)
     theta = nlme_model.assemble_individual_parameters(pdu).squeeze(0)

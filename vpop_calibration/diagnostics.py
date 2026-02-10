@@ -620,25 +620,26 @@ def plot_map_vs_posterior(
 ):
 
     # Sample new etas, compute physical
-    init_etas = nlme_model.sample_etas(1)
-    sample_etas = nlme_model.sample_conditional_distribution(nb_samples, init_etas)
+    sample_etas = nlme_model.sample_conditional_distribution(nb_samples)
     sample_gaussian = nlme_model.etas_to_gaussian_params(sample_etas)
     sample_physical = nlme_model.gaussian_to_physical_params(
         sample_gaussian, nlme_model.log_MI
     )
 
-    # Get MAP estimates for descriptors
-    map_theta = nlme_model.map_estimates_descriptors()
+    observed_df = nlme_model.observations_df
+    total_patient_num = len(nlme_model.patients)
+    ind_to_plot = rand.sample(range(total_patient_num), n_patients_to_plot)
+
+    # Get EBE estimates for descriptors
+    # ebe_theta = nlme_model.compute_ebe(init_etas)
+    # print(ebe_theta.shape)
 
     nb_samples, nb_patients, nb_params = sample_physical.shape
 
-    # Sample random patient indices to plot
-    patient_indices = rand.sample(
-        range(nb_patients), min(n_patients_to_plot, nb_patients)
-    )
-
-    for patient_index in patient_indices:
-        patient_samples = sample_physical[:, patient_index, :].detach().cpu().numpy()
+    for k in range(n_patients_to_plot):
+        patient_id = nlme_model.patients[ind_to_plot[k]]
+        print(len(observed_df.loc[observed_df["id"] == patient_id]))
+        patient_samples = sample_physical[:, ind_to_plot[k], :].detach().cpu().numpy()
 
         # Adapt rows to columns
         n_cols = 3
@@ -659,15 +660,15 @@ def plot_map_vs_posterior(
                         x_range, kde(x_range), color="blue", lw=1.5, label="PDF (KDE)"
                     )
 
-                map_val = map_theta[nlme_model.PDU_names[i]][patient_index]
+                # map_val = ebe_theta[i + nlme_model.nb_PDK][ind_to_plot[k]]
 
-                ax.axvline(
-                    map_val,
-                    color="red",
-                    linewidth=1.5,
-                    linestyle="dashed",
-                    label=f"MAP estimate: {map_val:.2f}",
-                )
+                # ax.axvline(
+                #     map_val,
+                #     color="red",
+                #     linewidth=1.5,
+                #     linestyle="dashed",
+                #     label=f"MAP estimate: {map_val:.2f}",
+                # )
 
                 ax.axvline(
                     param_data.mean(),
@@ -686,7 +687,7 @@ def plot_map_vs_posterior(
                     label=f"95% CI: [{ci_low:.2f}, {ci_high:.2f}]",
                 )
 
-                ax.set_title(f"Patient {patient_index} - {nlme_model.PDU_names[i]}")
+                ax.set_title(f"Patient {ind_to_plot[k]} - {nlme_model.PDU_names[i]}")
                 ax.legend(fontsize="small")
 
             else:
