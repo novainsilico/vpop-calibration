@@ -616,7 +616,9 @@ def plot_weighted_residuals(
 
 
 def plot_map_vs_posterior(
-    nlme_model: NlmeModel, nb_samples: int, n_patients_to_plot: int
+    nlme_model: NlmeModel,
+    nb_samples: int,
+    n_patients_to_plot: int,
 ):
 
     # Sample new etas, compute physical
@@ -626,19 +628,19 @@ def plot_map_vs_posterior(
         sample_gaussian, nlme_model.log_MI
     )
 
-    observed_df = nlme_model.observations_df
     total_patient_num = len(nlme_model.patients)
     ind_to_plot = rand.sample(range(total_patient_num), n_patients_to_plot)
 
     # Get EBE estimates for descriptors
-    # ebe_theta = nlme_model.compute_ebe(init_etas)
-    # print(ebe_theta.shape)
+    ebe_theta = nlme_model.ebe_estimates
+
+    # Get false MAP for comparison
+    map_theta = nlme_model.map_estimates_descriptors()
 
     nb_samples, nb_patients, nb_params = sample_physical.shape
 
     for k in range(n_patients_to_plot):
         patient_id = nlme_model.patients[ind_to_plot[k]]
-        print(len(observed_df.loc[observed_df["id"] == patient_id]))
         patient_samples = sample_physical[:, ind_to_plot[k], :].detach().cpu().numpy()
 
         # Adapt rows to columns
@@ -660,15 +662,16 @@ def plot_map_vs_posterior(
                         x_range, kde(x_range), color="blue", lw=1.5, label="PDF (KDE)"
                     )
 
-                # map_val = ebe_theta[i + nlme_model.nb_PDK][ind_to_plot[k]]
+                map_val = ebe_theta[0][ind_to_plot[k]][i]
+                map_theta_val = map_theta.iloc[ind_to_plot[k], i + nlme_model.nb_PDK]
 
-                # ax.axvline(
-                #     map_val,
-                #     color="red",
-                #     linewidth=1.5,
-                #     linestyle="dashed",
-                #     label=f"MAP estimate: {map_val:.2f}",
-                # )
+                ax.axvline(
+                    map_val,
+                    color="red",
+                    linewidth=1.5,
+                    linestyle="dashed",
+                    label=f"MAP estimate: {map_val:.2f}",
+                )
 
                 ax.axvline(
                     param_data.mean(),
@@ -676,6 +679,14 @@ def plot_map_vs_posterior(
                     linewidth=1.5,
                     linestyle="dashed",
                     label=f"Conditional mean: {param_data.mean():.2f}",
+                )
+
+                ax.axvline(
+                    map_theta_val,
+                    color="yellow",
+                    linewidth=1.5,
+                    linestyle="dashed",
+                    label=f"Previous MAP estimate: {map_theta_val:.2f}",
                 )
 
                 ci_low, ci_high = np.percentile(param_data, [2.5, 97.5])

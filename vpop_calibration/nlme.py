@@ -826,7 +826,6 @@ class NlmeModel:
             - list of simulated values for each patient on each chain
 
         """
-        print(etas.shape, (self.num_chains, self.nb_patients, self.nb_PDU))
         assert etas.shape == (self.num_chains, self.nb_patients, self.nb_PDU)
         if not hasattr(self, "observations_tensors"):
             raise ValueError(
@@ -1294,6 +1293,11 @@ class NlmeModel:
 
     def sample_conditional_distribution(self, nb_samples: int):
 
+        if (
+            hasattr(self, "cond_dist_samples")
+            and nb_samples <= self.cond_dist_samples.shape[0]
+        ):
+            return self.cond_dist_samples
         init_etas = self.sample_etas(1, self.nb_patients)
         (current_log_prob, current_gaussian_params, current_pred) = (
             self.log_posterior_etas(init_etas)
@@ -1324,7 +1328,8 @@ class NlmeModel:
         sample_tensor = torch.stack(sample_list)
         etas_samples = torch.squeeze(sample_tensor)
 
-        return etas_samples
+        self.cond_dist_samples = etas_samples
+        return self.cond_dist_samples
 
     def compute_ebe(self, init_samples: torch.Tensor):
         """
@@ -1333,10 +1338,13 @@ class NlmeModel:
         Returns: ebe_estimates: dim(nb_patients, nb_PDU)
         """
 
+        # if hasattr(self, "ebe_estimates"):
+        #     return self.ebe_estimates
+
         nb_patients = self.nb_patients
         nb_PDU = self.nb_PDU
-        ebe_estimates = torch.zeros((self.nb_patients, self.nb_PDU))
-
+        ebe_etas = torch.zeros((self.nb_patients, self.nb_PDU))
+        total_log_post = 0
         for i in range(nb_patients):
 
             def objective_function(eta_array):
@@ -1346,10 +1354,20 @@ class NlmeModel:
                 return -log_post
 
             x0 = init_samples[i].numpy()
-            res = minimize(objective_function, x0, method="Nelder-Mead", tol=1e-4)
-            ebe_estimates[i] = torch.from_numpy(res.x)
 
-        return ebe_estimates
+            res = minimize(objective_function, x0, method="Nelder-Mead", tol=1e-4)
+            ebe_etas[i] = torch.from_numpy(res.x)
+            total_log_post += objective_function(res.x)
+
+            # BFGS : 2695.5881325498262
+            # NM : 487.03976336041796
+
+            print("EBE patient : ", i)
+        ebe_etas = ebe_etas.expand(1, -1, -1)
+        ebe_gaussian = self.etas_to_gaussian_params(ebe_etas)
+        ebe_physical = self.gaussian_to_physical_params(ebe_gaussian, self.log_MI)
+        self.ebe_estimates = ebe_physical
+        print(total_log_post)
 
     def log_posterior_etas_single(self, etas: torch.Tensor, patient_ind: int) -> float:
         assert etas.shape == (1, 1, self.nb_PDU)
@@ -1361,13 +1379,14 @@ class NlmeModel:
                 "Cannot compute log-posterior without an associated observations data frame."
             )
 
+        # etas to gaussian params
         gaussian_params = (
             self.design_matrices[patient_id] @ self.population_betas + etas
         )
-
         psi = gaussian_params
-        pdu = torch.zeros_like(psi)
 
+        # gaussian to physical params
+        pdu = torch.zeros_like(psi)
         pdu[:, :, self.pdu_transforms["exp"]] = torch.exp(
             psi[:, :, self.pdu_transforms["exp"]]
         )
@@ -1375,20 +1394,17 @@ class NlmeModel:
             psi[:, :, self.pdu_transforms["sigmoid"]]
         )
         pdu = self.pdu_shift + self.pdu_scale * pdu
-
         log_mi = self.log_MI
-
         mi = torch.zeros_like(log_mi)
-
         mi[self.mi_transforms["exp"]] = torch.exp(log_mi[self.mi_transforms["exp"]])
         mi[self.mi_transforms["sigmoid"]] = torch.sigmoid(
             log_mi[self.mi_transforms["sigmoid"]]
         )
         mi = self.mi_shift + self.mi_scale * mi
         mi = mi.expand(1, 1, -1)
-
         physical_params = torch.cat((pdu, mi), dim=-1)
 
+        # physical to theta params
         theta = torch.cat(
             (
                 self.patients_pdk[patient_id].unsqueeze(0),
@@ -1410,8 +1426,11 @@ class NlmeModel:
             ),
             dim=-1,
         )
+
         prediction_index = (
-            self.observations_tensors[patient_id]["p_index_repeated"],
+            torch.zeros_like(
+                self.observations_tensors[patient_id]["p_index_repeated"]
+            ),  # only one patient, index 0
             self.observations_tensors[patient_id]["time_step_indices"],
             self.observations_tensors[patient_id]["tasks_indices"],
         )
