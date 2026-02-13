@@ -3,7 +3,7 @@ from typing import Union, Optional, Callable
 import pandas as pd
 import numpy as np
 from .structural_model import StructuralModel
-from .utils import device
+from .utils import device, smoke_test
 from scipy.optimize import minimize
 
 
@@ -1395,6 +1395,11 @@ class NlmeModel:
             )
             self.sample_conditional_distribution(100)
 
+        if smoke_test:
+            max_iter = 1
+        else:
+            max_iter = 1000
+
         # Taking conditional distribution samples means as a starting point for optimization
         init_samples = self.cond_dist_samples.mean(dim=0)
 
@@ -1411,7 +1416,13 @@ class NlmeModel:
 
             x0 = init_samples[i].numpy()
 
-            res = minimize(objective_function, x0, method="Nelder-Mead", tol=1e-4)
+            res = minimize(
+                objective_function,
+                x0,
+                method="Nelder-Mead",
+                tol=1e-4,
+                options={"maxiter": max_iter},
+            )
             ebe_etas[i] = torch.from_numpy(res.x)
             print("EBE patient : ", i, "/", nb_patients)
 
