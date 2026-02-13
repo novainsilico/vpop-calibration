@@ -683,7 +683,7 @@ class NlmeModel:
             num_chains_local,
             self.nb_patients,
             self.nb_descriptors,
-        ), f"Wrong shape in theta to structural model inputs: {inputs.shape}"
+        ), f"Wrong shape in theta to structural model inputs: {inputs.shape}, expected: {num_chains_local, self.nb_patients, self.nb_descriptors}"
 
         if not hasattr(self, "observations_tensors"):
             raise ValueError(
@@ -826,7 +826,8 @@ class NlmeModel:
             - list of simulated values for each patient on each chain
 
         """
-        assert etas.shape == (self.num_chains, self.nb_patients, self.nb_PDU)
+        nb_chains_local = etas.shape[0]
+        assert etas.shape == (nb_chains_local, self.nb_patients, self.nb_PDU)
         if not hasattr(self, "observations_tensors"):
             raise ValueError(
                 "Cannot compute log-posterior without an associated observations data frame."
@@ -847,14 +848,14 @@ class NlmeModel:
 
         # calculate log-prior of the random samples
         log_priors: torch.Tensor = self._log_prior_etas(etas)
-        assert log_priors.shape == (self.num_chains, self.nb_patients)
+        assert log_priors.shape == (nb_chains_local, self.nb_patients)
 
         # Compute the log likelihood of observations
         log_likelihood_observations = self.log_likelihood_observation(full_pred)
-        assert log_likelihood_observations.shape == (self.num_chains, self.nb_patients)
+        assert log_likelihood_observations.shape == (nb_chains_local, self.nb_patients)
 
         log_posterior = log_likelihood_observations + log_priors
-        assert log_posterior.shape == (self.num_chains, self.nb_patients)
+        assert log_posterior.shape == (nb_chains_local, self.nb_patients)
         return (
             log_posterior,
             gaussian_params_chains,
@@ -1234,13 +1235,37 @@ class NlmeModel:
         )
 
     def map_estimates_descriptors(self) -> pd.DataFrame:
-        theta = self.current_map_estimates
+
+        if not hasattr(self, "cond_dist_samples"):
+            print(
+                "Conditional distribution has not been run before. Running it with 100 samples by default...",
+                "If more samples needed, run sample_conditional_distribution(nb_samples) before.",
+            )
+            self.sample_conditional_distribution(100)
+
+        ebe_physical = self.compute_ebe()
+
+        (nb_samples, nb_patients, nb_descriptors) = ebe_physical.shape
+
+        # Assemble the thetas by adding the PDKs
+        theta = torch.cat(
+            (
+                self.patients_pdk_full.expand(nb_samples, -1, -1),
+                ebe_physical,
+            ),
+            dim=-1,
+        )
+
         if theta is None:
             raise ValueError("No estimation available yet. Run the algorithm first.")
+
+        theta = theta.squeeze()
+
         assert theta.shape == (
             self.nb_patients,
             self.nb_descriptors,
-        ), f"Unexpected dimensions of MAP estimates: {theta.shape=}"
+        ), f"Unexpected dimensions of MAP estimates: {theta.shape}"
+
         map_per_patient = pd.DataFrame(
             data=theta.cpu().numpy(), columns=self.descriptors
         )
@@ -1249,7 +1274,27 @@ class NlmeModel:
         return map_per_patient
 
     def map_estimates_predictions(self) -> pd.DataFrame:
-        theta = self.current_map_estimates
+
+        if not hasattr(self, "cond_dist_samples"):
+            print(
+                "Conditional distribution has not been run before. Running it with 100 samples by default...",
+                "If more samples needed, run sample_conditional_distribution(nb_samples) before.",
+            )
+            self.sample_conditional_distribution(100)
+
+        ebe_physical = self.compute_ebe()
+
+        (nb_samples, nb_patients, nb_descriptors) = ebe_physical.shape
+
+        # Assemble the thetas by adding the PDKs
+        theta = torch.cat(
+            (
+                self.patients_pdk_full.expand(nb_samples, -1, -1),
+                ebe_physical,
+            ),
+            dim=-1,
+        )
+
         if theta is None:
             raise ValueError(
                 "No estimation available yet. Run the optimization algorithm first."
@@ -1260,7 +1305,7 @@ class NlmeModel:
 
     def map_predictions_eta_zero(self) -> pd.DataFrame:
         """
-        Returns simulated dataframe for null etas, i.e. without individual individual random effects but keeping the covariables effects.
+        Returns simulated dataframe for null etas, i.e. without individual random effects but keeping the covariables effects.
         """
 
         # Sample new etas, in order to approximate mean E(y_i) and variance V_i
@@ -1292,12 +1337,16 @@ class NlmeModel:
         return warnings
 
     def sample_conditional_distribution(self, nb_samples: int):
+        """
+        Returns: cond_dist_samples: dim(nb_patients, nb_PDU)
+        """
 
         if (
             hasattr(self, "cond_dist_samples")
             and nb_samples <= self.cond_dist_samples.shape[0]
         ):
             return self.cond_dist_samples
+
         init_etas = self.sample_etas(1, self.nb_patients)
         (current_log_prob, current_gaussian_params, current_pred) = (
             self.log_posterior_etas(init_etas)
@@ -1331,20 +1380,27 @@ class NlmeModel:
         self.cond_dist_samples = etas_samples
         return self.cond_dist_samples
 
-    def compute_ebe(self, init_samples: torch.Tensor):
+    def compute_ebe(self):
         """
-        Args: init_samples: dim(nb_patients, nb_PDU)
-
         Returns: ebe_estimates: dim(nb_patients, nb_PDU)
         """
 
-        # if hasattr(self, "ebe_estimates"):
-        #     return self.ebe_estimates
+        if hasattr(self, "ebe_estimates"):
+            return self.ebe_estimates
+
+        if not hasattr(self, "cond_dist_samples"):
+            print(
+                "Conditional distribution has not been run before. Running it with 100 samples by default...",
+                "If more samples needed, run sample_conditional_distribution(nb_samples).",
+            )
+            self.sample_conditional_distribution(100)
+
+        # Taking conditional distribution samples means as a starting point for optimization
+        init_samples = self.cond_dist_samples.mean(dim=0)
 
         nb_patients = self.nb_patients
         nb_PDU = self.nb_PDU
         ebe_etas = torch.zeros((self.nb_patients, self.nb_PDU))
-        total_log_post = 0
         for i in range(nb_patients):
 
             def objective_function(eta_array):
@@ -1357,19 +1413,24 @@ class NlmeModel:
 
             res = minimize(objective_function, x0, method="Nelder-Mead", tol=1e-4)
             ebe_etas[i] = torch.from_numpy(res.x)
-            total_log_post += objective_function(res.x)
+            print("EBE patient : ", i, "/", nb_patients)
 
-            # BFGS : 2695.5881325498262
-            # NM : 487.03976336041796
-
-            print("EBE patient : ", i)
         ebe_etas = ebe_etas.expand(1, -1, -1)
         ebe_gaussian = self.etas_to_gaussian_params(ebe_etas)
         ebe_physical = self.gaussian_to_physical_params(ebe_gaussian, self.log_MI)
         self.ebe_estimates = ebe_physical
-        print(total_log_post)
+        return ebe_physical
 
     def log_posterior_etas_single(self, etas: torch.Tensor, patient_ind: int) -> float:
+        """
+        Args:
+            etas: random effects sample for one patient, dim (1, 1, nb_PDU)
+            patient_ind: index of a patient in self.patients
+
+        Returns:
+            log_posterior: value of log-posterior distribution for given etas and patient
+        """
+
         assert etas.shape == (1, 1, self.nb_PDU)
 
         patient_id = self.patients[patient_ind]
@@ -1407,7 +1468,7 @@ class NlmeModel:
         # physical to theta params
         theta = torch.cat(
             (
-                self.patients_pdk[patient_id].unsqueeze(0),
+                self.patients_pdk_full[patient_ind].view(1, 1, -1),
                 physical_params,
             ),
             dim=-1,
@@ -1469,46 +1530,3 @@ class NlmeModel:
         log_posterior = log_lik_patient + log_priors
 
         return log_posterior
-
-
-"""
-        print("etas : ", etas.shape)
-        print(
-            "design_mat :",
-            self.design_matrices[patient_id].shape,
-            "population_betas :",
-            self.population_betas.shape,
-        )
-        print("gaussian_params", gaussian_params.shape)
-        print("pdu : ", pdu.shape)
-        print("log_mi : ", log_mi)
-        print("mi : ", mi.shape)
-        print("physical_params : ", physical_params.shape)
-        print("patients_pdk", self.patients_pdk[patient_id].shape)
-        print("theta : ", theta.shape)
-        print("theta_expanded : ", theta_expanded.shape)
-        print("full_inputs : ", full_inputs.shape)
-        print(
-            "p_index_repeated : ",
-            self.observations_tensors[patient_id]["p_index_repeated"].shape,
-        )
-        print(
-            "time_step_indices : ",
-            self.observations_tensors[patient_id]["time_step_indices"].shape,
-        )
-        print(
-            "tasks_indices : ",
-            self.observations_tensors[patient_id]["tasks_indices"].shape,
-        )
-        print("predictions : ", predictions.shape)
-        print("log_prior : ", log_priors)
-
-        print(
-            "observations_tensors : ",
-            self.observations_tensors[patient_id]["observations"].expand(1, -1).shape,
-        )
-        print("residuals : ", residuals.shape)
-        print("res_error_var : ", res_error_var.shape)
-        print("log_lik_patient : ", log_lik_patient)
-        print("log_posterior : ", log_posterior)
-"""
