@@ -1,5 +1,5 @@
 import torch
-from typing import Union, Optional, Callable
+from typing import Union, Optional, Callable, cast
 import pandas as pd
 import numpy as np
 from .structural_model import StructuralModel
@@ -572,7 +572,7 @@ class NlmeModel:
         etas = self.eta_distribution.sample([nb_samples, nb_patients])
         return etas
 
-    @torch.compile
+    # @torch.compile
     def etas_to_gaussian_params(
         self,
         individual_etas: torch.Tensor,
@@ -609,7 +609,7 @@ class NlmeModel:
         )
         return gaussian_params
 
-    # #@torch.compile
+    # ## @torch.compile
     def gaussian_to_physical_params(
         self,
         psi: torch.Tensor,
@@ -660,7 +660,7 @@ class NlmeModel:
 
         return phi
 
-    @torch.compile
+    # @torch.compile
     def assemble_individual_parameters(
         self,
         physical_params: torch.Tensor,
@@ -704,7 +704,7 @@ class NlmeModel:
         assert thetas.shape == (nb_samples, len(ind_ids_for_etas), self.nb_descriptors)
         return thetas
 
-    @torch.compile
+    # @torch.compile
     def struc_model_inputs_from_theta(
         self,
         thetas: torch.Tensor,
@@ -938,7 +938,9 @@ class NlmeModel:
         assert log_priors.shape == (nb_chains_local, self.nb_patients)
 
         # Compute the log likelihood of observations
-        log_likelihood_observations = self.log_likelihood_observation(full_pred)
+        log_likelihood_observations = cast(
+            torch.Tensor, self.log_likelihood_observation(full_pred)
+        )
         assert log_likelihood_observations.shape == (nb_chains_local, self.nb_patients)
 
         log_posterior = log_likelihood_observations + log_priors
@@ -949,7 +951,7 @@ class NlmeModel:
             full_pred,
         )
 
-    @torch.compile
+    # @torch.compile
     def calculate_residuals(
         self,
         observed_data: torch.Tensor,
@@ -975,7 +977,7 @@ class NlmeModel:
         else:
             raise ValueError("Unsupported error model type.")
 
-    @torch.compile
+    # @torch.compile
     def sum_sq_residuals_chains(self, prediction: torch.Tensor) -> torch.Tensor:
         """Compute the sum of squared residuals for current predictions on all chains
 
@@ -1000,7 +1002,7 @@ class NlmeModel:
         sum_residuals = sum_residuals_per_chain.mean(dim=0)
         return sum_residuals
 
-    @torch.compile
+    # @torch.compile
     def compute_error_variance(
         self, predictions: torch.Tensor, output_indices: Optional[torch.Tensor] = None
     ) -> torch.Tensor:
@@ -1198,7 +1200,7 @@ class NlmeModel:
         self.npde = npde_results
         return npde_results
 
-    @torch.compile
+    # @torch.compile
     def log_likelihood_observation(
         self,
         predictions: torch.Tensor,
@@ -1518,7 +1520,7 @@ class NlmeModel:
         if smoke_test:
             max_iter = 1
         else:
-            max_iter = 1000
+            max_iter = 5000
 
         # Taking conditional distribution samples means as a starting point for optimization
         init_samples = self.cond_dist_samples.mean(dim=0)
@@ -1586,6 +1588,6 @@ class NlmeModel:
         log_priors = self._log_prior_etas(etas)
         log_lik_patient = self.log_likelihood_observation(predictions, [patient_id])
 
-        log_posterior = log_lik_patient + log_priors
+        log_posterior = cast(float, log_lik_patient + log_priors)
 
         return log_posterior
