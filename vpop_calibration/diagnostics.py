@@ -416,18 +416,27 @@ def plot_map_estimates_gof(
         margin = (max_val - min_val) * 0.05
         range_val = [min_val - margin, max_val + margin]
 
-        if tolerance_ribbon == "relative":
-            lower_bound = [i * (1 - tolerance_pct / 100) for i in range_val]
-            upper_bound = [i * (1 + tolerance_pct / 100) for i in range_val]
-        else:
-            if tolerance_ribbon == "median":
-                tol = all_vals["value"].median() * tolerance_pct / 100
-            elif tolerance_ribbon == "mean":
-                tol = all_vals["value"].mean() * tolerance_pct / 100
-            else:
-                tol = 0
-            lower_bound = [i - tol for i in range_val]
-            upper_bound = [i + tol for i in range_val]
+        match tolerance_ribbon:
+            case "relative":
+                tol = [i * tolerance_pct / 100 for i in range_val]
+            case "median":
+                tol = (
+                    all_vals["value"].median()
+                    * tolerance_pct
+                    / 100
+                    * np.ones_like(range_val)
+                )
+            case "mean":
+                tol = (
+                    all_vals["value"].mean()
+                    * tolerance_pct
+                    / 100
+                    * np.ones_like(range_val)
+                )
+            case _:
+                tol = np.zeros_like(range_val)
+        lower_bound = [val - tolerance for val, tolerance in zip(range_val, tol)]
+        upper_bound = [val + tolerance for val, tolerance in zip(range_val, tol)]
 
         ax.plot(range_val, range_val, color="red", linestyle="-", linewidth=1.5)
         ax.fill_between(
