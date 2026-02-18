@@ -617,9 +617,18 @@ def plot_weighted_residuals(
 
 def plot_map_vs_posterior(
     nlme_model: NlmeModel,
-    nb_samples: int,
-    n_patients_to_plot: int,
+    nb_samples: int = 1000,
+    n_patients_to_plot: int = 3,
 ):
+    """
+    Plot pdf of the conditional distribution along with MAP estimate, one plot per patient PDU.
+
+    Args:
+
+        nlme_model (NlmeModel)
+        nb_samples (int): number of conditional distribution samples, used to apprixmate the pdf
+        n_patients_to_plot (int): number of patients to plot, randomly selected within the population
+    """
 
     # Sample new etas, compute physical
     sample_etas = nlme_model.sample_conditional_distribution(nb_samples)
@@ -636,20 +645,20 @@ def plot_map_vs_posterior(
 
     nb_samples, nb_patients, nb_params = sample_physical.shape
 
+    nb_PDU = nlme_model.nb_PDU
     for k in range(n_patients_to_plot):
-        patient_id = nlme_model.patients[ind_to_plot[k]]
         patient_samples = sample_physical[:, ind_to_plot[k], :].detach().cpu().numpy()
 
         # Adapt rows to columns
         n_cols = 3
-        n_rows = (nb_params + n_cols - 1) // n_cols
+        n_rows = (nb_PDU + n_cols - 1) // n_cols
         _, axes = plt.subplots(n_rows, n_cols, figsize=(15, 4 * n_rows))
         axes = np.atleast_1d(axes).flatten()
 
         # Plot distribution and MAP for each PDU
         for i in range(len(axes)):
             ax = axes[i]
-            if i < nb_params:
+            if i < nb_PDU:
                 param_data = patient_samples[:, i]
 
                 if np.unique(param_data).size > 1:

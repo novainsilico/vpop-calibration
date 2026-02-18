@@ -462,8 +462,6 @@ class PySaem:
                 self.current_gaussian_params, self.model.log_MI
             )
         )
-        new_thetas_map = new_thetas_chains.mean(dim=0)
-        self.model.update_map_estimates(new_thetas_map)
 
         # --- M-Step: Update Population Means, Omega and Residual variance ---
 
