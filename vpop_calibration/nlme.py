@@ -1464,7 +1464,7 @@ class NlmeModel:
         simulated_df = self.outputs_to_df(simulated_tensor)
         return simulated_df
 
-    def map_predictions_eta_zero(self) -> pd.DataFrame:
+    def population_predictions(self) -> pd.DataFrame:
         """
         Returns simulated dataframe for null etas, i.e. without individual random effects but keeping the covariables effects.
         """

@@ -558,7 +558,7 @@ def plot_weighted_residuals(
     ## Plot vs. predictions
 
     if compare_to_pop_pred:
-        all_predictions = nlme_model.map_predictions_eta_zero()
+        all_predictions = nlme_model.population_predictions()
     else:
         all_predictions = nlme_model.map_estimates_predictions()
 
