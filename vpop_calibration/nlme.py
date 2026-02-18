@@ -1553,7 +1553,10 @@ class NlmeModel:
                 "Conditional distribution has not been run before. Running it with 1000 samples by default...",
                 "If more samples needed, run sample_conditional_distribution(nb_samples).",
             )
-            self.sample_conditional_distribution(1000)
+            samples = self.sample_conditional_distribution(1000)
+
+        else:
+            samples = self.cond_dist_samples
 
         if smoke_test:
             max_iter = 1
@@ -1561,7 +1564,7 @@ class NlmeModel:
             max_iter = 5000
 
         # Taking conditional distribution samples means as a starting point for optimization
-        init_samples = self.cond_dist_samples.mean(dim=0)
+        init_samples = samples.mean(dim=0)
 
         nb_PDU = self.nb_PDU
         ebe_etas = torch.zeros((self.nb_patients, self.nb_PDU))
