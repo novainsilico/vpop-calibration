@@ -1504,7 +1504,7 @@ class NlmeModel:
 
         if (
             hasattr(self, "cond_dist_samples")
-            and nb_samples <= self.cond_dist_samples.shape[0]
+            and nb_samples == self.cond_dist_samples.shape[0]
         ):
             return self.cond_dist_samples
 
