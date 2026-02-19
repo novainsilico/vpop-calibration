@@ -370,7 +370,11 @@ def plot_all_individual_map_estimates(
 
 
 def plot_map_estimates_gof(
-    nlme_model: NlmeModel, facet_width: float = 8.0, facet_height: float = 8.0
+    nlme_model: NlmeModel,
+    facet_width: float = 8.0,
+    facet_height: float = 8.0,
+    tolerance_ribbon: str = "mean",
+    tolerance_pct: int = 50,
 ) -> None:
 
     observed_df = nlme_model.observations_df
@@ -404,26 +408,46 @@ def plot_map_estimates_gof(
             edgecolors="w",
         )
 
-        # Plot 2x interval
+        # Plot tolerance interval
         all_vals = gof_df[["value", "predicted_value"]]
         min_val = all_vals.min().min()
         max_val = all_vals.max().max()
+
         margin = (max_val - min_val) * 0.05
         range_val = [min_val - margin, max_val + margin]
+
+        match tolerance_ribbon:
+            case "relative":
+                tol = [i * tolerance_pct / 100 for i in range_val]
+            case "median":
+                tol = (
+                    all_vals["value"].median()
+                    * tolerance_pct
+                    / 100
+                    * np.ones_like(range_val)
+                )
+            case "mean":
+                tol = (
+                    all_vals["value"].mean()
+                    * tolerance_pct
+                    / 100
+                    * np.ones_like(range_val)
+                )
+            case _:
+                tol = np.zeros_like(range_val)
+        lower_bound = [val - tolerance for val, tolerance in zip(range_val, tol)]
+        upper_bound = [val + tolerance for val, tolerance in zip(range_val, tol)]
+
         ax.plot(range_val, range_val, color="red", linestyle="-", linewidth=1.5)
-        ax.plot(
+        ax.fill_between(
             range_val,
-            [i * 2 for i in range_val],
-            color="red",
+            lower_bound,
+            upper_bound,
+            color="grey",
             linestyle="--",
             linewidth=1.5,
-        )
-        ax.plot(
-            range_val,
-            [i / 2 for i in range_val],
-            color="red",
-            linestyle="--",
-            linewidth=1.5,
+            alpha=0.15,
+            label=f"CI: {tolerance_pct} % {tolerance_ribbon}",
         )
 
         ax.set_xlim(range_val)
@@ -447,6 +471,7 @@ def plot_map_estimates_gof(
         )
 
         title = f"Output: {output_name}"
+        ax.legend()
         ax.set_title(title)
         plt.tight_layout()
 
