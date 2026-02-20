@@ -5,36 +5,56 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [3.0.0] - 2026-02-19
+## [3.0.1] - 2026-02-20
+
 ### Added
+
+- NLME: remove torch.compile on data handling functions (graph breaks)
+
+## [3.0.0] - 2026-02-19
+
+### Added
+
 - NLME: add true MAP computation, through conditional distribution sampling and optimization
 - NLME: new plotting function to visualize conditional distribution and MAP
 
 ## Modified
+
 - NLME: all MAP-related functions now use the true maximum of the distribution, including individual MAP plots and residuals computation
 - NLME: functions allowing to go from etas to outputs can now handle single-patient case
 
 ## [2.6.0] - 2026-01-29
+
 ### Added
+
 - NLME: add weighted residual computations (IWRES, PWRES, NPDE) and plotting
 
 ## [2.5.1] - 2026-01-19
+
 ### Modified
+
 - NLME: add diagnostic plots for post optimization visual check (see `diagnostics.py`)
 
 ## [2.5.0] - 2026-01-14
+
 ### Modified
+
 - NLME: add support for parameter constraints using sigmoidal transformation in the computation of physical parameters
 
 ## [2.4.1] - 2026-01-14
+
 ### Modified
+
 - Consolidate pytest pipelibe structure
 
 ## [2.4.0] - 2026-01-08
+
 ### Modified
+
 - NLME: Add support for multiple parallel MCMC chains per patient
 
 ### Added
+
 - Examples: two benchmarking examples for comparison with `saemix` results. Theophylline and orange trees data sets
 
 ## [2.3.1] - 2025-12-15

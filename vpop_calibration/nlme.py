@@ -576,7 +576,7 @@ class NlmeModel:
         etas = self.eta_distribution.sample([nb_samples, nb_patients])
         return etas
 
-    @torch.compile
+    # @torch.compile
     def etas_to_gaussian_params(
         self,
         individual_etas: torch.Tensor,
@@ -668,7 +668,7 @@ class NlmeModel:
 
         return phi
 
-    @torch.compile
+    # @torch.compile
     def assemble_individual_parameters(
         self,
         physical_params: torch.Tensor,
@@ -1234,12 +1234,12 @@ class NlmeModel:
         self.npde = npde_results
         return npde_results
 
-    @torch.compile
+    # @torch.compile
     def log_likelihood_observation(
         self,
         predictions: torch.Tensor,
         ind_ids_for_etas: Optional[list[str | int]] = None,
-    ) -> torch.Tensor | float:
+    ) -> torch.Tensor:
         """Compute the log-likelihood of observations across all chains
 
         Args:
@@ -1283,9 +1283,9 @@ class NlmeModel:
             torch.log(2 * torch.pi * variance) + (residuals**2 / variance)
         )
 
-        # If only one patient, return likelihood as a float
+        # If only one patient, return likelihood as a single item tensor
         if nb_patients_local == 1:
-            log_lik_patient = log_lik_full.sum().item()
+            log_lik_patient = log_lik_full.sum()
             return log_lik_patient
 
         # If several patients, create likelihood tensor
@@ -1395,14 +1395,6 @@ class NlmeModel:
         )
 
     def map_estimates_descriptors(self) -> pd.DataFrame:
-
-        if not hasattr(self, "cond_dist_samples"):
-            print(
-                "Conditional distribution has not been run before. Running it with 1000 samples by default...",
-                "If more samples needed, run sample_conditional_distribution(nb_samples) before.",
-            )
-            self.sample_conditional_distribution(1000)
-
         ebe_physical = self.compute_ebe()
 
         (nb_samples, nb_patients, nb_descriptors) = ebe_physical.shape
@@ -1435,14 +1427,6 @@ class NlmeModel:
         return map_per_patient
 
     def map_estimates_predictions(self) -> pd.DataFrame:
-
-        if not hasattr(self, "cond_dist_samples"):
-            print(
-                "Conditional distribution has not been run before. Running it with 1000 samples by default...",
-                "If more samples needed, run sample_conditional_distribution(nb_samples) before.",
-            )
-            self.sample_conditional_distribution(1000)
-
         ebe_physical = self.compute_ebe()
 
         (nb_samples, nb_patients, nb_descriptors) = ebe_physical.shape
@@ -1497,7 +1481,12 @@ class NlmeModel:
                 warnings.append(i)
         return warnings
 
-    def sample_conditional_distribution(self, nb_samples: int):
+    def sample_conditional_distribution(
+        self,
+        nb_samples: int = 100,
+        nb_burn_in: int = 50,
+        override: bool = False,
+    ):
         """
         Returns: cond_dist_samples: dim(nb_samples, nb_patients, nb_PDU)
         """
@@ -1505,8 +1494,13 @@ class NlmeModel:
         if (
             hasattr(self, "cond_dist_samples")
             and nb_samples == self.cond_dist_samples.shape[0]
+            and (not override)
         ):
             return self.cond_dist_samples
+
+        if smoke_test:
+            nb_samples = 2
+            nb_burn_in = 1
 
         init_etas = self.sample_etas(1, self.nb_patients)
         (current_log_prob, current_gaussian_params, current_pred) = (
@@ -1514,8 +1508,8 @@ class NlmeModel:
         )
         current_etas = init_etas
         sample_list = []
-        nb_burn_in = 25
-        for i in range(nb_burn_in + nb_samples):
+        print(f"Sampling conditional distribution on {nb_samples} samples:")
+        for i in tqdm(range(nb_burn_in + nb_samples)):
             (
                 current_etas,
                 current_log_prob,
@@ -1540,34 +1534,25 @@ class NlmeModel:
         self.cond_dist_samples = etas_samples
         return self.cond_dist_samples
 
-    def compute_ebe(self):
+    def compute_ebe(self, max_iter: int = 5000, override: bool = False):
         """
         Returns: ebe_estimates: dim(nb_patients, nb_PDU)
         """
 
-        if hasattr(self, "ebe_estimates"):
+        if hasattr(self, "ebe_estimates") and (not override):
             return self.ebe_estimates
 
-        if not hasattr(self, "cond_dist_samples"):
-            print(
-                "Conditional distribution has not been run before. Running it with 1000 samples by default...",
-                "If more samples needed, run sample_conditional_distribution(nb_samples).",
-            )
-            samples = self.sample_conditional_distribution(1000)
-
-        else:
-            samples = self.cond_dist_samples
+        samples = self.sample_conditional_distribution(100)
 
         if smoke_test:
             max_iter = 1
-        else:
-            max_iter = 5000
 
         # Taking conditional distribution samples means as a starting point for optimization
         init_samples = samples.mean(dim=0)
 
         nb_PDU = self.nb_PDU
         ebe_etas = torch.zeros((self.nb_patients, self.nb_PDU))
+        print("Computing EBEs for each patient:")
         for i in tqdm(range(self.nb_patients)):
 
             def objective_function(eta_array):
@@ -1625,7 +1610,9 @@ class NlmeModel:
         )
 
         log_priors = self._log_prior_etas(etas)
-        log_lik_patient = self.log_likelihood_observation(predictions, [patient_id])
+        log_lik_patient = self.log_likelihood_observation(
+            predictions, [patient_id]
+        ).item()
 
         log_posterior = cast(float, log_lik_patient + log_priors)
 
