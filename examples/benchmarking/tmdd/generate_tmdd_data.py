@@ -37,7 +37,7 @@ def equations(t, y, k_eL, k_eP, inj, Vc, R0):
     return ydot
 
 
-def generate_benchmark_data():
+def generate_benchmark_data(nb_patients: int = 50):
     # Define the parameters values
 
     tmax = 10.0  # hours
@@ -75,7 +75,6 @@ def generate_benchmark_data():
     }
 
     # Define the patients data frame
-    nb_patients = 100
     # Give them a unique id
     patients_df = pd.DataFrame({"id": [str(uuid.uuid4()) for _ in range(nb_patients)]})
     patients_df["protocol_arm"] = "identity"
@@ -109,14 +108,11 @@ def export_saemix_data(df):
     )
 
 
-def export_nlmixr2_data(df):
+def export_nlmixr2_data(df, out: str):
     df_nlmixr2 = df[["id", "time", "value"]].rename(
         columns={"value": "DV", "time": "TIME", "id": "ID"}
     )
     df_nlmixr2["EVID"] = 0
     df_nlmixr2["CMT"] = 1
     df_nlmixr2["AMT"] = 0
-    df_nlmixr2.loc[df_nlmixr2["TIME"] == 0, "EVID"] = 1
-    df_nlmixr2.to_csv(
-        "./tmdd_synthetic_data_nlmixr2.csv", sep=" ", float_format="%.3f", index=False
-    )
+    df_nlmixr2.to_csv(out, sep=",", float_format="%.3f", index=False)
