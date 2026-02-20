@@ -1,9 +1,11 @@
 import torch
-from typing import Union, Optional, Callable
+from typing import Union, Optional, Callable, cast
 import pandas as pd
 import numpy as np
 from .structural_model import StructuralModel
-from .utils import device
+from .utils import device, smoke_test
+from tqdm.notebook import tqdm
+from scipy.optimize import minimize
 
 
 class NlmeModel:
@@ -256,15 +258,31 @@ class NlmeModel:
             self.pdu_transforms["exp"] = list(np.arange(self.nb_PDU))
             self.mi_transforms["exp"] = list(np.arange(self.nb_MI))
 
+        self.pdu_transforms = {
+            "exp": torch.tensor(
+                self.pdu_transforms["exp"], dtype=torch.long, device=device
+            ),
+            "sigmoid": torch.tensor(
+                self.pdu_transforms["sigmoid"], dtype=torch.long, device=device
+            ),
+        }
+
+        self.mi_transforms = {
+            "exp": torch.tensor(
+                self.mi_transforms["exp"], dtype=torch.long, device=device
+            ),
+            "sigmoid": torch.tensor(
+                self.mi_transforms["sigmoid"], dtype=torch.long, device=device
+            ),
+        }
         # Initiate the patient parameters
-        self.init_etas = self.sample_etas(self.num_chains)
+        self.init_etas = self.sample_etas(self.num_chains, self.nb_patients)
         self.update_eta_samples(self.init_etas)
         # Compute a first naive guess for the patient parameters on all chains
         gaussian_params = self.etas_to_gaussian_params(self.eta_samples_chains)
         physical_params = self.gaussian_to_physical_params(gaussian_params, self.log_MI)
         # Average over the chains to estimate the current patient descriptors
         theta = self.assemble_individual_parameters(physical_params).mean(dim=0)
-        self.update_map_estimates(theta)
 
     def _create_design_matrix(self, covariates: dict[str, float]) -> torch.Tensor:
         """
@@ -476,7 +494,7 @@ class NlmeModel:
         self.eta_distribution = torch.distributions.MultivariateNormal(
             loc=torch.zeros(self.nb_PDU, device=device),
             covariance_matrix=self.omega_pop,
-        ).expand([self.nb_patients])
+        )
 
     def update_res_var(self, residual_var: torch.Tensor) -> None:
         """Update the residual variance of the NLME model, while ensuring it remains positive."""
@@ -530,19 +548,6 @@ class NlmeModel:
 
         self.eta_samples_chains = eta
 
-    def update_map_estimates(self, theta: torch.Tensor) -> None:
-        """Update the model current maximum a posteriori estimates (PDK, PDU, MIs)."""
-
-        if hasattr(self, "current_map_estimates"):
-            expected_shape = self.current_map_estimates.shape
-        else:
-            expected_shape = (self.nb_patients, self.nb_descriptors)
-        assert (
-            theta.shape == expected_shape
-        ), f"Wrong shape in theta estimates update: {theta.shape}, expected: {expected_shape}"
-
-        self.current_map_estimates = theta
-
     def update_current_parameters(
         self,
         omega: torch.Tensor,
@@ -562,51 +567,79 @@ class NlmeModel:
         self.update_log_mi(log_mi)
         self.update_res_var(res_var)
 
-    def sample_etas(self, nb_samples) -> torch.Tensor:
+    def sample_etas(self, nb_samples, nb_patients) -> torch.Tensor:
         """Sample individual random effects on all chains from the current estimate of Omega
 
         Returns:
             torch.Tensor : individual random effects for all patients in the population, one per chain. Size: (num_chains, nb_patients, nb_PDUs)
         """
-        etas = self.eta_distribution.sample([nb_samples])
+        etas = self.eta_distribution.sample([nb_samples, nb_patients])
         return etas
 
     @torch.compile
-    def etas_to_gaussian_params(self, individual_etas: torch.Tensor) -> torch.Tensor:
+    def etas_to_gaussian_params(
+        self,
+        individual_etas: torch.Tensor,
+        ind_ids_for_etas: Optional[list[str | int]] = None,
+    ) -> torch.Tensor:
         """Compute individual (gaussian) parameters from random effects chains
 
         Args:
             individual_etas (torch.Tensor): Individual random effects samples. Size: (num_chains, nb_patients, nb_PDU)
+            ind_ids_for_etas (List[Union[str, int]]): List of individual ids corresponding to the sampled etas, used to fetch the design matrices
 
         Returns:
             torch.Tensor: The individual parameters in gaussian (unconstrained) space. Size: (num_chains, nb_patients, nb_PDU)
         """
-        (nb_samples, nb_patients, nb_PDU) = individual_etas.shape
-        assert (nb_patients, nb_PDU) == (
-            self.nb_patients,
+        if ind_ids_for_etas is None:
+            ind_ids_for_etas = self.patients
+
+        (nb_samples, nb_patients_local, nb_PDU) = individual_etas.shape
+
+        assert (nb_patients_local, nb_PDU) == (
+            len(ind_ids_for_etas),
             self.nb_PDU,
-        )
+        ), f"Wrong shape for individual_etas, expected {len(ind_ids_for_etas), self.nb_PDU}, got {nb_patients_local, nb_PDU}"
+
+        if nb_patients_local == self.nb_patients:
+            stacked_design_matrices = self.full_design_matrix
+        else:
+            list_design_matrices = [
+                self.design_matrices[ind_id] for ind_id in ind_ids_for_etas
+            ]
+            stacked_design_matrices = torch.stack(list_design_matrices).to(device)
+
         gaussian_params = (
-            self.full_design_matrix.expand(nb_samples, -1, -1, -1)
+            stacked_design_matrices.expand(nb_samples, -1, -1, -1)
             @ self.population_betas
             + individual_etas
         )
+
         return gaussian_params
 
-    # @torch.compile
+    @torch.compile
     def gaussian_to_physical_params(
-        self, psi: torch.Tensor, log_mi: torch.Tensor
+        self,
+        psi: torch.Tensor,
+        log_mi: torch.Tensor,
+        ind_ids_for_etas: Optional[list[str | int]] = None,
     ) -> torch.Tensor:
         """Transform gaussian parameters to physical parameters (thetas)
 
         Args:
             psi (torch.Tensor): Tensor of individual unconstrained parameter values. Size: (num_chains, nb_patients, nb_PDU)
+            ind_ids_for_etas (List[Union[str, int]]): List of individual ids corresponding to the sampled etas
 
         Returns:
             torch.Tensor: Tensor of individual physical parameter values. Both PDUs and MIs are included. Size: (num_chains, nb_patients, nb_PDU + nb_MI)
         """
-        (nb_samples, nb_patients, nb_PDU) = psi.shape
-        assert (nb_patients, nb_PDU) == (self.nb_patients, self.nb_PDU)
+
+        if ind_ids_for_etas is None:
+            ind_ids_for_etas = self.patients
+
+        (nb_samples, nb_patients_local, nb_PDU) = psi.shape
+        assert nb_patients_local == len(ind_ids_for_etas), nb_PDU == self.nb_PDU
+
         pdu = torch.zeros_like(psi, device=device)
         # Apply exp transform
         pdu[:, :, self.pdu_transforms["exp"]] = torch.exp(
@@ -627,16 +660,19 @@ class NlmeModel:
             log_mi[self.mi_transforms["sigmoid"]]
         )
         mi = self.mi_shift + self.mi_scale * mi
-        mi = mi.expand(nb_samples, self.nb_patients, -1)
-        assert mi.shape == (nb_samples, self.nb_patients, self.nb_MI)
+        mi = mi.expand(nb_samples, nb_patients_local, -1)
+
+        assert mi.shape == (nb_samples, nb_patients_local, self.nb_MI)
         # Todo: allow for different transformations of gaussian parameters (logit)
-        phi = torch.cat((pdu, mi), dim=-1)
+        phi = torch.cat((pdu, mi), dim=-1).to(device)
+
         return phi
 
     @torch.compile
     def assemble_individual_parameters(
         self,
         physical_params: torch.Tensor,
+        ind_ids_for_etas: Optional[list[str | int]] = None,
     ) -> torch.Tensor:
         """Compute individual patient parameters
 
@@ -645,42 +681,71 @@ class NlmeModel:
 
         Args:
             physical_params (Tensor): output from self.gaussian_to_physical_params. Transformed MI and PDU params
+            ind_ids_for_etas (List[Union[str, int]]): List of individual ids corresponding to the sampled etas
+
         Returns:
             torch.Tensor [nb_patients x nb_parameters]: One parameter set for each patient. Dim 0 corresponds to the patients, dim 1 is the parameters
         """
+        if ind_ids_for_etas is None:
+            ind_ids_for_etas = self.patients
 
-        (nb_samples, nb_patients, nb_descriptors) = physical_params.shape
+        (nb_samples, nb_patients_local, nb_descriptors) = physical_params.shape
+
+        assert len(ind_ids_for_etas) == nb_patients_local
+
+        if nb_patients_local == self.nb_patients:
+            pdk = self.patients_pdk_full
+        elif nb_patients_local == 1:
+            if self.nb_PDK > 0:
+                pdk_list = [self.patients_pdk[ind] for ind in ind_ids_for_etas]
+                pdk = torch.stack(pdk_list)
+            else:
+                pdk = torch.empty((nb_patients_local, 0), device=device)
+        else:
+            raise ValueError(
+                "In assemble_individual_parameters, nb_patients_local should either be 1 or the total number of patients."
+            )
 
         # Assemble the thetas by adding the PDKs
         thetas = torch.cat(
             (
-                self.patients_pdk_full.expand(nb_samples, -1, -1),
+                pdk.expand(nb_samples, -1, -1),
                 physical_params,
             ),
             dim=-1,
         )
 
-        assert thetas.shape == (nb_samples, self.nb_patients, self.nb_descriptors)
+        assert thetas.shape == (nb_samples, nb_patients_local, self.nb_descriptors)
         return thetas
 
     @torch.compile
-    def struc_model_inputs_from_theta(self, thetas: torch.Tensor) -> torch.Tensor:
+    def struc_model_inputs_from_theta(
+        self,
+        thetas: torch.Tensor,
+        ind_ids_for_etas: Optional[list[str | int]] = None,
+    ) -> torch.Tensor:
         """Return model inputs for all patients
 
         Args:
             thetas (torch.Tensor): Parameter values per patient. Theta may contain one parameter per chain
+            ind_ids_for_etas (List[Union[str, int]]): List of individual ids corresponding to the sampled etas
 
         Returns:
             torch.Tensor: the full inputs required to simulate all patients on all time steps
         """
+        if ind_ids_for_etas is None:
+            ind_ids_for_etas = self.patients
+
         # If theta was not provided in batch format, add a dummy dimension
         inputs = thetas
+
         if inputs.dim() < 3:
             inputs = inputs.unsqueeze(0)
         num_chains_local = inputs.shape[0]
+        nb_patients_local = len(ind_ids_for_etas)
         assert inputs.shape == (
             num_chains_local,
-            self.nb_patients,
+            nb_patients_local,
             self.nb_descriptors,
         ), f"Wrong shape in theta to structural model inputs: {inputs.shape}"
 
@@ -695,23 +760,43 @@ class NlmeModel:
             .unsqueeze(-2)
             .expand((-1, -1, self.nb_global_time_steps, -1))
         )
+
+        # Repeat global time steps as much as there are patients in ind_ids_for_etas
+        if nb_patients_local == self.nb_patients:
+            time_steps_expanded = self.global_time_steps_expanded
+        elif nb_patients_local == 1:
+            time_steps_expanded = (
+                self.global_time_steps.unsqueeze(0)
+                .unsqueeze(-1)
+                .repeat((nb_patients_local, 1, 1))
+            )
+        else:
+            raise ValueError(
+                "In struc_model_inputs_from_theta, nb_patients_local should either be 1 or the total number of patients."
+            )
+
         full_inputs = torch.cat(
             (
                 theta_expanded,
-                self.global_time_steps_expanded.expand(num_chains_local, -1, -1, -1),
+                time_steps_expanded.expand(num_chains_local, -1, -1, -1),
             ),
             dim=-1,
         )
+
         assert full_inputs.shape == (
             num_chains_local,
-            self.nb_patients,
+            nb_patients_local,
             self.nb_global_time_steps,
             self.nb_descriptors + 1,
         )
+
         return full_inputs
 
     def predict_outputs_from_theta(
-        self, thetas: torch.Tensor
+        self,
+        thetas: torch.Tensor,
+        ind_ids_for_etas: Optional[list[str | int]] = None,
+        model_inputs: Optional[torch.Tensor] = None,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         """Return model predictions for all patients
 
@@ -719,17 +804,44 @@ class NlmeModel:
 
         Args:
             thetas (torch.Tensor): Parameter values per patient. Size (num_chains | 1, nb_patients, nb_time_steps, nb_descriptors + 1)
+            ind_ids_for_etas (List[Union[str, int]]): List of individual ids corresponding to the sampled etas
 
         Returns:
             list[torch.Tensor]: a tensor of predictions for each patient
         """
-        model_inputs = self.struc_model_inputs_from_theta(thetas)
+        if ind_ids_for_etas is None:
+            ind_ids_for_etas = self.patients
+
+        nb_patients_local = len(ind_ids_for_etas)
+
+        if model_inputs is None:
+            model_inputs = self.struc_model_inputs_from_theta(thetas)
+
+        if nb_patients_local == self.nb_patients:
+            prediction_index = self.prediction_index
+            chunk_sizes = self.chunk_sizes
+        elif nb_patients_local == 1:
+            ind = ind_ids_for_etas[0]
+            prediction_index = (
+                torch.zeros_like(
+                    self.observations_tensors[ind]["p_index_repeated"]
+                ),  # only one patient, index 0
+                self.observations_tensors[ind]["time_step_indices"],
+                self.observations_tensors[ind]["tasks_indices"],
+            )
+            chunk_sizes = [len(prediction_index[0])]
+        else:
+            raise ValueError(
+                "In predict_outputs_from_theta, nb_patients_local should either be 1 or the total number of patients."
+            )
+
         # Shape: (nb_chains | 1, nb_patients, nb_global_time_steps, nb_descriptors + 1)
         pred_mean, pred_var = self.structural_model.simulate(
             model_inputs,
-            self.prediction_index,
-            self.chunk_sizes,
+            prediction_index,
+            chunk_sizes,
         )
+
         return pred_mean, pred_var
 
     def add_residual_error(self, outputs: torch.Tensor) -> torch.Tensor:
@@ -803,10 +915,6 @@ class NlmeModel:
         """
 
         log_priors: torch.Tensor = self.eta_distribution.log_prob(etas).to(device)
-        assert log_priors.shape == (
-            self.num_chains,
-            self.nb_patients,
-        ), "Unexpected prior shape"
         return log_priors
 
     def log_posterior_etas(
@@ -829,7 +937,8 @@ class NlmeModel:
             - list of simulated values for each patient on each chain
 
         """
-        assert etas.shape == (self.num_chains, self.nb_patients, self.nb_PDU)
+        nb_chains_local = etas.shape[0]
+        assert etas.shape == (nb_chains_local, self.nb_patients, self.nb_PDU)
         if not hasattr(self, "observations_tensors"):
             raise ValueError(
                 "Cannot compute log-posterior without an associated observations data frame."
@@ -850,14 +959,16 @@ class NlmeModel:
 
         # calculate log-prior of the random samples
         log_priors: torch.Tensor = self._log_prior_etas(etas)
-        assert log_priors.shape == (self.num_chains, self.nb_patients)
+        assert log_priors.shape == (nb_chains_local, self.nb_patients)
 
         # Compute the log likelihood of observations
-        log_likelihood_observations = self.log_likelihood_observation(full_pred)
-        assert log_likelihood_observations.shape == (self.num_chains, self.nb_patients)
+        log_likelihood_observations = cast(
+            torch.Tensor, self.log_likelihood_observation(full_pred)
+        )
+        assert log_likelihood_observations.shape == (nb_chains_local, self.nb_patients)
 
         log_posterior = log_likelihood_observations + log_priors
-        assert log_posterior.shape == (self.num_chains, self.nb_patients)
+        assert log_posterior.shape == (nb_chains_local, self.nb_patients)
         return (
             log_posterior,
             gaussian_params_chains,
@@ -866,7 +977,9 @@ class NlmeModel:
 
     @torch.compile
     def calculate_residuals(
-        self, observed_data: torch.Tensor, predictions: torch.Tensor
+        self,
+        observed_data: torch.Tensor,
+        predictions: torch.Tensor,
     ) -> torch.Tensor:
         """Calculates residuals based on the error model
 
@@ -915,13 +1028,18 @@ class NlmeModel:
 
     @torch.compile
     def compute_error_variance(
-        self,
-        predictions: torch.Tensor,
+        self, predictions: torch.Tensor, output_indices: Optional[torch.Tensor] = None
     ) -> torch.Tensor:
+
+        if output_indices is None:
+            output_indices = self.full_output_indices
+
         num_chains_local = predictions.shape[0]
+
         res_error_var = self.residual_var.expand(num_chains_local, -1).index_select(
-            1, self.full_output_indices
+            1, output_indices
         )
+
         # Log-likelihood of normal distribution
         if self.error_model_type == "additive":
             variance = res_error_var
@@ -950,7 +1068,17 @@ class NlmeModel:
         observed_tensor = self.full_obs_data.view(1, -1)
 
         # Gather predictions tensor
-        theta = self.current_map_estimates.unsqueeze(0)
+        ebe_physical = self.compute_ebe()
+        (nb_samples, nb_patients_local, nb_descriptors) = ebe_physical.shape
+
+        # Assemble the thetas by adding the PDKs
+        theta = torch.cat(
+            (
+                self.patients_pdk_full.expand(nb_samples, -1, -1),
+                ebe_physical,
+            ),
+            dim=-1,
+        )
         simulated_tensor, _ = self.predict_outputs_from_theta(theta)
 
         # Compute residuals and variance
@@ -992,7 +1120,7 @@ class NlmeModel:
             return self.pwres
 
         # Sample new etas, in order to approximate mean E(y_i) and variance V_i
-        mc_etas = self.sample_etas(num_samples)
+        mc_etas = self.sample_etas(num_samples, self.nb_patients)
 
         # Compute gaussian parameters
         mc_gaussian = self.etas_to_gaussian_params(mc_etas)
@@ -1057,7 +1185,7 @@ class NlmeModel:
             return self.npde
 
         # Sample new etas
-        mc_etas = self.sample_etas(num_samples)
+        mc_etas = self.sample_etas(num_samples, self.nb_patients)
 
         # Compute gaussian parameters
         mc_gaussian = self.etas_to_gaussian_params(mc_etas)
@@ -1110,7 +1238,8 @@ class NlmeModel:
     def log_likelihood_observation(
         self,
         predictions: torch.Tensor,
-    ) -> torch.Tensor:
+        ind_ids_for_etas: Optional[list[str | int]] = None,
+    ) -> torch.Tensor | float:
         """Compute the log-likelihood of observations across all chains
 
         Args:
@@ -1120,27 +1249,56 @@ class NlmeModel:
             torch.Tensor: Log likelihood per patient and per chain. Size (num_chains, nb_patient)
         """
         num_chains_local = predictions.shape[0]
+
+        if ind_ids_for_etas is None:
+            ind_ids_for_etas = self.patients
+
+        nb_patients_local = len(ind_ids_for_etas)
+        if nb_patients_local == 1:
+            patient_id = ind_ids_for_etas[0]
+            observations = self.observations_tensors[patient_id]["observations"]
+            output_indices = self.observations_tensors[patient_id]["outputs_indices"]
+        elif nb_patients_local == self.nb_patients:
+            observations = self.full_obs_data
+            output_indices = self.full_output_indices
+        else:
+            raise ValueError(
+                "In log_likelihood_observation, nb_patients_local should either be 1 or the total number of patients."
+            )
+
         residuals: torch.Tensor = self.calculate_residuals(
-            self.full_obs_data.expand(num_chains_local, -1), predictions
+            observations.expand(num_chains_local, -1), predictions
         )
+
         res_error_var = self.residual_var.expand(num_chains_local, -1).index_select(
-            1, self.full_output_indices
+            1, output_indices
         )
+
         assert residuals.shape == res_error_var.shape
+
         # Log-likelihood of normal distribution
-        variance = self.compute_error_variance(predictions)
+        variance = self.compute_error_variance(predictions, output_indices)
+
         log_lik_full = -0.5 * (
             torch.log(2 * torch.pi * variance) + (residuals**2 / variance)
         )
-        log_lik_per_patient = torch.zeros(
-            (num_chains_local, self.nb_patients), device=device
-        )
-        log_lik_per_patient.scatter_add_(
-            1,
-            self.observation_to_patient_index.expand(num_chains_local, -1),
-            log_lik_full,
-        )
-        return log_lik_per_patient
+
+        # If only one patient, return likelihood as a float
+        if nb_patients_local == 1:
+            log_lik_patient = log_lik_full.sum().item()
+            return log_lik_patient
+
+        # If several patients, create likelihood tensor
+        else:
+            log_lik_per_patient = torch.zeros(
+                (num_chains_local, self.nb_patients), device=device
+            )
+            log_lik_per_patient.scatter_add_(
+                1,
+                self.observation_to_patient_index.expand(num_chains_local, -1),
+                log_lik_full,
+            )
+            return log_lik_per_patient
 
     def mh_step(
         self,
@@ -1237,22 +1395,67 @@ class NlmeModel:
         )
 
     def map_estimates_descriptors(self) -> pd.DataFrame:
-        theta = self.current_map_estimates
+
+        if not hasattr(self, "cond_dist_samples"):
+            print(
+                "Conditional distribution has not been run before. Running it with 1000 samples by default...",
+                "If more samples needed, run sample_conditional_distribution(nb_samples) before.",
+            )
+            self.sample_conditional_distribution(1000)
+
+        ebe_physical = self.compute_ebe()
+
+        (nb_samples, nb_patients, nb_descriptors) = ebe_physical.shape
+
+        # Assemble the thetas by adding the PDKs
+        theta = torch.cat(
+            (
+                self.patients_pdk_full.expand(nb_samples, -1, -1),
+                ebe_physical,
+            ),
+            dim=-1,
+        )
+
         if theta is None:
             raise ValueError("No estimation available yet. Run the algorithm first.")
+
+        theta = theta.squeeze()
+
         assert theta.shape == (
             self.nb_patients,
             self.nb_descriptors,
-        ), f"Unexpected dimensions of MAP estimates: {theta.shape=}"
+        ), f"Unexpected dimensions of MAP estimates: {theta.shape}"
+
         map_per_patient = pd.DataFrame(
             data=theta.cpu().numpy(), columns=self.descriptors
         )
         id_column = self.patients
         map_per_patient["id"] = id_column
+
         return map_per_patient
 
     def map_estimates_predictions(self) -> pd.DataFrame:
-        theta = self.current_map_estimates
+
+        if not hasattr(self, "cond_dist_samples"):
+            print(
+                "Conditional distribution has not been run before. Running it with 1000 samples by default...",
+                "If more samples needed, run sample_conditional_distribution(nb_samples) before.",
+            )
+            self.sample_conditional_distribution(1000)
+
+        ebe_physical = self.compute_ebe()
+
+        (nb_samples, nb_patients, nb_descriptors) = ebe_physical.shape
+
+        # Assemble the thetas by adding the PDKs
+        theta = torch.cat(
+            (
+                self.patients_pdk_full.expand(nb_samples, -1, -1),
+                ebe_physical,
+            ),
+            dim=-1,
+        )
+
         if theta is None:
             raise ValueError(
                 "No estimation available yet. Run the optimization algorithm first."
@@ -1261,9 +1464,9 @@ class NlmeModel:
         simulated_df = self.outputs_to_df(simulated_tensor)
         return simulated_df
 
-    def map_predictions_eta_zero(self) -> pd.DataFrame:
+    def population_predictions(self) -> pd.DataFrame:
         """
-        Returns simulated dataframe for null etas, i.e. without individual individual random effects but keeping the covariables effects.
+        Returns simulated dataframe for null etas, i.e. without individual random effects but keeping the covariables effects.
         """
 
         # Sample new etas, in order to approximate mean E(y_i) and variance V_i
@@ -1293,3 +1496,137 @@ class NlmeModel:
             if var > threshold:
                 warnings.append(i)
         return warnings
+
+    def sample_conditional_distribution(self, nb_samples: int):
+        """
+        Returns: cond_dist_samples: dim(nb_samples, nb_patients, nb_PDU)
+        """
+
+        if (
+            hasattr(self, "cond_dist_samples")
+            and nb_samples == self.cond_dist_samples.shape[0]
+        ):
+            return self.cond_dist_samples
+
+        init_etas = self.sample_etas(1, self.nb_patients)
+        (current_log_prob, current_gaussian_params, current_pred) = (
+            self.log_posterior_etas(init_etas)
+        )
+        current_etas = init_etas
+        sample_list = []
+        nb_burn_in = 25
+        for i in range(nb_burn_in + nb_samples):
+            (
+                current_etas,
+                current_log_prob,
+                _,
+                current_pred,
+                current_gaussian_params,
+                _,
+            ) = self.mh_step(
+                current_etas,
+                current_log_prob,
+                current_pred,
+                current_gaussian_params,
+                step_size=0.1,
+                learning_rate=0.0,
+            )
+
+            if i >= nb_burn_in:
+                sample_list.append(current_etas)
+
+        sample_tensor = torch.stack(sample_list)
+        etas_samples = torch.squeeze(sample_tensor, 1)
+        self.cond_dist_samples = etas_samples
+        return self.cond_dist_samples
+
+    def compute_ebe(self):
+        """
+        Returns: ebe_estimates: dim(nb_patients, nb_PDU)
+        """
+
+        if hasattr(self, "ebe_estimates"):
+            return self.ebe_estimates
+
+        if not hasattr(self, "cond_dist_samples"):
+            print(
+                "Conditional distribution has not been run before. Running it with 1000 samples by default...",
+                "If more samples needed, run sample_conditional_distribution(nb_samples).",
+            )
+            samples = self.sample_conditional_distribution(1000)
+
+        else:
+            samples = self.cond_dist_samples
+
+        if smoke_test:
+            max_iter = 1
+        else:
+            max_iter = 5000
+
+        # Taking conditional distribution samples means as a starting point for optimization
+        init_samples = samples.mean(dim=0)
+
+        nb_PDU = self.nb_PDU
+        ebe_etas = torch.zeros((self.nb_patients, self.nb_PDU))
+        for i in tqdm(range(self.nb_patients)):
+
+            def objective_function(eta_array):
+                eta_tensor = torch.from_numpy(eta_array).float().view(1, 1, nb_PDU)
+                with torch.no_grad():
+                    log_post = self.log_posterior_etas_single(eta_tensor, i)
+                return -log_post
+
+            x0 = init_samples[i].numpy()
+
+            res = minimize(
+                objective_function,
+                x0,
+                method="Nelder-Mead",
+                tol=1e-4,
+                options={"maxiter": max_iter},
+            )
+            ebe_etas[i] = torch.from_numpy(res.x)
+
+        ebe_etas = ebe_etas.expand(1, -1, -1)
+        ebe_gaussian = self.etas_to_gaussian_params(ebe_etas)
+        ebe_physical = self.gaussian_to_physical_params(ebe_gaussian, self.log_MI)
+        self.ebe_estimates = ebe_physical
+        return ebe_physical
+
+    def log_posterior_etas_single(self, etas: torch.Tensor, patient_ind: int) -> float:
+        """
+        Args:
+            etas: random effects sample for one patient, dim (1, 1, nb_PDU)
+            patient_ind: index of a patient in self.patients
+
+        Returns:
+            log_posterior: value of log-posterior distribution for given etas and patient
+        """
+
+        assert etas.shape == (1, 1, self.nb_PDU)
+
+        patient_id = self.patients[patient_ind]
+
+        if not hasattr(self, "observations_tensors"):
+            raise ValueError(
+                "Cannot compute log-posterior without an associated observations data frame."
+            )
+
+        # Proceed from etas to model inputs
+        gaussian_params = self.etas_to_gaussian_params(etas, [patient_id])
+        physical_params = self.gaussian_to_physical_params(
+            gaussian_params, self.log_MI, [patient_id]
+        )
+        theta = self.assemble_individual_parameters(physical_params, [patient_id])
+        full_inputs = self.struc_model_inputs_from_theta(theta, [patient_id])
+
+        predictions, _ = self.predict_outputs_from_theta(
+            theta, [patient_id], full_inputs
+        )
+
+        log_priors = self._log_prior_etas(etas)
+        log_lik_patient = self.log_likelihood_observation(predictions, [patient_id])
+
+        log_posterior = cast(float, log_lik_patient + log_priors)
+
+        return log_posterior
