@@ -576,7 +576,7 @@ class NlmeModel:
         etas = self.eta_distribution.sample([nb_samples, nb_patients])
         return etas
 
-    # @torch.compile
+    @torch.compile
     def etas_to_gaussian_params(
         self,
         individual_etas: torch.Tensor,
