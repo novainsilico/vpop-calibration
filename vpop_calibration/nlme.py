@@ -576,7 +576,6 @@ class NlmeModel:
         etas = self.eta_distribution.sample([nb_samples, nb_patients])
         return etas
 
-    # @torch.compile
     def etas_to_gaussian_params(
         self,
         individual_etas: torch.Tensor,
@@ -603,11 +602,14 @@ class NlmeModel:
 
         if nb_patients_local == self.nb_patients:
             stacked_design_matrices = self.full_design_matrix
+        elif nb_patients_local == 1:
+            stacked_design_matrices = self.design_matrices[
+                ind_ids_for_etas[0]
+            ].unsqueeze(0)
         else:
-            list_design_matrices = [
-                self.design_matrices[ind_id] for ind_id in ind_ids_for_etas
-            ]
-            stacked_design_matrices = torch.stack(list_design_matrices).to(device)
+            raise ValueError(
+                f"Unsupported amount of patients requested in `etas_to_gaussian` {nb_patients_local}"
+            )
 
         gaussian_params = (
             stacked_design_matrices.expand(nb_samples, -1, -1, -1)
@@ -668,7 +670,6 @@ class NlmeModel:
 
         return phi
 
-    # @torch.compile
     def assemble_individual_parameters(
         self,
         physical_params: torch.Tensor,
@@ -697,13 +698,12 @@ class NlmeModel:
             pdk = self.patients_pdk_full
         elif nb_patients_local == 1:
             if self.nb_PDK > 0:
-                pdk_list = [self.patients_pdk[ind] for ind in ind_ids_for_etas]
-                pdk = torch.stack(pdk_list)
+                pdk = self.patients_pdk[ind_ids_for_etas[0]].unsqueeze(0)
             else:
                 pdk = torch.empty((nb_patients_local, 0), device=device)
         else:
             raise ValueError(
-                "In assemble_individual_parameters, nb_patients_local should either be 1 or the total number of patients."
+                f"Unsupported amount of patients requested in `assemble_individual_parameters` {nb_patients_local}."
             )
 
         # Assemble the thetas by adding the PDKs
@@ -1234,7 +1234,6 @@ class NlmeModel:
         self.npde = npde_results
         return npde_results
 
-    # @torch.compile
     def log_likelihood_observation(
         self,
         predictions: torch.Tensor,
@@ -1263,7 +1262,7 @@ class NlmeModel:
             output_indices = self.full_output_indices
         else:
             raise ValueError(
-                "In log_likelihood_observation, nb_patients_local should either be 1 or the total number of patients."
+                f"Unsupported amount of patients requested in `log_likelihood_observation` {nb_patients_local}."
             )
 
         residuals: torch.Tensor = self.calculate_residuals(
