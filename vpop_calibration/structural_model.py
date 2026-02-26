@@ -107,11 +107,12 @@ class StructuralOdeModel(StructuralModel):
         self,
         ode_model: OdeModel,
         protocol_design: pd.DataFrame,
+        output_names: list[str],
     ):
         self.ode_model = ode_model
         protocol_arms = protocol_design["protocol_arm"].drop_duplicates().to_list()
         self.protocol_design = protocol_design
-        output_names: list[str] = self.ode_model.variable_names
+        assert set(output_names) <= set(self.ode_model.variable_names)
         tasks: list[str] = [
             output + "_" + protocol
             for protocol in protocol_arms
@@ -125,7 +126,8 @@ class StructuralOdeModel(StructuralModel):
         }
         # Map task index to output index
         task_idx_to_output_idx = {
-            tasks.index(k): output_names.index(v) for k, v in task_to_output.items()
+            tasks.index(task): self.ode_model.variable_names.index(output)
+            for task, output in task_to_output.items()
         }
         # Map task to protocol arm
         task_to_protocol = {

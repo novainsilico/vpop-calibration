@@ -71,7 +71,9 @@ def test_ode_saem(np_rng):
     }
 
     # Create a structural model
-    structural_ode = StructuralOdeModel(pk_two_compartments_model, protocol_design)
+    structural_ode = StructuralOdeModel(
+        pk_two_compartments_model, protocol_design, variable_names
+    )
     # Create a NLME moedl
     nlme = NlmeModel(
         structural_ode,

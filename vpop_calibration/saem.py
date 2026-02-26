@@ -456,13 +456,6 @@ class PySaem:
         # Update the model's eta and thetas
         self.model.update_eta_samples(self.current_etas_chains)
 
-        # Compute the new patient parameter estimates by averaging over all chains
-        new_thetas_chains = self.model.assemble_individual_parameters(
-            self.model.gaussian_to_physical_params(
-                self.current_gaussian_params, self.model.log_MI
-            )
-        )
-
         # --- M-Step: Update Population Means, Omega and Residual variance ---
 
         # 1. Update residual error variances
