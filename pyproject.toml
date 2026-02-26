@@ -56,7 +56,7 @@ env = ["IS_PYTEST_RUNNING=True", "CUDA_VISIBLE_DEVICES=", "MPLBACKEND=agg"]
 
 [tool.coverage.run]
 branch = true
-omit = ["vpop_calibration/test/*", "examples"]
+omit = ["vpop_calibration/test/*"]
 
 [tool.coverage.report]
 # Regexes for lines to exclude from consideration
