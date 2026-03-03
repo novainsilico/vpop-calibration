@@ -1,48 +1,74 @@
 library(nlmixr2)
 library(rxode2)
+library(dplyr)
+library(microbenchmark)
+library(ggplot2)
+library(stringr)
 
+# Generic model
 tmdd_model <- function() {
   ini({
-    k_D <- fix(1.0)
-    k_deg <- fix(1.0)
-    inj <- fix(10.0)
-    k_off <- fix(1.0)
+    mu.k_eL <- 1.0
+    mu.R0 <- 1.0
+    mu.Vc <- 1.0
 
-    log_k_eL <- log(5e-2)
-    log_k_eP <- log(1e-1)
-    log_R0 <- log(3.0)
-    log_Vc <- log(3.0)
-
-    eta.k_eL ~ 0.25
-    eta.k_eP ~ 0.2
+    eta.k_eL ~ 0.1
     eta.R0 ~ 0.1
-    eta.Vc ~ 0.1
+    eta.Vc ~0.1
 
-    prop.err <- 0.05
+    add.err <- 0.1
   })
   model({
-    k_eL = exp(log_k_eL + eta.k_eL)
-    k_eP = exp(log_k_eP + eta.k_eP)
-    R0 = exp(log_R0 + eta.R0)
-    Vc = exp(log_Vc + eta.Vc)
+    k_eL <- exp(mu.k_eL + eta.k_eL)
+    R0 <- exp(mu.R0 + eta.R0)
+    Vc <- exp(mu.Vc + eta.Vc)
 
     k_on = k_off / k_D
     k_syn = R0 * k_deg
 
-    L(0) = inj / Vc
+    L(0) = 0
     R(0) = R0
     P(0) = 0
 
-    d/dt(L) = - k_eL * L - k_on * L * R + k_off * P
+    d/dt(L) = -k_eL * L - k_on * L * R + k_off * P
     d/dt(R) = k_syn - k_deg * R - k_on * L * R + k_off * P
     d/dt(P) = k_on * L * R - k_off * P - k_eP * P
 
-    L ~ prop(prop.err)
+    DV = log(L / Vc)
+    DV ~ add(add.err)
   })
 }
 
-data <- read.csv("tmdd_synthetic_data_nlmixr2.csv")
+print(tmdd_model)
 
-fit <- nlmixr2(tmdd_model, data, est = "saem", saemControl(print=50, nBurn=200, nEm=300), tableControl(cwres = TRUE))
+fit_nlmixr <- function(nb_patients) {
+  file <- paste0("examples/benchmarking/tmdd/obs_data_",nb_patients,".csv")
+  data <- read.csv(file)
+  options <- saemControl(
+    print = 0,
+    nBurn = 100,
+    nEm = 100,
+    nmc = 1,
+    nu = c(1, 1, 1),
+    logLik = F
+  )
+  fit <-
+    nlmixr2(tmdd_model,
+            data,
+            est = "saem",
+            options,
+            tableControl(cwres = TRUE))
+  return(fit)
+}
 
-vpcPlot(fit, n=500, show=list(L=TRUE), log_y = TRUE)
+# benchmark the execution time
+nb_patients_list <- c(10,50,100,200,300,400,500,1000)
+
+tests <- lapply(nb_patients_list, function(nb_patients) {bquote(fit_nlmixr(.(nb_patients)))})
+res <- microbenchmark(list=tests, times = 3)
+res_inc <- res %>%
+  mutate(nb_patients = as.numeric(str_extract_all(expr,"\\d+")), time = time / 1e9) %>%
+  select(!expr)
+ggplot(res_inc, aes(y=time, x=nb_patients, group=nb_patients)) + geom_boxplot(width=50)
+
+write.csv(x=res_inc, file="examples/benchmarking/tmdd/performance_nlmixr.csv", row.names = F)
