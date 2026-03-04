@@ -56,14 +56,13 @@ fit_nlmixr <- function(nb_patients) {
     nlmixr2(tmdd_model,
             data,
             est = "saem",
-            options,
-            tableControl(cwres = TRUE))
+            options)
   return(fit)
 }
 
 # benchmark the execution time
 # Exclude 5k as it breaks Rstudio
-nb_patients_list <- c(100,200,300,400,500,1000,2000)
+nb_patients_list <- c(100,200,300,400,500,1000,2000,5000)
 
 tests <- lapply(nb_patients_list, function(nb_patients) {bquote(fit_nlmixr(.(nb_patients)))})
 res <- microbenchmark(list=tests, times = 5)

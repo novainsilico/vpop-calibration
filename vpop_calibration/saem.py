@@ -902,7 +902,7 @@ class PySaem:
             print("Model intrinsic parameters:")
             for i, mi in enumerate(self.model.MI_names):
                 val_log = self.model.log_MI[i]
-                print(f"{mi}: {torch.exp(val_log):.2f} (log: {val_log:.2f})")
+                print(f"{mi}: {val_log:.2f}")
         if self.model.nb_PDU > 0:
             print("------")
             print("PDU parameters:")
@@ -912,7 +912,7 @@ class PySaem:
                 omega_val = self.model.omega_pop[i, i]
                 std_dev = (torch.exp(omega_val) - 1) * torch.exp(2 * mu_val + omega_val)
                 print(
-                    f"{pdu}: mu: {torch.exp(mu_val): .2f} (log: {mu_val:.2f}), omega^2: {omega_val:.2e}, variance: {std_dev:.2f}"
+                    f"{pdu}: mu: {mu_val: .2f}, omega^2: {omega_val:.2e}, variance: {std_dev:.2f}"
                 )
         if self.model.nb_covariates > 0:
             print("------")

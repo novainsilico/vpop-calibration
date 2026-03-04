@@ -43,8 +43,8 @@ generate_training_data <- function(nb_patients) {
   samples = sobol(length(ids), 3)
 
   # Define the ranges for the training patient sampling
-  low=array(c(-2,0,0), dim=c(1,3))
-  high=array(c(1,2,3), dim=c(1,3))
+  low=array(c(-2,-1,-1), dim=c(1,3))
+  high=array(c(1,1,3), dim=c(1,3))
   low_rep = low[col(samples)]
   high_rep = high[col(samples)]
 
@@ -72,17 +72,15 @@ ggplot(train_data,aes(x=time,y=DV, group=id))+
 
 write.csv(x = train_data, file = "qspc26/data/gp_training.csv", row.names = F)
 
-
-
 simulate_model<- function(nb_patients) {
   ids = 1:nb_patients
   sol = rxSolve(
     tmdd_model,
     events = events |> et(id=ids),
     params = c(
-      mu.k_eL = log(0.5),
-      mu.R0 = log(1.0),
-      mu.Vc = log(3.0)
+      mu.k_eL = -0.6,
+      mu.R0 = 0.0,
+      mu.Vc = 1.0
     ),
     omega = lotri(eta.k_eL ~ 0.2, eta.R0 ~ 0.15, eta.Vc ~ 0.5),
     sigma = lotri(add.err ~ 0.15),
