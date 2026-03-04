@@ -42,7 +42,7 @@ tmdd_model <- function() {
 print(tmdd_model)
 
 fit_nlmixr <- function(nb_patients) {
-  file <- paste0("examples/benchmarking/tmdd/obs_data_",nb_patients,".csv")
+  file <- paste0("qspc26/obs_data_",nb_patients,".csv")
   data <- read.csv(file)
   options <- saemControl(
     print = 0,
@@ -71,4 +71,4 @@ res_inc <- res %>%
   select(!expr)
 ggplot(res_inc, aes(y=time, x=nb_patients, group=nb_patients)) + geom_boxplot(width=50)
 
-write.csv(x=res_inc, file="examples/benchmarking/tmdd/performance_nlmixr.csv", row.names = F)
+write.csv(x=res_inc, file="qspc26/performance_nlmixr.csv", row.names = F)
