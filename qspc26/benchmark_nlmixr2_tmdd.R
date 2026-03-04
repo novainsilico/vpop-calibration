@@ -62,10 +62,11 @@ fit_nlmixr <- function(nb_patients) {
 }
 
 # benchmark the execution time
-nb_patients_list <- c(10,50,100,200,300,400,500,1000)
+# Exclude 5k as it breaks Rstudio
+nb_patients_list <- c(100,200,300,400,500,1000,2000)
 
 tests <- lapply(nb_patients_list, function(nb_patients) {bquote(fit_nlmixr(.(nb_patients)))})
-res <- microbenchmark(list=tests, times = 3)
+res <- microbenchmark(list=tests, times = 5)
 res_inc <- res %>%
   mutate(nb_patients = as.numeric(str_extract_all(expr,"\\d+")), time = time / 1e9) %>%
   select(!expr)

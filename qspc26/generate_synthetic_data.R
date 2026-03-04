@@ -1,6 +1,7 @@
 library(rxode2)
 library(dplyr)
 library(randtoolbox)
+library(ggplot2)
 
 # Global params
 
@@ -109,7 +110,7 @@ generate_syn_data <- function(nb_patients) {
 }
 
 
-for (nb_patients in c(10,50,100,200,300,400,500,1000)) {
+for (nb_patients in c(100,200,300,400,500,1000,2000,5000)) {
   out <- generate_syn_data(nb_patients)
   file = paste0("qspc26/obs_data_", nb_patients, ".csv")
   write.csv(x = out, file = file, row.names = F)
