@@ -46,7 +46,7 @@ For any issue or comments, please reach out to paul.lemarre@novainsilico.ai, or 
 
 ## Acknowledgements
 
-- Adeline Leclerq-Sampson
+- Adeline Leclercq-Sampson
 - Eliott Tixier
 - Louis Philippe
 

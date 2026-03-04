@@ -42,7 +42,7 @@ tmdd_model <- function() {
 print(tmdd_model)
 
 fit_nlmixr <- function(nb_patients) {
-  file <- paste0("qspc26/data/obs_data_",nb_patients,".csv")
+  file <- paste0("qspc26/tmdd_benchmark/data/obs_data_",nb_patients,".csv")
   data <- read.csv(file)
   options <- saemControl(
     print = 0,
@@ -56,14 +56,13 @@ fit_nlmixr <- function(nb_patients) {
     nlmixr2(tmdd_model,
             data,
             est = "saem",
-            options,
-            tableControl(cwres = TRUE))
+            options)
   return(fit)
 }
 
 # benchmark the execution time
 # Exclude 5k as it breaks Rstudio
-nb_patients_list <- c(100,200,300,400,500,1000,2000)
+nb_patients_list <- c(100,200,300,400,500,1000,2000,5000)
 
 tests <- lapply(nb_patients_list, function(nb_patients) {bquote(fit_nlmixr(.(nb_patients)))})
 res <- microbenchmark(list=tests, times = 5)
@@ -72,4 +71,4 @@ res_inc <- res %>%
   select(!expr)
 ggplot(res_inc, aes(y=time, x=nb_patients, group=nb_patients)) + geom_boxplot(width=50)
 
-write.csv(x=res_inc, file="qspc26/performance_nlmixr.csv", row.names = F)
+write.csv(x=res_inc, file="qspc26/tmdd_benchmark/performance_nlmixr.csv", row.names = F)
