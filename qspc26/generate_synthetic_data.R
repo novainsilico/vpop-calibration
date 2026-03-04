@@ -70,7 +70,7 @@ ggplot(train_data,aes(x=time,y=DV, group=id))+
   geom_line(alpha=0.1)+
   geom_point(alpha=0.1)
 
-write.csv(x = train_data, file = "qspc26/gp_training.csv", row.names = F)
+write.csv(x = train_data, file = "qspc26/data/gp_training.csv", row.names = F)
 
 
 
@@ -112,6 +112,6 @@ generate_syn_data <- function(nb_patients) {
 
 for (nb_patients in c(100,200,300,400,500,1000,2000,5000)) {
   out <- generate_syn_data(nb_patients)
-  file = paste0("qspc26/obs_data_", nb_patients, ".csv")
+  file = paste0("qspc26/data/obs_data_", nb_patients, ".csv")
   write.csv(x = out, file = file, row.names = F)
 }

@@ -42,7 +42,7 @@ tmdd_model <- function() {
 print(tmdd_model)
 
 fit_nlmixr <- function(nb_patients) {
-  file <- paste0("qspc26/obs_data_",nb_patients,".csv")
+  file <- paste0("qspc26/data/obs_data_",nb_patients,".csv")
   data <- read.csv(file)
   options <- saemControl(
     print = 0,
