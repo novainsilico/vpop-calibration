@@ -14,7 +14,7 @@ tmdd_model <- function() {
 
     eta.k_eL ~ 0.5
     eta.R0 ~ 0.5
-    eta.Vc ~0.5
+    eta.Vc ~ 0.5
 
     add.err <- 0.5
   })
@@ -30,9 +30,9 @@ tmdd_model <- function() {
     R(0) = R0
     P(0) = 0
 
-    d/dt(L) = -k_eL * L - k_on * L * R + k_off * P
-    d/dt(R) = k_syn - k_deg * R - k_on * L * R + k_off * P
-    d/dt(P) = k_on * L * R - k_off * P - k_eP * P
+    d/dt(L) = -k_eL * L - k_on * L * R / Vc + k_off * P
+    d/dt(R) = k_syn - k_deg * R - k_on * L * R / Vc + k_off * P
+    d/dt(P) = k_on * L * R / Vc - k_off * P - k_eP * P
 
     DV = log(L / Vc)
     DV ~ add(add.err)
@@ -41,19 +41,33 @@ tmdd_model <- function() {
 
 print(tmdd_model)
 
-file <- paste0("qspc26/data/obs_data_100.csv")
+
+file <- paste0("qspc26/data/obs_data_200.csv")
 data <- read.csv(file)
 options <- saemControl(
   print = 10,
-  nBurn = 100,
+  nBurn = 200,
   nEm = 100,
-  nmc = 3,
-  nu = c(5, 1, 1),
-  logLik = F
+  nmc = 5,
+  nu = c(2, 2, 2),
+  rxControl = rxControl(atol=1e-10, rtol=1e-8)
 )
-fit <-nlmixr2(tmdd_model,
-          data,
-          est = "saem",
-          options,
-          tableControl(cwres = FALSE))
-print(fit$fixef)
+fit <- nlmixr2(tmdd_model,
+               data,
+               "saem",
+               options,
+               tableControl())
+population_params <- c(fit$fixef, diag(fit$omega))
+
+print(population_params)
+traceplot(fit)
+
+ebe <-
+  data.frame(
+    id = fit$ID,
+    k_eL = fit$k_eL,
+    R0 = fit$R0,
+    Vc = fit$Vc
+  ) %>% unique()
+
+write.csv(x=ebe,file="./qspc26/outputs/ebe_nlmixr.csv",row.names = F,quote=F)

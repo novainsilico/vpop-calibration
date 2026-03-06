@@ -51,11 +51,8 @@ The convergence of the algorithm is tested against a reference data set simulate
 The results are summarized in `convergence_nlmixr.csv` and `convergence_pysaem.csv`, which are used by the [`generate_comparison_plots.ipynb`](./generate_comparison_plots.ipynb) notebook.
 
 Below is the typical comparison of estimated population parameters by both implementations with similar settings.
-Todo:
 
-- add comparison of population parameter estimates
-- add comparison of iwres after EBE estimation
-- add comparison of EBE table ?
+![EBE distribution comparison with ground truth](outputs/convergence_benchmark.png)
 
 ## Runtime benchmark
 

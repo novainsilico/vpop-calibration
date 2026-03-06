@@ -1535,7 +1535,7 @@ class NlmeModel:
 
     def compute_ebe(
         self,
-        max_iter: int = 5000,
+        max_iter: int = 500,
         override: bool = False,
         samples_cond_dist: Optional[int] = None,
     ):
@@ -1573,8 +1573,7 @@ class NlmeModel:
             res = minimize(
                 objective_function,
                 x0,
-                method="Nelder-Mead",
-                tol=1e-4,
+                method="L-BFGS-B",
                 options={"maxiter": max_iter},
             )
             ebe_etas[i] = torch.from_numpy(res.x)
