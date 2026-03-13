@@ -1150,22 +1150,27 @@ class NlmeModel:
             # mean_patient shape: nb_samples * n_obs_patient -> n_obs_patient
             mean_patient = patient_data.mean(dim=0)
 
-            # variance_patient shape: n_obs_patient * n_obs_patient
-            variance_patient = torch.cov(patient_data.T)
-
             # obs_patient shape: n_obs_patient
             obs_patient = self.observations_tensors[patient_id]["observations"]
             time_steps_patient = self.observations_tensors[patient_id]["time_steps"]
+
+            # variance_patient shape: n_obs_patient * n_obs_patient
+            variance_patient = torch.cov(obs_patient.T)
 
             # Transform residual into a column
             residual = (obs_patient - mean_patient).unsqueeze(-1)
 
             # Compute V^-1/2 with Cholesky factorization, adding a jitter for stability purposes
-            jitter = torch.eye(variance_patient.size(0)) * 1e-6
-            L = torch.linalg.cholesky(variance_patient + jitter)
+            if variance_patient.dim() > 1:
+                jitter = torch.eye(variance_patient.size(0)) * 1e-6
+                L = torch.linalg.cholesky(variance_patient + jitter)
+                pwres_patient = torch.linalg.solve_triangular(L, residual, upper=False)
+            else:
+                jitter = 1e-6
+                pwres_patient = variance_patient ** (-1 / 2) * residual
 
             # Compute patient PWRES and add them to dictionnary
-            pwres_patient = L @ residual
+
             pwres_results.update(
                 {
                     patient_id: {
