@@ -30,8 +30,10 @@ tmdd_model_true <- RxODE({
     DV = log(L / Vc) + add.err
 })
 
+# Observation time points
 time_steps <- seq(0, 24, 3)
 
+# Dosing events
 event.obs <- et(timeUnits="hr") %>%
   et(time_steps, evid=0, cmt="L")
 event.dose_1 <- event.obs %>%
@@ -39,9 +41,12 @@ event.dose_1 <- event.obs %>%
 event.dose_2 <- event.obs %>%
   et(amt=10, ii=12, until=13, cmt="L")
 
-generate_training_data <- function(nb_patients_tot) {
+
+generate_training_data <- function(nb_patients) {
+  # Generate surrogate model training data using Sobol sampling, and two separate dosings
+
   # Separate patients in half
-  nb_patients = floor(nb_patients_tot / 2)
+  nb_patients_tot = nb_patients * 2
   ids_dose1 <- 1:nb_patients
   ids_dose2 <- nb_patients + ids_dose1
   ids <- 1:nb_patients_tot
@@ -53,16 +58,16 @@ generate_training_data <- function(nb_patients_tot) {
             id = ids_dose1,
             protocol_arm = "arm_2")
 
-  # Generate Sobol samples for 3 parameters: k_eL, R0
+  # Generate Sobol samples for 3 parameters: k_eL, R0, Vc
   nb_params = 3
   samples = sobol(nb_patients_tot, nb_params)
 
   # Define the ranges for the training patient sampling
   low = array(c(-3, -2, -1), dim = c(1, nb_params))
   high = array(c(1, 2, 3), dim = c(1, nb_params))
+  # Scale the samples to meet specified bounds
   low_rep = low[col(samples)]
   high_rep = high[col(samples)]
-
   scaled_samples = low_rep + (high_rep - low_rep) * samples
 
   colnames(scaled_samples) = c("mu.k_eL", "mu.R0", "mu.Vc")
@@ -76,9 +81,11 @@ generate_training_data <- function(nb_patients_tot) {
       eta.R0 = 0,
       eta.Vc= 0,
     )
+  # Build full event table with two doses
   events_full <-
     etRbind(event.dose_1 |> et(id = ids_dose1),
             event.dose_2 |> et(id = ids_dose2), id = "unique")
+  # Solve ODE model
   sol <-
     rxSolve(
       tmdd_model_true,
@@ -88,6 +95,7 @@ generate_training_data <- function(nb_patients_tot) {
       atol = 1e-10,
       rtol = 1e-8
     )
+  # Format output, and renumber patients to span 1:nb_patients
   out_data <- sol %>%
     select(id, time, DV, R0, k_eL, Vc) %>%
     rename(value = DV, id_all=id) %>%
@@ -97,7 +105,7 @@ generate_training_data <- function(nb_patients_tot) {
   return(out_data)
 }
 
-train_data <- generate_training_data(500)
+train_data <- generate_training_data(200)
 
 ggplot(train_data,aes(x=time,y=value, group=id, color=as.factor(id)))+
   geom_line(alpha=0.1)+
@@ -107,15 +115,28 @@ ggplot(train_data,aes(x=time,y=value, group=id, color=as.factor(id)))+
 
 write.csv(x = train_data, file = "qspc26/tmdd_benchmark/data/gp_training.csv", row.names = F)
 
-simulate_model<- function(nb_patients) {
-  nb_patients_half = floor(nb_patients / 2)
-  ids_dose1 <- 1:nb_patients_half
-  ids_dose2 <- nb_patients_half + ids_dose1
+simulate_model<- function(nb_patients, nb_dosings) {
+  # Generate synthetic data for a give number of patients, with one or two dosings
 
-  events_full <-
-    etRbind(event.dose_1 |> et(id = ids_dose1),
-            event.dose_2 |> et(id = ids_dose2), id="unique")
+  # Create event table depending on the requested number of dosings
+  if (nb_dosings == 1) {
+    ids <- 1:nb_patients
 
+    events_full <- event.dose_1 |> et(id = ids)
+    patients_to_arm <- data.frame(id=ids, protocol_arm="arm_1")
+  } else if (nb_dosings == 2) {
+    nb_patients_half = floor(nb_patients / 2)
+    ids_dose1 <- 1:nb_patients_half
+    ids_dose2 <- nb_patients_half + ids_dose1
+    events_full <-
+      etRbind(event.dose_1 |> et(id = ids_dose1),
+              event.dose_2 |> et(id = ids_dose2), id="unique")
+    patients_to_arm <- data.frame(id=ids_dose1, protocol_arm="arm_1") %>%
+      bind_rows(data.frame(id=ids_dose2, protocol_arm="arm_2"))
+
+  }
+
+# Solve ODE model
   sol = rxSolve(
     tmdd_model_true,
     events = events_full,
@@ -130,11 +151,11 @@ simulate_model<- function(nb_patients) {
     atol = 1e-10,
     rtol = 1e-8
   )
-  return(list(sol=sol))
+  return(list(sol=sol, arms=patients_to_arm))
 }
 
-generate_syn_data <- function(nb_patients) {
-  res <- simulate_model(nb_patients)
+generate_syn_data <- function(nb_patients, nb_dosings) {
+  res <- simulate_model(nb_patients, nb_dosings)
   sol <- res$sol
   event_table <- sol$get.EventTable()
   true_params <- data.frame(id=sol$id, true_k_eL=sol$k_eL, true_R0=sol$R0, true_Vc = sol$Vc) %>%
@@ -150,16 +171,24 @@ generate_syn_data <- function(nb_patients) {
       k_off = unique(sol$k_off),
       k_eP = unique(sol$k_eP)
     ) %>%
-    mutate(protocol_arm = ifelse(id > floor(nb_patients/2), "arm_2", "arm_1")) # not sure this is safe
+    left_join(res$arms, by=c("id"))
   out_data <- event_table %>%
     left_join(out_dv, by = c("id", "time", "evid")) %>%
     left_join(true_params, by=c("id"))
   return(out_data)
 }
 
+# Generate synthetic data sets for convergence benchmark:
+# 50 patients, one or two separate doses
+for (nb_doses in c(1,2)) {
+  out <- generate_syn_data(50, nb_dosings=nb_doses)
+  file = paste0("qspc26/tmdd_benchmark/data/synthetic_data_50pts_", nb_doses,  "_dose.csv")
+  write.csv(x = out, file = file, row.names = F, quote=F)
+}
 
+# Generate synthetic data sets for performance benchmark
 for (nb_patients in c(100,200,300,400,500,1000,2000,5000)) {
-  out <- generate_syn_data(nb_patients)
-  file = paste0("qspc26/tmdd_benchmark/data/obs_data_", nb_patients, ".csv")
+  out <- generate_syn_data(nb_patients, nb_dosings=1)
+  file = paste0("qspc26/tmdd_benchmark/data/obs_data_", nb_patients, "pts.csv")
   write.csv(x = out, file = file, row.names = F, quote=F)
 }

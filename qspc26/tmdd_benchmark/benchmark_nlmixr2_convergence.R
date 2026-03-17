@@ -1,7 +1,6 @@
 library(nlmixr2)
 library(rxode2)
 library(dplyr)
-library(microbenchmark)
 library(ggplot2)
 library(stringr)
 
@@ -48,13 +47,13 @@ fit_to_data <- function(data) {
     nEm = 100,
     nmc = 5,
     nu = c(2, 2, 2),
-    rxControl = rxControl(atol=1e-10, rtol=1e-8)
+    rxControl = rxControl(atol=1e-10, rtol=1e-8, method = "liblsoda")
   )
   fit <- nlmixr2(tmdd_model,
                       data,
                       "saem",
                       options,
-                      tableControl())
+                      tableControl(cores=7L))
   pop_params <- c(fit$fixef, diag(fit$omega))
   ebe <-
     data.frame(
@@ -66,16 +65,9 @@ fit_to_data <- function(data) {
   return(list(pop=pop_params, ebe=ebe))
 }
 
-file <- paste0("qspc26/tmdd_benchmark/data/obs_data_200.csv")
-data_full <- read.csv(file)
-data_one_dose <- data_full %>%
-  filter(protocol_arm == "arm_1")
-
-out_full <- fit_to_data(data_full)
-out_one_dose <- fit_to_data(data_one_dose)
-
-print(out_full$pop)
-print(out_one_dose$pop)
-
-write.csv(x=out_full$ebe,file="./qspc26/tmdd_benchmark/outputs/ebe_nlmixr_2dose.csv",row.names = F,quote=F)
-write.csv(x=out_one_dose$ebe,file="./qspc26/tmdd_benchmark/outputs/ebe_nlmixr_1dose.csv",row.names = F,quote=F)
+for (nb_dosings in c(1,2)) {
+  file <- paste0("qspc26/tmdd_benchmark/data/synthetic_data_50pts_", nb_dosings, "_dose.csv")
+  data <- read.csv(file)
+  out <- fit_to_data(data)
+  write.csv(x=out$ebe,file=paste0("./qspc26/tmdd_benchmark/outputs/ebe_nlmixr_", nb_dosings, "_dose.csv"),row.names = F,quote=F)
+}
