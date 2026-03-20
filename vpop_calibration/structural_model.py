@@ -162,7 +162,7 @@ class StructuralOdeModel(StructuralModel):
         prediction_index: tuple[torch.Tensor, torch.Tensor, torch.Tensor],
         chunks: list[int],
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        _patient_index_full, rows_full, tasks_full = prediction_index
+        patient_index_full, rows_full, tasks_full = prediction_index
         list_rows = torch.split(rows_full, chunks)
         list_tasks = torch.split(tasks_full, chunks)
         list_id = [id[0].item for id in torch.split(patient_index_full, chunks)]
