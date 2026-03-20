@@ -619,7 +619,6 @@ class NlmeModel:
 
         return gaussian_params
 
-    @torch.compile
     def gaussian_to_physical_params(
         self,
         psi: torch.Tensor,
@@ -1051,6 +1050,7 @@ class NlmeModel:
 
     def compute_iwres(
         self,
+        refresh: bool = False,
     ) -> dict:
         """Compute Individual Weighted RESiduals, following the formula :
 
@@ -1061,7 +1061,7 @@ class NlmeModel:
         """
 
         # Avoid computing if already computed residuals
-        if hasattr(self, "iwres"):
+        if (hasattr(self, "iwres")) and (not refresh):
             return self.iwres
 
         # Gather observations tensor
@@ -1106,7 +1106,7 @@ class NlmeModel:
         self.iwres = iwres_results
         return iwres_results
 
-    def compute_pwres(self, num_samples: int) -> dict:
+    def compute_pwres(self, num_samples: int = 100, refresh: bool = False) -> dict:
         """Compute Population Weighted RESiduals, following the formula :
 
         PWRES_i = V_i^(-1/2) (y_i - E(f(t_ij, psi_i))
@@ -1116,7 +1116,7 @@ class NlmeModel:
         """
 
         # Avoid computing if already computed residuals
-        if hasattr(self, "pwres"):
+        if (hasattr(self, "pwres")) and (not refresh):
             return self.pwres
 
         # Sample new etas, in order to approximate mean E(y_i) and variance V_i
@@ -1183,10 +1183,10 @@ class NlmeModel:
         self.pwres = pwres_results
         return pwres_results
 
-    def compute_npde(self, num_samples: int = 100) -> dict:
+    def compute_npde(self, num_samples: int = 100, refresh: bool = False) -> dict:
 
         # Avoid computing if already computed residuals
-        if hasattr(self, "npde"):
+        if (hasattr(self, "npde")) and (not refresh):
             return self.npde
 
         # Sample new etas
