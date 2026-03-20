@@ -852,7 +852,7 @@ class NlmeModel:
         if self.error_model_type == "additive":
             new_out = outputs + noise
         elif self.error_model_type == "proportional":
-            new_out = outputs * noise
+            new_out = outputs + outputs * noise
         else:
             raise ValueError(f"Non-implemented error model {self.error_model_type}")
         return new_out
@@ -1482,7 +1482,7 @@ class NlmeModel:
 
     def sample_conditional_distribution(
         self,
-        nb_samples: int = 100,
+        nb_samples: int = 1000,
         nb_burn_in: int = 50,
         override: bool = False,
     ):
@@ -1533,7 +1533,12 @@ class NlmeModel:
         self.cond_dist_samples = etas_samples
         return self.cond_dist_samples
 
-    def compute_ebe(self, max_iter: int = 5000, override: bool = False):
+    def compute_ebe(
+        self,
+        max_iter: int = 500,
+        override: bool = False,
+        samples_cond_dist: Optional[int] = None,
+    ):
         """
         Returns: ebe_estimates: dim(nb_patients, nb_PDU)
         """
@@ -1541,7 +1546,10 @@ class NlmeModel:
         if hasattr(self, "ebe_estimates") and (not override):
             return self.ebe_estimates
 
-        samples = self.sample_conditional_distribution(100)
+        if samples_cond_dist:
+            samples = self.sample_conditional_distribution(samples_cond_dist)
+        else:
+            samples = self.sample_conditional_distribution()
 
         if smoke_test:
             max_iter = 1
@@ -1565,8 +1573,7 @@ class NlmeModel:
             res = minimize(
                 objective_function,
                 x0,
-                method="Nelder-Mead",
-                tol=1e-4,
+                method="L-BFGS-B",
                 options={"maxiter": max_iter},
             )
             ebe_etas[i] = torch.from_numpy(res.x)

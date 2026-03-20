@@ -4,11 +4,11 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import r2_score
 import random as rand
 from .nlme import NlmeModel
-from .saem import PySaem
 from .model.gp import GP
 from .structural_model import StructuralGp
 from .utils import smoke_test
 import scipy.stats as stats
+from typing import Optional
 
 
 def check_surrogate_validity_gp(
@@ -617,7 +617,7 @@ def plot_weighted_residuals(
 
 def plot_map_vs_posterior(
     nlme_model: NlmeModel,
-    nb_samples: int = 1000,
+    nb_samples: Optional[int] = None,
     n_patients_to_plot: int = 3,
 ):
     """
@@ -631,7 +631,10 @@ def plot_map_vs_posterior(
     """
 
     # Sample new etas, compute physical
-    sample_etas = nlme_model.sample_conditional_distribution(nb_samples)
+    if nb_samples:
+        sample_etas = nlme_model.sample_conditional_distribution(nb_samples)
+    else:
+        sample_etas = nlme_model.sample_conditional_distribution()
     sample_gaussian = nlme_model.etas_to_gaussian_params(sample_etas)
     sample_physical = nlme_model.gaussian_to_physical_params(
         sample_gaussian, nlme_model.log_MI

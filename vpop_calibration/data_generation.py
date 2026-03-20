@@ -12,11 +12,11 @@ def simulate_dataset_from_ranges(
     ode_model: OdeModel,
     log_nb_individuals: int,
     param_ranges: dict[str, dict[str, float | bool]],
-    initial_conditions: np.ndarray,
-    protocol_design: Optional[pd.DataFrame],
-    residual_error_variance: Optional[np.ndarray],
-    error_model: Optional[str],  # "additive" or "proportional"
     time_steps: np.ndarray,
+    protocol_design: Optional[pd.DataFrame] = None,
+    residual_error_variance: Optional[np.ndarray] = None,
+    error_model: Optional[str] = None,  # "additive" or "proportional"
+    output_names: Optional[list[str]] = None,
 ) -> pd.DataFrame:
     """Generate a simulated data set with an ODE model
 
@@ -71,13 +71,17 @@ def simulate_dataset_from_ranges(
     # Add a choice of protocol arm for each patient
     protocol_arms = pd.DataFrame(protocol_design_filt["protocol_arm"].drop_duplicates())
     patients_df = patients_df.merge(protocol_arms, how="cross")
+
+    if output_names is None:
+        outputs_list = ode_model.variable_names
+    else:
+        outputs_list = output_names
+
     # Add the outputs for each patient
-    outputs = pd.DataFrame({"output_name": ode_model.variable_names})
+    outputs = pd.DataFrame({"output_name": outputs_list})
     patients_df = patients_df.merge(outputs, how="cross")
     # Simulate the ODE model
-    output_df = ode_model.run_trial(
-        patients_df, initial_conditions, protocol_design_filt, time_steps
-    )
+    output_df = ode_model.run_trial(patients_df, protocol_design_filt, time_steps)
     # Pivot to wide to add noise per model output
     wide_output = output_df.pivot_table(
         index=["id", *ode_model.param_names, "time", "protocol_arm"],
@@ -98,11 +102,9 @@ def simulate_dataset_from_ranges(
                 (wide_output.shape[0], ode_model.nb_outputs),
             )
             if error_model == "additive":
-                wide_output[ode_model.variable_names] += noise
+                wide_output[outputs_list] += noise
             elif error_model == "proportional":
-                wide_output[ode_model.variable_names] += (
-                    noise * wide_output[ode_model.variable_names]
-                )
+                wide_output[outputs_list] += noise * wide_output[outputs_list]
             else:
                 raise ValueError(f"Incorrect error_model choice: {error_model}")
     # Pivot back to long format
@@ -113,7 +115,7 @@ def simulate_dataset_from_ranges(
             "time",
             *ode_model.param_names,
         ],
-        value_vars=ode_model.variable_names,
+        value_vars=outputs_list,
         var_name="output_name",
         value_name="value",
     )
@@ -126,13 +128,13 @@ def simulate_dataset_from_omega(
     ode_model: OdeModel,
     protocol_design: pd.DataFrame,
     time_steps: np.ndarray,
-    init_conditions: np.ndarray,
     log_mi: dict[str, float],
     log_pdu: dict[str, dict[str, float]],
     error_model: str,
     res_var: list[float],
-    covariate_map: dict[str, dict[str, dict[str, str | float]]],
+    covariate_map: dict[str, dict[str, dict[str, str | float]]] | None,
     patient_covariates: pd.DataFrame,
+    output_names: Optional[list[str]] = None,
 ) -> pd.DataFrame:
     """Generate synthetic data set using an ODE model and population distributions of parameters
 
@@ -152,7 +154,10 @@ def simulate_dataset_from_omega(
         pd.DataFrame: _description_
     """
 
-    structural_model = StructuralOdeModel(ode_model, protocol_design, init_conditions)
+    if output_names is None:
+        output_names = ode_model.variable_names
+
+    structural_model = StructuralOdeModel(ode_model, protocol_design, output_names)
     nlme_model = NlmeModel(
         structural_model,
         patient_covariates,
