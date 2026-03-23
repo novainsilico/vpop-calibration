@@ -25,7 +25,7 @@ def test_gp_saem(np_rng):
         {"id": ["patient-1", "patient-2"], "protocol_arm": ["arm-B", "arm-A"]}
     )
     obs_df = patient_df.merge(outputs, how="cross").merge(time_steps, how="cross")
-    obs_df["value"] = np_rng.normal()
+    obs_df["value"] = np_rng.normal(size=obs_df.shape[0])
     obs_df = obs_df.sample(frac=0.7)
 
     init_mi = {"k1": 0.0}

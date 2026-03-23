@@ -18,7 +18,7 @@ def test_analytical_saem(np_rng):
     df = patient_df.merge(pd.DataFrame({"output_name": outputs}), how="cross")
     time_steps = [0.0, 1.0, 3.0]
     df = df.merge(pd.DataFrame({"time": time_steps}), how="cross")
-    df["value"] = np_rng.normal(0, 1)
+    df["value"] = np_rng.normal(100, 10, df.shape[0])
 
     init_log_mi = {"lambda2": 0.0, "lambda3": 0.0}
     init_log_pdu = {
@@ -42,7 +42,7 @@ def test_analytical_saem(np_rng):
     optimizer = PySaem(nlme_model, df)
     optimizer.run()
     nlme_model.compute_ebe()
-    nlme_model.sample_conditional_distribution(nb_samples=2)
+    nlme_model.sample_conditional_distribution(nb_samples=3)
     plot_individual_map_estimates(nlme_model)
     plot_all_individual_map_estimates(nlme_model)
     plot_map_estimates_gof(nlme_model)
@@ -229,7 +229,7 @@ def test_analytical_two_arms_two_overrides():
     )
     (num_chains, nb_patients, nb_timesteps, nb_params) = X.shape
     actual_y, _pred_var = struct_model.simulate(
-        X, (patient_index, timestep_index, task_index), chunks=None
+        X, (patient_index, timestep_index, task_index), chunks=[6]
     )
     expected_y = logistic_growth(
         lambda1=torch.tensor([333, 333, 333, 483, 483, 483]),
