@@ -6,6 +6,9 @@ A set of Python tools to allow for virtual population calibration, using a non-l
 
 The approach was mainly inspired from [^Grenier2018].
 
+Here is an overview of the proposed workflow:
+![flowchart](./docs/vpop-calib-flowchart.png)
+
 ### Currently available features
 
 - Surrogate modeling using gaussian processes, implemented using [GPyTorch](https://github.com/cornellius-gp/gpytorch)
@@ -56,25 +59,27 @@ For any issue or comments, please reach out to <paul.lemarre@novainsilico.ai>, o
 - Eliott Tixier
 - Louis Philippe
 
+## QSPC26 poster
+
+This work was presented at QSPC2026 in Leiden, and all the corresponding material is introduced in [this document](./qspc26/tmdd_benchmark/tmdd_benchmark.md).
+The benchmark notebooks for standard data sets are available directly for [orange trees](./examples/benchmarking/benchmark_orange_trees.ipynb) and [theophylline](./examples/benchmarking/benchmark_theophylline.ipynb).
+
+The poster itself is available in [this document](./qspc26/tmdd_benchmark/outputs/2026_QSPC_Vpop_calibration.pdf). The full list of references is available in [this document](./qspc26/references.md).
+
 ## Roadmap
+
+Here are a few planned features, in an unordered and non-exhaustive list:
 
 - NLME:
   - Support additional error models (additive-multiplicative, power, etc...)
   - Support additional covariate models (categorical covariates)
   - Compute likelihood via importance sampling following population parameters optimization
 - Structural models:
-  - Integrate with SBML models (Roadrunner)
+  - Integrate with SBML models (e.g. Roadrunner)
 - Surrogate models:
   - Support additional surrogate models in PyTorch
 - Optimizer:
   - Add preconditioned Stochastic-Gradient-Descent (SGD) method for surrogate model optimization
-
-## QSPC26 poster
-
-This work was presented at QSPC2026 in Leiden, and all the corresponding material is introduced in [this document](./qspc26/tmdd_benchmark/tmdd_benchmark.md).
-The benchmark notebooks for standard data sets are available directly for [orange trees](./examples/benchmarking/benchmark_orange_trees.ipynb) and [theophylline](./examples/benchmarking/benchmark_theophylline.ipynb).
-
-The poster itself will be made available in the repository as soon as it is ready.
 
 ## References
 

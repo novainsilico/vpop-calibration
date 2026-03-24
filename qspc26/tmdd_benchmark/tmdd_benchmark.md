@@ -1,6 +1,6 @@
 # TMDD Benchmarking
 
-This benchmark is designed to demonstrate the benefits of using a surrogate model + SAEM approach as opposed to the standard implementation. The "standard implementation" is hereby represented as the R package [nlmixr](https://nlmixrdevelopment.github.io/nlmixr/index.html). The figures introduced here are part of the poster presented by Nova In Silico at [QSPC 2026, Leiden](https://www.qspc.eu/qspc2026/home).
+This benchmark is designed to demonstrate the benefits of using a surrogate model + SAEM approach as opposed to the standard implementation. The "standard implementation" is hereby represented as the R package [nlmixr](https://nlmixrdevelopment.github.io/nlmixr/index.html). The figures introduced here are part of the poster presented by Nova In Silico at [QSPC 2026, Leiden](https://www.qspc.eu/qspc2026/home). The full poster itself is available in [this document](./outputs/2026_QSPC_Vpop_calibration.pdf).
 
 ## Data generation
 
@@ -56,10 +56,6 @@ The convergence of the algorithm is tested against a reference data set simulate
 
 The results are summarized in `convergence_nlmixr.csv` and `convergence_pysaem.csv`, which are used by the [`generate_comparison_plots.ipynb`](./generate_comparison_plots.ipynb) notebook.
 
-Below is the typical comparison of estimated population parameters by both implementations with similar settings.
-
-![EBE distribution comparison with ground truth](outputs/convergence_benchmark.png)
-
 ## Runtime benchmark
 
 The comparison of runtimes for increasing sizes of data sets is performed in
@@ -69,8 +65,10 @@ The comparison of runtimes for increasing sizes of data sets is performed in
 
 The results are aggregated in `performance_nlmixr.csv` and `performance_pysaem.csv`, which are used by the [`generate_comparison_plots.ipynb`](./generate_comparison_plots.ipynb) notebook.
 
-Below are the results of the runtime comparison.
-
-![performance comparison](./outputs/performance_benchmark.png)
-
 The performance of PySaem is evaluated by accounting for both surrogate model training, which accounts for an incompressible time of ~15s, cumulated with the runtime of SAEM on the surrogate model. In this very specific setup, the use of a surrogate model begins to be beneficial for data sets of >500 patients. For very large QSP models, this threshold is most likely much lower.
+
+## Benchmark plots
+
+The latest benchmarking plots, as included in the QSPC poster, are shown below
+
+![full benchmark](./outputs/tmdd_benchmark.png)
