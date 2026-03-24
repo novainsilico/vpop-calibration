@@ -25,10 +25,10 @@ def training_data(np_rng):
 
 
 @pytest.fixture(scope="session")
-def training_data_bootstrapped(training_data):
+def training_data_bootstrapped(training_data, np_rng):
     # Same as training data, but incomplete data set
     df, params = training_data
-    return (df.sample(frac=0.5), params)
+    return (df.sample(frac=0.9, random_state=np_rng), params)
 
 
 def test_gp_init(training_data, subtests):
