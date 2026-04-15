@@ -1,8 +1,7 @@
 from .nlme import NlmeModel
 from .saem import PySaem
-from .structural_model import StructuralGp, StructuralOdeModel, StructuralAnalytical
+from .structural_model import StructuralGp, StructuralAnalytical
 from .model import *
-from .ode import OdeModel
 from .vpop import generate_vpop_from_ranges
 from .data_generation import simulate_dataset_from_omega, simulate_dataset_from_ranges
 from .diagnostics import (
@@ -17,9 +16,7 @@ from .diagnostics import (
 
 __all__ = [
     "GP",
-    "OdeModel",
     "StructuralGp",
-    "StructuralOdeModel",
     "StructuralAnalytical",
     "NlmeModel",
     "PySaem",
