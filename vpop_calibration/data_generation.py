@@ -2,14 +2,13 @@ import numpy as np
 import pandas as pd
 from typing import Optional
 
-from .ode import OdeModel
 from .vpop import generate_vpop_from_ranges
-from .structural_model import StructuralOdeModel
+from .structural_model import StructuralModel
 from .nlme import NlmeModel
 
 
 def simulate_dataset_from_ranges(
-    ode_model: OdeModel,
+    struct_model: StructuralModel,
     log_nb_individuals: int,
     param_ranges: dict[str, dict[str, float | bool]],
     time_steps: np.ndarray,
