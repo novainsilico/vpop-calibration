@@ -1,5 +1,5 @@
 import torch
-from typing import Union, Optional, Callable, cast
+from typing import Union, Optional, cast
 import pandas as pd
 import numpy as np
 from .structural_model import StructuralModel

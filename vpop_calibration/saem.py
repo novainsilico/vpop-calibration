@@ -10,7 +10,6 @@ from IPython.display import display, DisplayHandle
 
 from .utils import smoke_test, device
 from .nlme import NlmeModel
-from .structural_model import StructuralGp
 
 
 # Main SAEM Algorithm Class
