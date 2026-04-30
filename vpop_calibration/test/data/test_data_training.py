@@ -36,7 +36,10 @@ def test_data_container(training_data, log_inputs, log_outputs):
         log_descriptors=log_inputs,
         log_outputs=log_outputs,
     )
-    x, y = ds[ds.patients]
+    loader = torch.utils.data.DataLoader(
+        ds, batch_size=ds.nb_patients, collate_fn=ds.collate_fn
+    )
+    x, y = next(iter(loader))
 
     normalize, unnormalize = ds.get_processing_functions()
     sample_inputs = torch.abs(torch.rand(3, ds.nb_descriptors))

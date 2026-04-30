@@ -1,4 +1,5 @@
 import pandas as pd
+import pandera.pandas as pa
 
 
 def join_if_two(tup: str, sep: str = "_") -> str:
@@ -11,25 +12,46 @@ def join_if_two(tup: str, sep: str = "_") -> str:
         return sep.join(tup)
 
 
-def create_tasks_maps(
-    protocol_arms: list[str], outputs_names: list[str]
-) -> tuple[list[str], dict[int, int], dict[int, str]]:
-    """Util function to process a list of protocol arms and a list of outputs, into a set of tasks."""
+class TaskMap:
+    def __init__(self, protocol_arms: list[str], output_names: list[str]):
+        """Utility class to process a list of protocol arms and a list of outputs, into a set of tasks."""
+        self.protocol_arms = protocol_arms
+        self.output_names = output_names
+        self.full_tasks_map: dict[str, tuple[str, str]] = {
+            f"{self.task_name(output,protocol)}": (output, protocol)
+            for protocol in protocol_arms
+            for output in self.output_names
+        }
 
-    tasks_full_map: dict[str, tuple[str, str]] = {
-        f"{output}_{protocol}": (output, protocol)
-        for protocol in protocol_arms
-        for output in outputs_names
-    }
-    tasks = list(tasks_full_map.keys())
-    task_idx_to_output_idx: dict[int, int] = {
-        tasks.index(task): outputs_names.index(output)
-        for task, (output, _) in tasks_full_map.items()
-    }
-    task_idx_to_protocol: dict[int, str] = {
-        tasks.index(task): protocol for task, (_, protocol) in tasks_full_map.items()
-    }
-    return tasks, task_idx_to_output_idx, task_idx_to_protocol
+        self.tasks = list(self.full_tasks_map.keys())
+        self.task_idx_to_output_idx: dict[int, int] = {
+            self.tasks.index(task): self.output_names.index(output)
+            for task, (output, _) in self.full_tasks_map.items()
+        }
+        self.task_idx_to_protocol: dict[int, str] = {
+            self.tasks.index(task): protocol
+            for task, (_, protocol) in self.full_tasks_map.items()
+        }
+
+    def task_name(self, output: str, protocol: str) -> str:
+        return "_".join([output, protocol])
+
+    def _validate_protocols(self, new_protocol_arms: list[str]) -> bool:
+        return all(protocol in self.protocol_arms for protocol in new_protocol_arms)
+
+    def _validate_ouputs(self, new_outputs: list[str]) -> bool:
+        return all(output in self.output_names for output in new_outputs)
+
+    def validate_tasks(self, new_protocol_arms: list[str], new_outputs: list[str]):
+        """Utility function to validate a list of protocols and output names with respect to an existing task map."""
+        if not self._validate_protocols(new_protocol_arms):
+            raise ValueError(
+                f"Incompatible protocol arms with supplied task map.\n{new_protocol_arms}\n{self.protocol_arms}"
+            )
+        if not self._validate_ouputs(new_outputs):
+            raise ValueError(
+                f"Incompatible output names with supplied task map.\n{new_outputs}\n{self.output_names}"
+            )
 
 
 def normalize_dataframe(
@@ -42,3 +64,15 @@ def normalize_dataframe(
     std = data_in[selected_columns].std()
     norm_data[selected_columns] = (norm_data[selected_columns] - mean) / std
     return norm_data, mean, std
+
+
+def extend_schema(
+    schema: pa.DataFrameSchema, column_list: list[str], type: str
+) -> pa.DataFrameSchema:
+    """Add user-specified columns to the training data schema."""
+    if not column_list:
+        return schema
+    else:
+        return schema.add_columns(
+            {col: pa.Column(type, default=pd.NA) for col in column_list}
+        )

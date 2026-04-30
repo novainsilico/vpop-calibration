@@ -5,7 +5,7 @@ import numpy as np
 from typing import Callable
 import torch
 
-from .utils import join_if_two, create_tasks_maps, normalize_dataframe
+from .utils import join_if_two, TaskMap, normalize_dataframe, extend_schema
 from ..utils import device
 
 trainingDataSchemaLong = pa.DataFrameSchema(
@@ -26,15 +26,6 @@ trainingDataSchemaWide = pa.DataFrameSchema(
     add_missing_columns=False,
     strict=True,
 )
-
-
-def extend_schema(
-    schema: pa.DataFrameSchema, column_list: list[str], type: str
-) -> pa.DataFrameSchema:
-    """Add user-specified columns to the training data schema."""
-    return schema.add_columns(
-        {col: pa.Column(type, default=pd.NA) for col in column_list}
-    )
 
 
 def pivot_input_data(data_in: pd.DataFrame, descriptors: list[str]) -> pd.DataFrame:
@@ -76,44 +67,40 @@ class TrainingData(Dataset):
         log_outputs: list[str] = [],
     ):
         # Preliminary data validation on long data frame
-        self.descriptors = descriptors
-        self.nb_descriptors = len(descriptors)
+        self.descriptors: list[str] = descriptors
+        self.nb_descriptors: int = len(descriptors)
         # Add the descriptors to the validation schema
         self.long_schema = extend_schema(trainingDataSchemaLong, descriptors, "float")
         validated_df = self.long_schema.validate(data)
 
         # Extract all relevant metadata
-        self.output_names = validated_df.output_name.unique().tolist()
-        self.nb_outputs = len(self.output_names)
+        self.output_names: list[str] = validated_df.output_name.unique().tolist()
+        self.nb_outputs: int = len(self.output_names)
 
-        self.log_descriptors = log_descriptors
-        self.log_descriptors_idx = [
+        self.log_descriptors: list[str] = log_descriptors
+        self.log_descriptors_idx: list[int] = [
             self.descriptors.index(desc) for desc in self.log_descriptors
         ]
-        self.log_outputs = log_outputs
-        self.log_outputs_idx = [
+        self.log_outputs: list[str] = log_outputs
+        self.log_outputs_idx: list[int] = [
             self.output_names.index(out) for out in self.log_outputs
         ]
 
-        self.patients = validated_df.id.unique().tolist()
-        self.patients_idx = torch.LongTensor(
-            validated_df.id.apply(lambda p_id: self.patients.index(p_id)).values,
-            device=device,
-        )
-        self.nb_patients = len(self.patients)
-        self.protocol_arms = validated_df.protocol_arm.unique().tolist()
+        self.patients: list[str] = validated_df.id.unique().tolist()
+        self.nb_patients: int = len(self.patients)
+        self.protocol_arms: list[str] = validated_df.protocol_arm.unique().tolist()
 
         # Create maps between tasks and output/protocol arm
-        self.tasks, self.task_idx_to_output_idx, self.task_idx_to_protocol = (
-            create_tasks_maps(self.protocol_arms, self.output_names)
-        )
-        self.nb_tasks = len(self.tasks)
-        self.log_tasks_idx = [
+        self.task_map: TaskMap = TaskMap(self.protocol_arms, self.output_names)
+        self.nb_tasks: int = len(self.task_map.tasks)
+        self.log_tasks_idx: list[int] = [
             idx
-            for idx in self.task_idx_to_output_idx
-            if self.task_idx_to_output_idx[idx] in self.log_outputs_idx
+            for idx in self.task_map.task_idx_to_output_idx
+            if self.task_map.task_idx_to_output_idx[idx] in self.log_outputs_idx
         ]
-        self.log_tasks = [self.tasks[idx] for idx in self.log_tasks_idx]
+        self.log_tasks: list[str] = [
+            self.task_map.tasks[idx] for idx in self.log_tasks_idx
+        ]
 
         # Pivot the input data to a wide format
         pivoted_df = pivot_input_data(validated_df, self.descriptors)
@@ -124,9 +111,13 @@ class TrainingData(Dataset):
 
         # Validate the wide data
         self.wide_schema = extend_schema(
-            trainingDataSchemaWide, self.descriptors + self.tasks, "float"
+            trainingDataSchemaWide, self.descriptors + self.task_map.tasks, "float"
         )
         final_df = self.wide_schema.validate(pivoted_df)
+        self.patients_idx: torch.LongTensor = torch.LongTensor(
+            final_df.id.apply(lambda p_id: self.patients.index(p_id)).values,
+            device=device,
+        )
         # Normalize the inputs and outputs
         self.normalized_df, mean, std = normalize_dataframe(final_df, ["id"])
         # Store normalizing values as tensors
@@ -135,19 +126,32 @@ class TrainingData(Dataset):
             torch.as_tensor(std[self.descriptors].values, device=device),
         )
         self.output_mean, self.output_std = (
-            torch.as_tensor(mean[self.tasks].values, device=device),
-            torch.as_tensor(std[self.tasks].values, device=device),
+            torch.as_tensor(mean[self.task_map.tasks].values, device=device),
+            torch.as_tensor(std[self.task_map.tasks].values, device=device),
         )
 
-        self.X = torch.as_tensor(
+        self.X_full: torch.Tensor = torch.as_tensor(
             self.normalized_df[self.descriptors].values, device=device
         )
-        self.Y = torch.as_tensor(self.normalized_df[self.tasks].values, device=device)
+        self.Y_full: torch.Tensor = torch.as_tensor(
+            self.normalized_df[self.task_map.tasks].values, device=device
+        )
+        self.data = []
+        for i, _ in enumerate(self.patients):
+            rows = torch.tensor(self.patients_idx == i, device=device)
+            x = self.X_full[rows, :]
+            y = self.Y_full[rows, :]
+            self.data.append((x, y))
 
-    def __getitem__(self, index):
-        rows = torch.tensor(self.patients_idx == index, device=device)
-        x = self.X[rows, :]
-        y = self.Y[rows, :]
+    def __getitem__(self, index) -> tuple[torch.Tensor, torch.Tensor]:
+        return self.data[index]
+
+    def __len__(self):
+        return self.nb_patients
+
+    def collate_fn(self, batch):
+        x = torch.cat([item[0] for item in batch])
+        y = torch.cat([item[1] for item in batch])
         return x, y
 
     def get_processing_functions(self) -> tuple[Callable, Callable]:
@@ -168,7 +172,7 @@ class TrainingData(Dataset):
         ) -> torch.Tensor:
             """Unnormalize long outputs (one row per task) from the model."""
             rescaled_data = data
-            for task_idx, task in enumerate(self.tasks):
+            for task_idx, task in enumerate(self.task_map.tasks):
                 log_task = task in self.log_tasks
                 mask = torch.tensor(task_indices == task_idx, device=device).bool()
                 rescaled_data[mask] = (
