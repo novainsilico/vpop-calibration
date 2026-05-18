@@ -1,12 +1,9 @@
 from torch.utils.data import Dataset
 import pandera.pandas as pa
 import pandas as pd
-import numpy as np
-from typing import Callable, Literal
 import torch
-from pydantic import BaseModel, Field
 
-from .utils import join_if_two, TaskMap, normalize_dataframe, extend_schema
+from .utils import TaskMap, extend_schema
 from ..utils import device
 
 obsDataSchemaLong = pa.DataFrameSchema(
@@ -25,17 +22,16 @@ patientDataSchema = pa.DataFrameSchema({"id": pa.Column(str, unique=True)})
 
 
 class ObsData(Dataset):
-    def __init__(self, data: pa.typing.DataFrame, task_map: TaskMap):
+    def __init__(self, data: pa.typing.DataFrame, task_map: TaskMap | None = None):
         self.obs_schema = obsDataSchemaLong
+        # initial validation
         self.input_df = self.obs_schema.validate(data)
-        self.input_df["task"] = self.input_df[["output_name", "protocol_arm"]].apply(
-            lambda r: "_".join(r), axis=1
-        )
         self.patients = self.input_df.id.drop_duplicates().to_list()
         self.nb_patients = len(self.patients)
 
+        # Create the patient data frame (id and descriptors)
         patients_df_raw = self.input_df.drop(
-            columns=["output_name", "time", "value", "protocol_arm", "task"]
+            columns=["output_name", "time", "value", "protocol_arm"]
         ).drop_duplicates()
         self.descriptors_known = patients_df_raw.columns.to_list()
         self.descriptors_known.remove("id")
@@ -43,24 +39,31 @@ class ObsData(Dataset):
             patientDataSchema, self.descriptors_known, "float"
         )
         self.patients_df = self.patients_schema.validate(patients_df_raw)
-        self.task_map = task_map
         # Gather the observed outputs and protocols
         self.protocol_arms = self.input_df["protocol_arm"].drop_duplicates().to_list()
         self.output_names = self.input_df["output_name"].drop_duplicates().to_list()
-        # Validate against the provided task map
-        self.task_map.validate_tasks(self.protocol_arms, self.output_names)
-        # Create additional columns for the input data frame
-        self.input_df["task"] = self.input_df.apply(
-            lambda r: self.task_map.task_name(r["output_name"], r["protocol_arm"]),
-            axis=1,
+        # Create task column
+        self.input_df["task"] = self.input_df[["output_name", "protocol_arm"]].apply(
+            lambda r: "_".join(r), axis=1
         )
+        if task_map is not None:
+            self.task_map = task_map
+            # Validate against the provided task map
+            self.task_map.validate_tasks(self.protocol_arms, self.output_names)
+        else:
+            # Create the task map
+            self.task_map = TaskMap(
+                protocol_arms=self.protocol_arms, output_names=self.output_names
+            )
+
+        # Create indexing columns
         self.input_df["task_index"] = self.input_df["task"].apply(
             lambda task: self.task_map.tasks.index(task)
         )
         self.input_df["output_index"] = self.input_df["output_name"].apply(
             lambda output: self.task_map.output_names.index(output)
         )
-
+        # Common list of time steps
         self.global_time_steps = (
             self.input_df["time"].drop_duplicates().sort_values().to_list()
         )
@@ -102,3 +105,12 @@ class ObsData(Dataset):
         time_index = torch.cat([item[0][2] for item in batch])
         y = torch.cat([item[1] for item in batch])
         return (p_index, task_index, time_index), y
+
+    def to_dataloader(self, batch_size: int | None = None):
+        if batch_size is None:
+            use_batch_size = len(self)
+        else:
+            use_batch_size = batch_size
+        return torch.utils.data.DataLoader(
+            dataset=self, batch_size=use_batch_size, collate_fn=self.collate_fn
+        )

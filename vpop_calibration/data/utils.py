@@ -32,6 +32,10 @@ class TaskMap:
             self.tasks.index(task): protocol
             for task, (_, protocol) in self.full_tasks_map.items()
         }
+        self.task_idx_to_protocol_idx: dict[int, int] = {
+            self.tasks.index(task): self.protocol_arms.index(protocol)
+            for task, (_, protocol) in self.full_tasks_map.items()
+        }
 
     def task_name(self, output: str, protocol: str) -> str:
         return "_".join([output, protocol])

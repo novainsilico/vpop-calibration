@@ -154,6 +154,13 @@ class TrainingData(Dataset):
         y = torch.cat([item[1] for item in batch])
         return x, y
 
+    def to_loader(self, batch_size: int | None = None):
+        if batch_size is None:
+            use_batch_size = len(self)
+        else:
+            use_batch_size = batch_size
+        return torch.utils.data.DataLoader(dataset=self, batch_size=use_batch_size)
+
     def get_processing_functions(self) -> tuple[Callable, Callable]:
         @torch.compile
         def normalize_inputs(inputs: torch.Tensor) -> torch.Tensor:

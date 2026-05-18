@@ -2,7 +2,7 @@ import torch
 from typing import Union, Optional, cast
 import pandas as pd
 import numpy as np
-from .structural_model import StructuralModel
+from .structural_model_legacy import StructuralModel
 from .utils import device, smoke_test
 from tqdm.notebook import tqdm
 from scipy.optimize import minimize
@@ -593,7 +593,7 @@ class NlmeModel:
         if ind_ids_for_etas is None:
             ind_ids_for_etas = self.patients
 
-        (nb_samples, nb_patients_local, nb_PDU) = individual_etas.shape
+        nb_samples, nb_patients_local, nb_PDU = individual_etas.shape
 
         assert (nb_patients_local, nb_PDU) == (
             len(ind_ids_for_etas),
@@ -638,7 +638,7 @@ class NlmeModel:
         if ind_ids_for_etas is None:
             ind_ids_for_etas = self.patients
 
-        (nb_samples, nb_patients_local, nb_PDU) = psi.shape
+        nb_samples, nb_patients_local, nb_PDU = psi.shape
         assert nb_patients_local == len(ind_ids_for_etas), nb_PDU == self.nb_PDU
 
         pdu = torch.zeros_like(psi, device=device)
@@ -689,7 +689,7 @@ class NlmeModel:
         if ind_ids_for_etas is None:
             ind_ids_for_etas = self.patients
 
-        (nb_samples, nb_patients_local, nb_descriptors) = physical_params.shape
+        nb_samples, nb_patients_local, nb_descriptors = physical_params.shape
 
         assert len(ind_ids_for_etas) == nb_patients_local
 
@@ -1069,7 +1069,7 @@ class NlmeModel:
 
         # Gather predictions tensor
         ebe_physical = self.compute_ebe()
-        (nb_samples, nb_patients_local, nb_descriptors) = ebe_physical.shape
+        nb_samples, nb_patients_local, nb_descriptors = ebe_physical.shape
 
         # Assemble the thetas by adding the PDKs
         theta = torch.cat(
@@ -1401,7 +1401,7 @@ class NlmeModel:
     def map_estimates_descriptors(self) -> pd.DataFrame:
         ebe_physical = self.compute_ebe()
 
-        (nb_samples, nb_patients, nb_descriptors) = ebe_physical.shape
+        nb_samples, nb_patients, nb_descriptors = ebe_physical.shape
 
         # Assemble the thetas by adding the PDKs
         theta = torch.cat(
@@ -1433,7 +1433,7 @@ class NlmeModel:
     def map_estimates_predictions(self) -> pd.DataFrame:
         ebe_physical = self.compute_ebe()
 
-        (nb_samples, nb_patients, nb_descriptors) = ebe_physical.shape
+        nb_samples, nb_patients, nb_descriptors = ebe_physical.shape
 
         # Assemble the thetas by adding the PDKs
         theta = torch.cat(
@@ -1507,7 +1507,7 @@ class NlmeModel:
             nb_burn_in = 1
 
         init_etas = self.sample_etas(1, self.nb_patients)
-        (current_log_prob, current_gaussian_params, current_pred) = (
+        current_log_prob, current_gaussian_params, current_pred = (
             self.log_posterior_etas(init_etas)
         )
         current_etas = init_etas

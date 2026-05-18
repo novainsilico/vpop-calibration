@@ -1,4 +1,3 @@
-import pytest
 import torch
 import pandas as pd
 from torch.testing import assert_close
@@ -227,7 +226,7 @@ def test_analytical_two_arms_two_overrides():
             ]
         ]
     )
-    (num_chains, nb_patients, nb_timesteps, nb_params) = X.shape
+    num_chains, nb_patients, nb_timesteps, nb_params = X.shape
     actual_y, _pred_var = struct_model.simulate(
         X, (patient_index, timestep_index, task_index), chunks=[6]
     )
