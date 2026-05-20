@@ -8,7 +8,7 @@ from pandas import DataFrame
 import numpy as np
 from IPython.display import display, DisplayHandle
 
-from .utils import smoke_test, device
+from .config import smoke_test, device
 from .nlme import NlmeModel
 
 

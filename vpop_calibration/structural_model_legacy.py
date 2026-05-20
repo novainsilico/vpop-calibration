@@ -5,8 +5,8 @@ from typing import Callable, Optional
 import itertools
 from warnings import deprecated
 
-from .model.gp import GP
-from .utils import device
+from .model.gp_legacy import GP
+from .config import device
 
 
 @deprecated("Use vpop_calibration.structural_model.StructuralModel instead")

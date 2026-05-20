@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 from functools import reduce
 
-from ..utils import device
+from ..config import device
 
 
 class TrainingDataSet:

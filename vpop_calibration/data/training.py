@@ -6,7 +6,7 @@ from typing import Callable
 import torch
 
 from .utils import join_if_two, TaskMap, normalize_dataframe, extend_schema
-from ..utils import device
+from ..config import device
 
 trainingDataSchemaLong = pa.DataFrameSchema(
     {

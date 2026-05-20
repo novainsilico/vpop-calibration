@@ -1,8 +1,6 @@
 import torch
 import pandas as pd
-import numpy as np
 from typing import Callable, Optional
-import itertools
 
 from .model.gp import GP
 from .data.utils import TaskMap

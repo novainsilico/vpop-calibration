@@ -4,9 +4,9 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import r2_score
 import random as rand
 from .nlme import NlmeModel
-from .model.gp import GP
+from .model.gp_legacy import GP
 from .structural_model_legacy import StructuralGp
-from .utils import smoke_test
+from .config import smoke_test
 import scipy.stats as stats
 from typing import Optional
 

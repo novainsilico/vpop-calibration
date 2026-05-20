@@ -4,7 +4,7 @@ import pandas as pd
 import torch
 
 from .utils import TaskMap, extend_schema
-from ..utils import device
+from ..config import device
 
 obsDataSchemaLong = pa.DataFrameSchema(
     {

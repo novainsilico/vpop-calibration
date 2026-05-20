@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 from typing import Optional, cast
 
-from vpop_calibration.data.training import TrainingData
+from .data import TrainingDataSet
 from .plot import (
     plot_all_solutions,
     plot_individual_solution,

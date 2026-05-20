@@ -3,7 +3,7 @@ from typing import Union, Optional, cast
 import pandas as pd
 import numpy as np
 from .structural_model_legacy import StructuralModel
-from .utils import device, smoke_test
+from .config import device, smoke_test
 from tqdm.notebook import tqdm
 from scipy.optimize import minimize
 
