@@ -43,7 +43,7 @@ def transform_param(x: float, const: Constraint) -> float:
         )
 
 
-class ModelIntrinsicParam(BaseModel):
+class PopulationParameter(BaseModel):
     model_config = ConfigDict(extra="forbid")
     prior: float = Field(ge=0)
     constraint: Constraint = Constraint()
@@ -62,23 +62,26 @@ class ModelIntrinsicParam(BaseModel):
         return transform_param(self.prior, self.constraint)
 
 
+class ModelIntrinsicParam(PopulationParameter):
+    # Model intrinsic parameters are just simple population parameters
+    pass
+
+
 class Covariate(BaseModel):
     model_config = ConfigDict(extra="forbid")
     coef_name: str
     prior: float
 
 
-class PatientDescriptorUnknown(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    prior_mean: float = Field(ge=0)
+class PatientDescriptorUnknown(PopulationParameter):
+    # A PDU is a PopulationParameter with an omega prior and some covariates
     prior_omega: float = Field(ge=0)
     covariates: Optional[dict[str, Covariate]]
-    constraint: Constraint = Constraint()
 
     @computed_field
     @property
     def transformed_prior(self) -> float:
-        return transform_param(self.prior_mean, self.constraint)
+        return transform_param(self.prior, self.constraint)
 
 
 class ErrorModel(BaseModel):

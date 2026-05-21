@@ -13,12 +13,12 @@ def sample_nlme_params() -> dict:
         "model_intrinsic": {"mi_1": {"prior": 10.0}},
         "pdu": {
             "pdu_1": {
-                "prior_mean": 10.0,
+                "prior": 10.0,
                 "prior_omega": 0.1,
                 "covariates": {"foo": {"coef_name": "coef_foo_pdu1", "prior": 0.5}},
             },
             "pdu_2": {
-                "prior_mean": 10.0,
+                "prior": 10.0,
                 "prior_omega": 0.1,
                 "covariates": {"foo": {"coef_name": "coef_foo_pdu2", "prior": 0.5}},
                 "constraint": {"low": 1.0, "high": 100.0},
