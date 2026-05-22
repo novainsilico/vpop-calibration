@@ -61,7 +61,7 @@ true_residual_sigma_A2 <- 0.1
 num_individuals <- 50
 time_span_start <- 0
 time_span_end <- 24
-nb_steps <- 20
+nb_steps <- 21
 time_steps <- seq(from = time_span_start, to = time_span_end, length.out = nb_steps)
 all_individual_data_list <- list()
 
