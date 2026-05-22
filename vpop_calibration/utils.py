@@ -47,7 +47,7 @@ class TaskMap:
         return all(output in self.output_names for output in new_outputs)
 
     def validate_tasks(self, new_protocol_arms: list[str], new_outputs: list[str]):
-        """Utility function to validate a list of protocols and output names with respect to an existing task map."""
+        """Validate a list of protocols and output names with respect to an existing task map."""
         if not self._validate_protocols(new_protocol_arms):
             raise ValueError(
                 f"Incompatible protocol arms with supplied task map.\n{new_protocol_arms}\n{self.protocol_arms}"
@@ -56,18 +56,6 @@ class TaskMap:
             raise ValueError(
                 f"Incompatible output names with supplied task map.\n{new_outputs}\n{self.output_names}"
             )
-
-
-def normalize_dataframe(
-    data_in: pd.DataFrame, ignore: list[str]
-) -> tuple[pd.DataFrame, pd.Series, pd.Series]:
-    """Normalize a data frame with respect to its mean and std, ignoring certain columns, and output the corresponding mean and std."""
-    selected_columns = data_in.columns.difference(ignore)
-    norm_data = data_in
-    mean = data_in[selected_columns].mean()
-    std = data_in[selected_columns].std()
-    norm_data[selected_columns] = (norm_data[selected_columns] - mean) / std
-    return norm_data, mean, std
 
 
 def extend_schema(

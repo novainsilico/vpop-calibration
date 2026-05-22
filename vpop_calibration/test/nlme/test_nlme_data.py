@@ -1,4 +1,4 @@
-from vpop_calibration.data.observed import ObsData, TaskMap
+from vpop_calibration.nlme_model.data import ObsData, TaskMap
 
 import pytest
 import numpy as np

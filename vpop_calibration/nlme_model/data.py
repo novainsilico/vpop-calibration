@@ -3,8 +3,8 @@ import pandera.pandas as pa
 import pandas as pd
 import torch
 
-from .utils import TaskMap, extend_schema
-from ..config import device
+from vpop_calibration.utils import TaskMap, extend_schema
+from vpop_calibration.config import device
 
 obsDataSchemaLong = pa.DataFrameSchema(
     {

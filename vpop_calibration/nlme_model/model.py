@@ -1,12 +1,11 @@
 import torch
 
 from vpop_calibration.structural_model import StructuralModel
-from vpop_calibration.data.observed import ObsData
+from vpop_calibration.nlme_model.data import ObsData
 from vpop_calibration.nlme_model.params import (
     MixedEffectParameters,
-    ModelIntrinsicParam,
-    PatientDescriptorUnknown,
 )
+from vpop_calibration.nlme_model.utils import init_transform_function
 from vpop_calibration.config import device
 
 
@@ -18,6 +17,16 @@ class NlmeModel:
         prior_params: MixedEffectParameters,
         num_chains: int = 1,
     ):
+        """Non-linear mixed effects model
+
+        Create a NLME model from three main elements: structural model, observed data and population parameter priors.
+
+        Args:
+            structural_model (StructuralModel): The deterministic model equations
+            dataset (ObsData): The observed longitudinal data.
+            prior_params (MixedEffectParameters): The user-defined parameter priors and configuration.
+            num_chains (int, optional): Number of parallel MC chains to track. Defaults to 1.
+        """
         # Load input data and initiate attributes
         self.structural_model = structural_model
         self.data = dataset
@@ -27,8 +36,10 @@ class NlmeModel:
         self.pdu_names = self.prior_params.pdu_names
         self.nb_pdu = len(self.pdu_names)
         self.pdk_names = self.prior_params.pdk
+        self.nb_pdk = len(self.pdk_names)
         self.beta_names = self.prior_params.beta_names
         self.nb_betas = len(self.beta_names)
+        self.nb_descriptors = self.nb_pdk + self.nb_pdu + self.nb_mi
         self.covariate_names = self.prior_params.covariate_names
         self.nb_covariates = len(self.covariate_names)
         self.patients = self.data.patients
@@ -73,12 +84,33 @@ class NlmeModel:
             [self.design_matrices[p] for p in self.patients]
         ).to(device)
 
+        # Assemble patients pdk tensors
+        self.patients_pdk = {}
+        for patient in self.patients:
+            if self.nb_pdk > 0:
+                row = self.data.patients_df.loc[
+                    self.data.patients_df["id"] == patient
+                ].drop_duplicates()
+                self.patients_pdk.update(
+                    {
+                        patient: torch.as_tensor(
+                            row[self.pdk_names].values, device=device
+                        )
+                    }
+                )
+            else:
+                self.patients_pdk.update({patient: torch.empty((1, 0), device=device)})
+        # Store the full pdk tensor on the device
+        self.patients_pdk_full = torch.cat(
+            [self.patients_pdk[ind] for ind in self.patients]
+        ).to(device)
+
         # Initiate transforms
-        self.pdu_transforms, self.pdu_shift, self.pdu_scale = (
-            self.init_transform_tensors(self.prior_params.pdu, self.pdu_names)
+        self.pdu_transform = init_transform_function(
+            self.prior_params.pdu, self.pdu_names
         )
 
-        self.mi_transforms, self.mi_shift, self.mi_scale = self.init_transform_tensors(
+        self.mi_transform = init_transform_function(
             self.prior_params.model_intrinsic, self.mi_names
         )
 
@@ -142,7 +174,7 @@ class NlmeModel:
         self.eta_distribution = torch.distributions.MultivariateNormal(
             loc=torch.zeros(self.nb_pdu, device=device),
             covariance_matrix=self.omega_pop,
-        )
+        ).expand([self.nb_patients])
 
     def update_res_var(self, residual_var: torch.Tensor) -> None:
         """Update the residual variance of the NLME model, while ensuring it remains positive."""
@@ -216,44 +248,69 @@ class NlmeModel:
         self.update_log_mi(log_mi)
         self.update_res_var(res_var)
 
-    def init_transform_tensors(
-        self,
-        param_dict: (
-            dict[str, PatientDescriptorUnknown] | dict[str, ModelIntrinsicParam]
-        ),
-        param_names: list[str],
-    ) -> tuple[dict[str, torch.LongTensor], torch.Tensor, torch.Tensor]:
-        """Extract transform functions and parameters (scale and shift) into tensors for efficient gaussian parameters transformation."""
+    def sample_etas(self, nb_samples: int) -> torch.Tensor:
+        """Sample individual random effects on all from the current estimate of Omega
 
-        transforms = {
-            "exp": torch.LongTensor(
-                torch.tensor(
-                    [
-                        param_names.index(p_name)
-                        for p_name, p_content in param_dict.items()
-                        if p_content.constraint.transform == "log"
-                    ],
-                    device=device,
-                    dtype=torch.long,
-                )
-            ),
-            "sigmoid": torch.LongTensor(
-                torch.tensor(
-                    [
-                        param_names.index(p_name)
-                        for p_name, p_content in param_dict.items()
-                        if p_content.constraint.transform == "logit"
-                    ],
-                    device=device,
-                    dtype=torch.long,
-                )
-            ),
-        }
-        scale = torch.Tensor(
-            [[[param_dict[param].constraint.scale for param in param_names]]]
+        Returns:
+            torch.Tensor (nb_samples, nb_patients, nb_PDUs) : individual random effects for all patients in the population, one per chain, per patient, and per PDU.
+        """
+        etas = self.eta_distribution.sample([nb_samples])
+        return etas
+
+    def convert_etas_to_gaussian(self, etas: torch.Tensor) -> torch.Tensor:
+        """Compute individual (gaussian) parameters from random effects chains
+
+        Args:
+            individual_etas (torch.Tensor): Individual random effects samples. Size: (nb_chains, nb_patients, nb_pdu)
+
+        Returns:
+            torch.Tensor: The individual parameters in gaussian (unconstrained) space. Size: (nb_chains, nb_patients, nb_pdu)
+        """
+        nb_samples = etas.shape[0]
+        assert etas.shape == torch.Size(
+            [nb_samples, self.nb_patients, self.nb_pdu]
+        ), f"Wrong shape of etas passed to `transform_etas_to_gaussian`: {etas.shape}"
+
+        expanded_design_matrix = self.full_design_matrix.expand(nb_samples, -1, -1, -1)
+        gaussian_params = expanded_design_matrix @ self.population_betas + etas
+
+        return gaussian_params
+
+    def convert_gaussian_to_physical(
+        self, psi: torch.Tensor, log_mi: torch.Tensor
+    ) -> torch.Tensor:
+        """Transform gaussian parameters to physical parameters (thetas)
+
+        Args:
+            psi (torch.Tensor): Tensor of individual unconstrained parameter values. Size: (nb_chains, nb_patients, nb_pdu)
+            log_mi (torch.Tensor): Tensor of current estimates for the (transformed) model intrinsic parameters.
+
+        Returns:
+            torch.Tensor: Tensor of individual physical parameter values. Both PDUs and MIs are included. Size: (nb_chains, nb_patients, nb_pdu + nb_mi)
+        """
+        nb_samples = psi.shape[0]
+        assert psi.shape == (nb_samples, self.nb_patients, self.nb_pdu)
+
+        # Apply the transforms
+        pdu = self.pdu_transform(psi)
+        mi = self.mi_transform(log_mi.expand(nb_samples, self.nb_patients, self.nb_mi))
+
+        phi = torch.cat((pdu, mi), dim=-1).to(device)
+        return phi
+
+    def convert_physical_to_model_parameters(
+        self, physical_params: torch.Tensor
+    ) -> torch.Tensor:
+        nb_samples = physical_params.shape[0]
+        assert physical_params.shape == (
+            nb_samples,
+            self.nb_patients,
+            self.nb_pdu + self.nb_mi,
+        )
+        pdk_tensor = self.patients_pdk_full
+        theta = torch.cat(
+            (pdk_tensor.expand(nb_samples, -1, -1), physical_params), dim=-1
         )
 
-        shift = torch.Tensor(
-            [[[param_dict[param].constraint.shift for param in param_names]]]
-        )
-        return transforms, shift, scale
+        assert theta.shape == (nb_samples, self.nb_patients, self.nb_descriptors)
+        return theta

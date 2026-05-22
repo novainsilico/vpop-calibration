@@ -3,7 +3,7 @@ import pandas as pd
 from typing import Callable, Optional
 
 from .model.gp import GP
-from .data.utils import TaskMap
+from .utils import TaskMap
 
 
 class StructuralModel:

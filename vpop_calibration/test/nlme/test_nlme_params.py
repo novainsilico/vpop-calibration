@@ -1,5 +1,5 @@
 from vpop_calibration.nlme_model.params import MixedEffectParameters
-from vpop_calibration.data.observed import ObsData
+from vpop_calibration.nlme_model.data import ObsData
 
 import pytest
 import numpy as np

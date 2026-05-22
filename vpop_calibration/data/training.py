@@ -5,8 +5,12 @@ import numpy as np
 from typing import Callable
 import torch
 
-from .utils import join_if_two, TaskMap, normalize_dataframe, extend_schema
-from ..config import device
+from vpop_calibration.utils import (
+    join_if_two,
+    TaskMap,
+    extend_schema,
+)
+from vpop_calibration.config import device
 
 trainingDataSchemaLong = pa.DataFrameSchema(
     {
@@ -56,6 +60,18 @@ def pivot_input_data(data_in: pd.DataFrame, descriptors: list[str]) -> pd.DataFr
     reshaped_df.columns = flat_column_names
 
     return reshaped_df
+
+
+def normalize_dataframe(
+    data_in: pd.DataFrame, ignore: list[str]
+) -> tuple[pd.DataFrame, pd.Series, pd.Series]:
+    """Normalize a data frame with respect to its mean and std, ignoring certain columns, and output the corresponding mean and std."""
+    selected_columns = data_in.columns.difference(ignore)
+    norm_data = data_in
+    mean = data_in[selected_columns].mean()
+    std = data_in[selected_columns].std()
+    norm_data[selected_columns] = (norm_data[selected_columns] - mean) / std
+    return norm_data, mean, std
 
 
 class TrainingData(Dataset):
