@@ -2,8 +2,6 @@ import torch
 import pandas as pd
 from typing import Callable, Optional
 
-from .taskmap import TaskMap
-
 
 class StructuralModel:
     def __init__(

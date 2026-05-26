@@ -1,5 +1,4 @@
 from vpop_calibration.nlme_model.data import ObsData
-from vpop_calibration.taskmap import TaskMap
 
 import pytest
 import numpy as np
