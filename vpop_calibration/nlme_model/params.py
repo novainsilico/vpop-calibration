@@ -4,6 +4,7 @@ from typing import Literal, Optional, get_args, Any
 from typing_extensions import Self
 
 from vpop_calibration.nlme_model.data import ObsData
+from vpop_calibration.structural_model import StructuralModel
 
 TransformFunction = Literal["log", "logit"]
 

@@ -1,9 +1,8 @@
-from torch.utils.data import Dataset
 import pandera.pandas as pa
 import pandas as pd
 import torch
 
-from vpop_calibration.utils import TaskMap, extend_schema
+from vpop_calibration.utils import extend_schema
 from vpop_calibration.config import device
 
 obsDataSchemaLong = pa.DataFrameSchema(
@@ -18,99 +17,121 @@ obsDataSchemaLong = pa.DataFrameSchema(
     add_missing_columns=True,
 )
 
-patientDataSchema = pa.DataFrameSchema({"id": pa.Column(str, unique=True)})
+patientDataSchema = pa.DataFrameSchema(
+    {"id": pa.Column(str, unique=True), "protocol_arm": pa.Column(str, unique=True)}
+)
 
 
-class ObsData(Dataset):
-    def __init__(self, data: pa.typing.DataFrame, task_map: TaskMap | None = None):
+class ObsData:
+    def __init__(self, data: pa.typing.DataFrame):
+        # Initial validation
         self.obs_schema = obsDataSchemaLong
-        # initial validation
         self.input_df = self.obs_schema.validate(data)
         self.patients = self.input_df.id.drop_duplicates().to_list()
         self.nb_patients = len(self.patients)
 
-        # Create the patient data frame (id and descriptors)
+        # Create the patient data frame (id, protocol_arm and descriptors)
         patients_df_raw = self.input_df.drop(
-            columns=["output_name", "time", "value", "protocol_arm"]
+            columns=["output_name", "time", "value"]
         ).drop_duplicates()
         self.descriptors_known = patients_df_raw.columns.to_list()
         self.descriptors_known.remove("id")
+        self.descriptors_known.remove("protocol_arm")
         self.patients_schema = extend_schema(
             patientDataSchema, self.descriptors_known, "float"
         )
         self.patients_df = self.patients_schema.validate(patients_df_raw)
-        # Gather the observed outputs and protocols
-        self.protocol_arms = self.input_df["protocol_arm"].drop_duplicates().to_list()
-        self.output_names = self.input_df["output_name"].drop_duplicates().to_list()
-        # Create task column
-        self.input_df["task"] = self.input_df[["output_name", "protocol_arm"]].apply(
-            lambda r: "_".join(r), axis=1
-        )
-        if task_map is not None:
-            self.task_map = task_map
-            # Validate against the provided task map
-            self.task_map.validate_tasks(self.protocol_arms, self.output_names)
-        else:
-            # Create the task map
-            self.task_map = TaskMap(
-                protocol_arms=self.protocol_arms, output_names=self.output_names
+        # Gather the reference lists for indexing:
+        # These are sorted list of unique elements for the three columns [protocol_arm, output_name and time]
+        self.protocol_arms, self.output_names, self.global_time_steps = tuple(
+            map(
+                lambda col: self.input_df[col]
+                .drop_duplicates()
+                .sort_values()
+                .to_list(),
+                ["protocol_arm", "output_name", "time"],
             )
+        )
+        self.nb_global_time_steps = len(self.global_time_steps)
+        self.time_steps_tensor = torch.as_tensor(self.global_time_steps, device=device)
 
         # Create indexing columns
-        self.input_df["task_index"] = self.input_df["task"].apply(
-            lambda task: self.task_map.tasks.index(task)
-        )
-        self.input_df["output_index"] = self.input_df["output_name"].apply(
-            lambda output: self.task_map.output_names.index(output)
-        )
-        # Common list of time steps
-        self.global_time_steps = (
-            self.input_df["time"].drop_duplicates().sort_values().to_list()
-        )
-        self.input_df["t_index"] = self.input_df["time"].apply(
-            lambda t: self.global_time_steps.index(t)
-        )
-        self.input_df["patient_index"] = self.input_df["id"].apply(
-            lambda p: self.patients.index(p)
-        )
+        # Avoiding code repetition with a config tuple list. Each element of the list is:
+        # (name of the added indexing column, name of the existing column, corresponding indexing list)
+        indexings = [
+            ("patient_index", "id", self.patients),
+            ("output_index", "output_name", self.output_names),
+            ("protocol_index", "protocol_arm", self.protocol_arms),
+            ("timestep_index", "time", self.global_time_steps),
+        ]
+        self.indexing_columns = [indexing[0] for indexing in indexings]
 
-        self.observations = []
+        for index_name, index_variable, indexing_list in indexings:
+            self.input_df[index_name] = self.input_df[index_variable].apply(
+                lambda x: indexing_list.index(x)
+            )
+        # Assemble the per-patient observations
+        self.observations = {}
         for p in self.patients:
             patient_data = self.input_df.loc[self.input_df["id"] == p]
-            p_index = torch.as_tensor(
-                patient_data["patient_index"].values, device=device
+            # Column extraction as separate tensors is now immediate with list comprehension:
+            self.observations.update(
+                {
+                    p: {
+                        "prediction_index": tuple(
+                            torch.as_tensor(patient_data[col].to_list(), device=device)
+                            for col in self.indexing_columns
+                        ),
+                        "value": torch.as_tensor(
+                            patient_data["value"].to_list(), device=device
+                        ),
+                    }
+                }
             )
-            task_index = torch.as_tensor(
-                patient_data["task_index"].values, device=device
+        # Assemble the full prediction index by concatenating separate tensors into one per index
+        # Important: the prediction index then contains one LongTensor per indexing column
+        # (patient_index, output_index, protocol_index, timestep_index) -> todo: replace with a dataclass
+        self.prediction_index = tuple(
+            map(
+                torch.cat,
+                zip(*[self.observations[p]["prediction_index"] for p in self.patients]),
             )
-            time_index = torch.as_tensor(patient_data["t_index"].values, device=device)
-            observed_value = torch.as_tensor(
-                patient_data["value"].values, device=device
-            )
-            self.observations.append(
-                ((p_index, task_index, time_index), observed_value)
-            )
-
-    def __getitem__(
-        self, index
-    ) -> tuple[tuple[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]:
-        return self.observations[index]
-
-    def __len__(self):
-        return self.nb_patients
-
-    def collate_fn(self, batch):
-        p_index = torch.cat([item[0][0] for item in batch])
-        task_index = torch.cat([item[0][1] for item in batch])
-        time_index = torch.cat([item[0][2] for item in batch])
-        y = torch.cat([item[1] for item in batch])
-        return (p_index, task_index, time_index), y
-
-    def to_dataloader(self, batch_size: int | None = None):
-        if batch_size is None:
-            use_batch_size = len(self)
-        else:
-            use_batch_size = batch_size
-        return torch.utils.data.DataLoader(
-            dataset=self, batch_size=use_batch_size, collate_fn=self.collate_fn
         )
+        # Assemble the full observation tensor
+        self.full_observations = torch.cat(
+            [self.observations[p]["value"] for p in self.patients]
+        )
+        self.nb_total_observations = self.full_observations.shape[0]
+
+    def init_pdk_values(self, pdk_names: list[str]) -> None:
+        """Generate per-patient PDK tensors
+
+        Once initialized they are stored in `self.patients_pdk[patient_id]` and `self.patients_pdk_full`.
+
+        Args:
+            pdk_names (list[str]): The name of the known parameters which are to be assembled as pdk. Must appear in the data set columns.
+        """
+        assert set(pdk_names) <= set(
+            self.descriptors_known
+        ), f"Unknown PDK: {set(pdk_names) - set(self.descriptors_known)}"
+        self.pdk_names = pdk_names
+        self.nb_pdk = len(pdk_names)
+        self.patients_pdk = {}
+        for patient in self.patients:
+            if self.nb_pdk > 0:
+                row = self.patients_df.loc[
+                    self.patients_df["id"] == patient
+                ].drop_duplicates()
+                self.patients_pdk.update(
+                    {
+                        patient: torch.as_tensor(
+                            row[self.pdk_names].values, device=device
+                        )
+                    }
+                )
+            else:
+                self.patients_pdk.update({patient: torch.empty((1, 0), device=device)})
+        # Store the full pdk tensor on the device
+        self.patients_pdk_full = torch.cat(
+            [self.patients_pdk[ind] for ind in self.patients]
+        ).to(device)

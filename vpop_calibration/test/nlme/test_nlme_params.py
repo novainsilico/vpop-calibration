@@ -35,12 +35,16 @@ def sample_nlme_params() -> dict:
 
 @pytest.fixture
 def obs_data(np_rng) -> ObsData:
-    patients = {"id": ["p1", "p2"], "foo": [0.0, 0.0], "pdk_1": [0.0, 0.0]}
     protocol_arms = ["arm-A", "arm-B"]
+    patients = {
+        "id": ["p1", "p2"],
+        "foo": [0.0, 0.0],
+        "pdk_1": [0.0, 0.0],
+        "protocol_arm": protocol_arms,
+    }
     outputs = ["out_1", "out_2"]
     time_steps = np.arange(0, 3.0, 1.0)
     df = pd.DataFrame.from_dict(patients)
-    df = df.merge(pd.DataFrame(protocol_arms, columns=["protocol_arm"]), how="cross")
     df = df.merge(pd.DataFrame(outputs, columns=["output_name"]), how="cross")
     df = df.merge(pd.DataFrame(time_steps, columns=["time"]), how="cross")
     df["value"] = np.abs(np_rng.normal(0, 1, df.shape[0]))

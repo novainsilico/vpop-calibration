@@ -38,12 +38,16 @@ def sample_nlme_params() -> MixedEffectParameters:
 
 @pytest.fixture
 def obs_data(np_rng) -> ObsData:
-    patients = {"id": ["p1", "p2"], "foo": [0.0, 5.0], "pdk_1": [0.0, 0.0]}
     protocol_arms = ["arm-A", "arm-B"]
+    patients = {
+        "id": ["p1", "p2"],
+        "foo": [0.0, 5.0],
+        "pdk_1": [0.0, 0.0],
+        "protocol_arm": protocol_arms,
+    }
     outputs = ["out_1", "out_2"]
     time_steps = np.arange(0, 3.0, 1.0)
     df = pd.DataFrame.from_dict(patients)
-    df = df.merge(pd.DataFrame(protocol_arms, columns=["protocol_arm"]), how="cross")
     df = df.merge(pd.DataFrame(outputs, columns=["output_name"]), how="cross")
     df = df.merge(pd.DataFrame(time_steps, columns=["time"]), how="cross")
     df["value"] = np.abs(np_rng.normal(0, 1, df.shape[0]))
@@ -53,11 +57,17 @@ def obs_data(np_rng) -> ObsData:
 
 @pytest.fixture
 def struct_model() -> StructuralModel:
-    def equations(pdu_1, pdu_2, foo, pdk_1, t):
-        return (0.0, 0.0)
+    def equations(mi_1, pdu_1, pdu_2, pdk_1, t):
+        out = torch.zeros_like(t)
+        return torch.cat((out, out), dim=-1)
 
+    protocol_design = pd.DataFrame(
+        {"id": ["p1", "p2"], "protocol_arm": ["arm-A", "arm-B"]}
+    )
     struct_model = StructuralAnalytical(
-        equations=equations, variable_names=["out_1", "out_2"]
+        equations=equations,
+        variable_names=["out_1", "out_2"],
+        protocol_design=protocol_design,
     )
     return struct_model
 
@@ -66,6 +76,8 @@ def test_nlme_init(sample_nlme_params, obs_data, struct_model):
     nlme_model = NlmeModel(
         structural_model=struct_model, dataset=obs_data, prior_params=sample_nlme_params
     )
+    assert nlme_model.descriptors == ["pdk_1", "pdu_1", "pdu_2", "mi_1"]
+
     # Ensure the initial omega matrix is diagonal with correct values
     torch.testing.assert_close(
         nlme_model.omega_pop,
@@ -123,17 +135,25 @@ def test_nlme_init(sample_nlme_params, obs_data, struct_model):
     p1_pdk = obs_data.patients_df.loc[obs_data.patients_df["id"] == "p1", "pdk_1"].iloc[
         0
     ]
-    torch.testing.assert_close(nlme_model.patients_pdk["p1"], torch.tensor([[p1_pdk]]))
+    torch.testing.assert_close(
+        nlme_model.data.patients_pdk["p1"], torch.tensor([[p1_pdk]])
+    )
+
     p2_pdk = obs_data.patients_df.loc[obs_data.patients_df["id"] == "p2", "pdk_1"].iloc[
         0
     ]
     torch.testing.assert_close(
-        nlme_model.patients_pdk["p1"], torch.tensor([[p2_pdk]]), check_dtype=False
+        nlme_model.data.patients_pdk["p1"], torch.tensor([[p2_pdk]]), check_dtype=False
     )
     torch.testing.assert_close(
-        nlme_model.patients_pdk_full, torch.tensor([[p1_pdk], [p2_pdk]])
+        nlme_model.data.patients_pdk_full, torch.tensor([[p1_pdk], [p2_pdk]])
     )
 
+
+def test_nlme_simulate(sample_nlme_params, obs_data, struct_model):
+    nlme_model = NlmeModel(
+        structural_model=struct_model, dataset=obs_data, prior_params=sample_nlme_params
+    )
     nb_samples = 1
     etas = nlme_model.sample_etas(nb_samples)
     # nullify etas to test the proper PDU and MI transformation
@@ -152,10 +172,17 @@ def test_nlme_init(sample_nlme_params, obs_data, struct_model):
     assert phi[0, 0, 1].item() == pytest.approx(pdu_2_prior)
     assert phi[0, 0, 2].item() == pytest.approx(mi_1_prior)
 
-    theta = nlme_model.convert_physical_to_model_parameters(phi)
+    theta = nlme_model.convert_physical_to_thetas(phi)
     # Double check the thetas are properly assembled and correspond to the priors for patient 1 (0 random effect, 0 covariate effect)
+    p1_pdk = obs_data.patients_df.loc[obs_data.patients_df["id"] == "p1", "pdk_1"].iloc[
+        0
+    ]
     torch.testing.assert_close(
         theta[0, 0, :],
         torch.tensor([p1_pdk, pdu_1_prior, pdu_2_prior, mi_1_prior]),
         check_dtype=False,
     )
+
+    model_inputs = nlme_model.convert_thetas_to_model_parameters(theta)
+
+    outs = nlme_model.predict(model_inputs)

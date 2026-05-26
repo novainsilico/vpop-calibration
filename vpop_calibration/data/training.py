@@ -7,9 +7,9 @@ import torch
 
 from vpop_calibration.utils import (
     join_if_two,
-    TaskMap,
     extend_schema,
 )
+from vpop_calibration.taskmap import TaskMap
 from vpop_calibration.config import device
 
 trainingDataSchemaLong = pa.DataFrameSchema(

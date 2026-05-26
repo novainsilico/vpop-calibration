@@ -5,7 +5,7 @@ from typing import Callable, Optional
 import itertools
 from warnings import deprecated
 
-from .model.gp_legacy import GP
+from .model.gp import GP
 from .config import device
 
 
