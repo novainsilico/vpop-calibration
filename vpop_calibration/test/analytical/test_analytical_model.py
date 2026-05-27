@@ -3,6 +3,7 @@ import pandas as pd
 from torch.testing import assert_close
 
 from vpop_calibration.structural_model import StructuralAnalytical
+from vpop_calibration.nlme_model.indexing import ObservationIndex, IndexedValues
 
 
 def test_analytical_no_protocol():
@@ -16,16 +17,10 @@ def test_analytical_no_protocol():
     )
 
     assert struct_model.parameter_names == ["lambda1", "lambda2", "lambda3"]
+    assert struct_model.protocol_parameters == []
     assert struct_model.nb_protocol_overrides == 0
-    assert struct_model.task_map.tasks == ["circumference_identity"]
-    assert struct_model.task_map.task_idx_to_protocol == {0: "identity"}
-    assert struct_model.task_map.task_idx_to_output_idx == {0: 0}
-    num_tasks = len(struct_model.task_map.tasks)
-    num_protocol_parameters = 0
-    assert struct_model.task_protocol_tensor.shape == (
-        num_tasks,
-        num_protocol_parameters,
-    )
+    assert struct_model.task_names == ["circumference_identity"]
+    assert struct_model.input_to_function_arg == [0, 1, 2, 3]
 
 
 def test_analytical_one_arm_one_override():
@@ -48,15 +43,10 @@ def test_analytical_one_arm_one_override():
         "lambda3",
     ]
     assert struct_model.nb_protocol_overrides == 1
-    assert struct_model.task_map.tasks == ["circumference_Italy"]
-    assert struct_model.task_map.task_idx_to_protocol == {0: "Italy"}
-    assert struct_model.task_map.task_idx_to_output_idx == {0: 0}
-    num_tasks = len(struct_model.task_map.tasks)
-    num_protocol_parameters = 1
-    assert struct_model.task_protocol_tensor.shape == (
-        num_tasks,
-        num_protocol_parameters,
-    )
+    assert struct_model.task_names == ["circumference_Italy"]
+    assert struct_model.input_to_function_arg == [0, 1, 2, 3, 4]
+    assert struct_model.protocol_parameters == ["sun_power_multiplicator"]
+    assert_close(struct_model.protocol_overrides_tensor, torch.tensor([[1.05]]))
 
 
 def test_analytical_one_arm_two_overrides():
@@ -107,15 +97,8 @@ def test_analytical_one_arm_two_overrides():
         5,  # position of "sun_power_multiplicator"
     ]
     assert struct_model.nb_protocol_overrides == 2
-    assert struct_model.task_map.tasks == ["circumference_Italy"]
-    assert struct_model.task_map.task_idx_to_protocol == {0: "Italy"}
-    assert struct_model.task_map.task_idx_to_output_idx == {0: 0}
-    num_tasks = len(struct_model.task_map.tasks)
-    num_protocol_parameters = 2
-    assert struct_model.task_protocol_tensor.shape == (
-        num_tasks,
-        num_protocol_parameters,
-    )
+    assert struct_model.task_names == ["circumference_Italy"]
+    assert_close(struct_model.protocol_overrides_tensor, torch.tensor([[1.05, 1.1]]))
 
 
 def test_analytical_two_arms_two_overrides():
@@ -152,22 +135,31 @@ def test_analytical_two_arms_two_overrides():
         "lambda3",
     ]
     assert struct_model.nb_protocol_overrides == 2
-    assert struct_model.task_map.tasks == [
+    assert struct_model.task_names == [
         "circumference_Italy",
         "circumference_Morocco",
     ]
-    assert struct_model.task_map.task_idx_to_protocol == {0: "Italy", 1: "Morocco"}
-    assert struct_model.task_map.task_idx_to_output_idx == {0: 0, 1: 0}
-    num_tasks = len(struct_model.task_map.tasks)
-    num_protocol_parameters = 2
-    assert struct_model.task_protocol_tensor.shape == (
-        num_tasks,
-        num_protocol_parameters,
+    assert_close(
+        struct_model.protocol_overrides_tensor, torch.tensor([[1.05, 1.1], [1.2, 1.25]])
     )
-    patient_index = torch.tensor([0, 0, 0, 1, 1, 1])
-    timestep_index = torch.tensor([0, 1, 2, 0, 1, 2])
-    #                           Italy    Morocco
-    task_index = torch.tensor([0, 0, 0, 1, 1, 1])
+    patient_index = IndexedValues(torch.tensor([0, 0, 0, 1, 1, 1]), ["p1", "p2"])
+    timestep_index = IndexedValues(torch.tensor([0, 1, 2, 0, 1, 2]), [0, 1, 2])
+    output_index = IndexedValues(torch.tensor([0, 0, 0, 0, 0, 0]), ["circumference"])
+    protocol_index = IndexedValues(
+        torch.tensor([0, 0, 0, 1, 1, 1]), ["Italy", "Morocco"]
+    )
+    task_index = IndexedValues(
+        torch.tensor([0, 0, 0, 1, 1, 1]),
+        ["circumference_Italy", "circumference_Morocco"],
+    )
+
+    obs_index = ObservationIndex(
+        id=patient_index,
+        time=timestep_index,
+        output_name=output_index,
+        task=task_index,
+        protocol_arm=protocol_index,
+    )
     X = torch.tensor(
         [
             [
@@ -185,9 +177,7 @@ def test_analytical_two_arms_two_overrides():
         ]
     )
     num_chains, nb_patients, nb_timesteps, nb_params = X.shape
-    actual_y, _pred_var = struct_model.simulate(
-        X, (patient_index, timestep_index, task_index)
-    )
+    actual_y, _pred_var = struct_model.simulate(X, obs_index)
     expected_y = logistic_growth(
         lambda1=torch.tensor([333, 333, 333, 483, 483, 483]),
         lambda2=torch.tensor([101, 101, 101, 100, 100, 100]),

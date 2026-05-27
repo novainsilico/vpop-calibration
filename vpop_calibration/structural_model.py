@@ -1,13 +1,20 @@
 import torch
 import pandas as pd
 from typing import Callable, Optional
+import pandera.pandas as pa
+
+from vpop_calibration.nlme_model.indexing import ObservationIndex
+from vpop_calibration.config import device
+from vpop_calibration.utils import extend_schema
 
 
 class StructuralModel:
     def __init__(
         self,
         parameter_names: list[str],
-        task_map: TaskMap,
+        output_names: list[str],
+        protocol_arms: list[str],
+        task_names: list[str],
     ):
         """Initialize a structural model
 
@@ -20,13 +27,14 @@ class StructuralModel:
             task_idx_to_protocol (list[str]): _description_
         """
         self.parameter_names: list[str] = parameter_names
-        self.nb_parameters: int = len(self.parameter_names)
-        self.task_map = task_map
+        self.output_names: list[str] = output_names
+        self.protocol_arms: list[str] = protocol_arms
+        self.task_names: list[str] = task_names
 
     def simulate(
         self,
         X: torch.Tensor,
-        prediction_index: tuple[torch.Tensor, torch.Tensor, torch.Tensor],
+        prediction_index: ObservationIndex,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         raise ValueError("Not implemented")
 
@@ -50,21 +58,44 @@ class StructuralAnalytical(StructuralModel):
             equations.__code__.co_varnames[: equations.__code__.co_argcount]
         )
         self.equations = equations
+
         if protocol_design is None:
             protocol_design = pd.DataFrame({"protocol_arm": ["identity"]})
-        protocol_arms = protocol_design["protocol_arm"].drop_duplicates().to_list()
 
-        protocol_overrides_set = set(protocol_design.drop(columns="protocol_arm"))
+        protocol_overrides = protocol_design.drop(
+            columns="protocol_arm"
+        ).columns.to_list()
 
+        base_protocol_schema = pa.DataFrameSchema(
+            {
+                "protocol_arm": pa.Column(str, default="identity"),
+            },
+            coerce=True,
+        )
+        self.protocol_schema = extend_schema(
+            base_protocol_schema, column_list=protocol_overrides, type="float"
+        )
+        self.protocol_design = self.protocol_schema.validate(protocol_design)
+        protocol_arms = protocol_design["protocol_arm"].drop_duplicates().tolist()
+        # Create the protocol overrides tensor
+        # Indexed by protocol index:
+        # protocol_overrides_tensor[protocol_index,:] = parameter overrides for this protocol
+        self.protocol_overrides_tensor = torch.as_tensor(
+            protocol_design.drop_duplicates()
+            .set_index("protocol_arm")
+            .loc[protocol_arms]
+            .reset_index()
+            .drop(columns="protocol_arm")
+            .values,
+            device=device,
+        )
         # the parameters of the "equations" function which are NOT protocol overrides and NOT time, in this order
         parameter_names_without_protocol_overrides = [
-            p
-            for p in function_arguments
-            if p not in protocol_overrides_set and p != "t"
+            p for p in function_arguments if p not in protocol_overrides and p != "t"
         ]
         # the parameters of the "equations" function which are protocol overrides, in this order
         self.protocol_parameters = [
-            p for p in function_arguments if p in protocol_overrides_set
+            p for p in function_arguments if p in protocol_overrides
         ]
         self.nb_protocol_overrides = len(self.protocol_parameters)
 
@@ -78,45 +109,57 @@ class StructuralAnalytical(StructuralModel):
             input_parameters.index(a) for a in function_arguments
         ]
 
-        if self.nb_protocol_overrides > 0:
-            self.task_protocol_tensor = torch.Tensor(
-                [
-                    protocol_design.loc[
-                        protocol_design["protocol_arm"]
-                        == task_map.task_idx_to_protocol[task_idx],
-                        self.protocol_parameters,
-                    ].values.squeeze(axis=0)
-                    for task_idx, _ in enumerate(task_map.tasks)
-                ]
-            )
-        else:
-            self.task_protocol_tensor = torch.empty((len(task_map.tasks), 0))
+        self.task_names = [
+            output + "_" + protocol
+            for output in variable_names
+            for protocol in protocol_arms
+        ]
 
         super().__init__(
             parameter_names=parameter_names_without_protocol_overrides,
-            task_map=task_map,
+            output_names=variable_names,
+            protocol_arms=protocol_arms,
+            task_names=self.task_names,
         )
 
     def simulate(
         self,
         X: torch.Tensor,
-        prediction_index: tuple[torch.Tensor, torch.Tensor, torch.Tensor],
+        prediction_index: ObservationIndex,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         num_chains, nb_patients, nb_timesteps, nb_params = X.shape
-        patient_index, timestep_index, task_index = prediction_index
-        protocol_overrides = self.task_protocol_tensor[task_index].reshape(
-            num_chains, nb_patients, nb_timesteps, self.nb_protocol_overrides
+        map_patient_to_protocol = {
+            t[0].item(): t[1].item()
+            for t in (
+                torch.stack(
+                    (
+                        prediction_index.id.index_values,
+                        prediction_index.protocol_arm.index_values,
+                    )
+                )
+                .unique(dim=-1)
+                .unbind(dim=-1)
+            )
+        }
+        actual_protocol_indices = [
+            map_patient_to_protocol[p_ind] for p_ind in range(nb_patients)
+        ]
+        protocol_overrides = self.protocol_overrides_tensor[actual_protocol_indices, :]
+        # protocol overrides: size (nb_patients, nb_protocol_overrides)
+        # expand it to (num_chains, nb_patients, nb_timesteps, nb_protocol_overrides)
+        protocol_overrides_expanded = (
+            protocol_overrides.unsqueeze(0)
+            .unsqueeze(-2)
+            .expand(num_chains, nb_patients, nb_timesteps, -1)
         )
-        X_with_protocol_overrides = torch.concat((X, protocol_overrides), dim=-1)
+        X_with_protocol_overrides = torch.cat((X, protocol_overrides_expanded), dim=-1)
 
-        nb_obs_per_chain = patient_index.shape[0]
+        nb_obs_per_chain = prediction_index.id.index_values.shape[0]
         prediction_index_expanded = (
             torch.arange(num_chains).repeat_interleave(nb_obs_per_chain),
-            patient_index.repeat(num_chains),
-            timestep_index.repeat(num_chains),
-            task_index.apply_(lambda i: self.task_map.task_idx_to_output_idx[i]).repeat(
-                num_chains
-            ),
+            prediction_index.id.index_values.repeat(num_chains),
+            prediction_index.time.index_values.repeat(num_chains),
+            prediction_index.output_name.index_values.repeat(num_chains),
         )
         # map the "columns" (in fact the last axis which corresponds to the parameters) of X_with_protocol_overrides
         # to the positions of the corresponding arguments in the signature of the "equations" function

@@ -6,8 +6,10 @@ from .structural_model_legacy import StructuralModel
 from .config import device, smoke_test
 from tqdm.notebook import tqdm
 from scipy.optimize import minimize
+from warnings import deprecated
 
 
+@deprecated("Replaced by nlme_model.model.NlmeModel")
 class NlmeModel:
     def __init__(
         self,

@@ -31,14 +31,6 @@ class NlmeModel:
         self.structural_model = structural_model
         self.data = dataset
         self.prior_params = prior_params
-        # self.task_map = self.data.task_map
-        # Both the structural model and the data come with a task map.
-        # The data task map takes precedence in the NLME model
-        # The structural model task map is validated against it by checking protocol arms and output names exist in the task map.
-        self.task_map.validate_tasks(
-            self.structural_model.task_map.protocol_arms,
-            self.structural_model.task_map.output_names,
-        )
 
         # -- Attributes initialization
         self.mi_names = self.prior_params.mi_names
@@ -54,24 +46,41 @@ class NlmeModel:
         self.covariate_names = self.prior_params.covariate_names
         self.nb_covariates = len(self.covariate_names)
         self.patients = self.data.patients
-        self.nb_patients = self.data.nb_patients
-        self.output_names = self.data.output_names
-        self.nb_outputs = len(self.output_names)
+        self.nb_patients = len(self.patients)
         self.num_chains = num_chains
 
         # -- Validation
         # Validate observed data against the user-specified parameters
         self.prior_params.validate_data(self.data)
         # Validate the structural model against user-specified parameters
-        assert set(self.output_names) == set(self.task_map.output_names)
         assert set(self.descriptors) == set(
             self.structural_model.parameter_names
         ), f"Inconsistent parameter set between patient data and structural model:\nIn the data: {set(self.descriptors)}\nIn the structural model: {set(self.structural_model.parameter_names)}"
-        assert set(self.structural_model.task_map.protocol_arms) == set(
-            self.data.protocol_arms
-        ), f"Inconsistent protocol arms between patient data and structural model:\nIn the data: {set(
-            self.data.protocol_arms
-        )}\nIn the structural model: {set(self.structural_model.task_map.protocol_arms)}"
+
+        # -- Mapping
+        # Map structural model inputs with NLME parameters
+        self.nlme_descriptor_to_struct_model_input = torch.as_tensor(
+            [
+                self.descriptors.index(param)
+                for param in self.structural_model.parameter_names
+            ],
+            device=device,
+        ).long()
+
+        # Map observation indices to structural model reference values
+        # This applies to output names, protocol arms and tasks
+        # The ordering coming from the structural model takes precedence.
+        self.output_names = self.structural_model.output_names
+        self.nb_outputs = len(self.output_names)
+        self.protocol_arms = self.structural_model.protocol_arms
+        self.nb_protocols = len(self.protocol_arms)
+        self.task_names = self.structural_model.task_names
+        self.nb_tasks = len(self.task_names)
+        self.data.remap_all_indexings(
+            new_output_names=self.output_names,
+            new_protocol_arms=self.protocol_arms,
+            new_tasks=self.task_names,
+        )
 
         # -- NLME state initialization
         # Initiate the nlme model parameters in torch tensors
@@ -91,7 +100,10 @@ class NlmeModel:
             ]
         )
         self.init_res_var = torch.as_tensor(
-            [self.prior_params.error_model[out].sigma for out in self.output_names]
+            [
+                self.prior_params.error_model[out].sigma
+                for out in self.structural_model.output_names
+            ]
         )
 
         self.set_current_parameters(
@@ -115,16 +127,6 @@ class NlmeModel:
         self.mi_transform = init_transform_function(
             self.prior_params.model_intrinsic, self.mi_names
         )
-        # Map structural model inputs with NLME parameters
-        # We assume that the descriptors will always be provided to the model in the following order: PDK, PDU, MI
-        # This is enforced in `convert_gaussian_to_physical` and `convert_physical_to_theta`
-        self.struct_model_input_to_descriptor = torch.as_tensor(
-            [
-                self.descriptors.index(param)
-                for param in self.structural_model.parameter_names
-            ],
-            device=device,
-        ).long()
 
     def init_design_matrix(self, patient_covariates: dict) -> torch.Tensor:
         """
@@ -354,12 +356,12 @@ class NlmeModel:
         assert theta.shape == (nb_samples, self.nb_patients, self.nb_descriptors)
 
         theta_expanded = (
-            theta[:, :, self.struct_model_input_to_descriptor]
+            theta[:, :, self.nlme_descriptor_to_struct_model_input]
             .unsqueeze(-2)
-            .expand((-1, -1, self.data.nb_global_time_steps, -1))
+            .expand((-1, -1, self.data.nb_global_timesteps, -1))
         )
         time_steps_expanded = (
-            self.data.time_steps_tensor.unsqueeze(0)
+            self.data.global_timesteps.unsqueeze(0)
             .unsqueeze(-1)
             .repeat((self.nb_patients, 1, 1))
         )
@@ -370,7 +372,7 @@ class NlmeModel:
         assert struct_model_inputs.shape == (
             nb_samples,
             self.nb_patients,
-            self.data.nb_global_time_steps,
+            self.data.nb_global_timesteps,
             self.nb_descriptors + 1,
         ), f"Unexpected shape {struct_model_inputs.shape}"
         return struct_model_inputs
@@ -391,11 +393,12 @@ class NlmeModel:
         assert inputs.shape == (
             nb_samples,
             self.nb_patients,
-            self.data.nb_global_time_steps,
+            self.data.nb_global_timesteps,
             self.nb_descriptors + 1,
         )
-        prediction_index = self.data.prediction_index
-        pred_mean, pred_var = self.structural_model.simulate(inputs, prediction_index)
+        pred_mean, pred_var = self.structural_model.simulate(
+            inputs, self.data.full_obs.obs_index
+        )
 
         assert pred_mean.shape == (
             nb_samples,

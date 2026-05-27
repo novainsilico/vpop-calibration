@@ -6,7 +6,7 @@ import pandas as pd
 
 
 @pytest.fixture
-def obs_data(np_rng) -> pd.DataFrame:
+def obs_data() -> pd.DataFrame:
     protocol_arms = ["arm-A", "arm-B"]
     patients_arms = {"id": ["p1", "p2"], "protocol_arm": protocol_arms}
     outputs = ["s1", "s2"]
@@ -14,7 +14,7 @@ def obs_data(np_rng) -> pd.DataFrame:
     df = pd.DataFrame.from_dict(patients_arms)
     df = df.merge(pd.DataFrame(outputs, columns=["output_name"]), how="cross")
     df = df.merge(pd.DataFrame(time_steps, columns=["time"]), how="cross")
-    df["value"] = np.abs(np_rng.normal())
+    df["value"] = 0.0
 
     return df
 

@@ -148,5 +148,5 @@ class MixedEffectParameters(BaseModel):
         ), f"Discrepancy between descriptor set and data set columns. The data set informs \n{data.descriptors_known}\n The input parameters inform\n{descriptors_known_params}"
 
         assert set(self.output_names) == set(
-            data.output_names
-        ), f"Discrepancy in output names. The data set contains \n{data.output_names}\n The input parameters contain \n{self.output_names}"
+            data.observed_output_names
+        ), f"Discrepancy in output names. The data set contains \n{data.observed_output_names}\n The input parameters contain \n{self.output_names}"

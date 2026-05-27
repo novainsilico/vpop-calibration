@@ -1,9 +1,11 @@
 import pandera.pandas as pa
 import pandas as pd
 import torch
+from pydantic import BaseModel, ConfigDict
 
 from vpop_calibration.utils import extend_schema
 from vpop_calibration.config import device
+from vpop_calibration.nlme_model.indexing import ObservationIndex
 
 obsDataSchemaLong = pa.DataFrameSchema(
     {
@@ -22,86 +24,61 @@ patientDataSchema = pa.DataFrameSchema(
 )
 
 
+class IndexedObservations(BaseModel):
+    obs_index: ObservationIndex
+    obs_values: torch.Tensor
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+
 class ObsData:
     def __init__(self, data: pa.typing.DataFrame):
         # Initial validation
         self.obs_schema = obsDataSchemaLong
         self.input_df = self.obs_schema.validate(data)
-        self.patients = self.input_df.id.drop_duplicates().to_list()
-        self.nb_patients = len(self.patients)
+        self.patients: list[str] = self.input_df.id.drop_duplicates().to_list()
 
         # Create the patient data frame (id, protocol_arm and descriptors)
         patients_df_raw = self.input_df.drop(
             columns=["output_name", "time", "value"]
         ).drop_duplicates()
-        self.descriptors_known = patients_df_raw.columns.to_list()
+        self.descriptors_known: list[str] = patients_df_raw.columns.to_list()
         self.descriptors_known.remove("id")
         self.descriptors_known.remove("protocol_arm")
         self.patients_schema = extend_schema(
             patientDataSchema, self.descriptors_known, "float"
         )
         self.patients_df = self.patients_schema.validate(patients_df_raw)
-        # Gather the reference lists for indexing:
-        # These are sorted list of unique elements for the three columns [protocol_arm, output_name and time]
-        self.protocol_arms, self.output_names, self.global_time_steps = tuple(
-            map(
-                lambda col: self.input_df[col]
-                .drop_duplicates()
-                .sort_values()
-                .to_list(),
-                ["protocol_arm", "output_name", "time"],
-            )
+
+        self.input_df = self.input_df.assign(
+            task=lambda x: x.output_name + "_" + x.protocol_arm
         )
-        self.nb_global_time_steps = len(self.global_time_steps)
-        self.time_steps_tensor = torch.as_tensor(self.global_time_steps, device=device)
 
-        # Create indexing columns
-        # Avoiding code repetition with a config tuple list. Each element of the list is:
-        # (name of the added indexing column, name of the existing column, corresponding indexing list)
-        indexings = [
-            ("patient_index", "id", self.patients),
-            ("output_index", "output_name", self.output_names),
-            ("protocol_index", "protocol_arm", self.protocol_arms),
-            ("timestep_index", "time", self.global_time_steps),
-        ]
-        self.indexing_columns = [indexing[0] for indexing in indexings]
+        self.full_obs = IndexedObservations(
+            obs_index=ObservationIndex.from_dataframe(self.input_df),
+            obs_values=torch.as_tensor(self.input_df["value"].to_list(), device=device),
+        )
+        self.global_timesteps = torch.tensor(
+            self.full_obs.obs_index.time.ref_values, device=device
+        )
+        self.nb_global_timesteps = self.global_timesteps.shape[0]
+        self.nb_total_observations = self.full_obs.obs_values.shape[0]
+        self.observed_output_names = self.full_obs.obs_index.output_name.ref_values
 
-        for index_name, index_variable, indexing_list in indexings:
-            self.input_df[index_name] = self.input_df[index_variable].apply(
-                lambda x: indexing_list.index(x)
-            )
-        # Assemble the per-patient observations
-        self.observations = {}
+        self.individual_observations: dict[str, IndexedObservations] = {}
         for p in self.patients:
             patient_data = self.input_df.loc[self.input_df["id"] == p]
-            # Column extraction as separate tensors is now immediate with list comprehension:
-            self.observations.update(
+            index_values_p = ObservationIndex.from_dataframe(patient_data)
+            obs_values_p = torch.as_tensor(
+                patient_data["value"].to_list(), device=device
+            )
+            self.individual_observations.update(
                 {
-                    p: {
-                        "prediction_index": tuple(
-                            torch.as_tensor(patient_data[col].to_list(), device=device)
-                            for col in self.indexing_columns
-                        ),
-                        "value": torch.as_tensor(
-                            patient_data["value"].to_list(), device=device
-                        ),
-                    }
+                    p: IndexedObservations(
+                        obs_index=index_values_p, obs_values=obs_values_p
+                    )
                 }
             )
-        # Assemble the full prediction index by concatenating separate tensors into one per index
-        # Important: the prediction index then contains one LongTensor per indexing column
-        # (patient_index, output_index, protocol_index, timestep_index) -> todo: replace with a dataclass
-        self.prediction_index = tuple(
-            map(
-                torch.cat,
-                zip(*[self.observations[p]["prediction_index"] for p in self.patients]),
-            )
-        )
-        # Assemble the full observation tensor
-        self.full_observations = torch.cat(
-            [self.observations[p]["value"] for p in self.patients]
-        )
-        self.nb_total_observations = self.full_observations.shape[0]
 
     def init_pdk_values(self, pdk_names: list[str]) -> None:
         """Generate per-patient PDK tensors
@@ -135,3 +112,24 @@ class ObsData:
         self.patients_pdk_full = torch.cat(
             [self.patients_pdk[ind] for ind in self.patients]
         ).to(device)
+
+    def remap_all_indexings(
+        self,
+        new_patient_ids: list | None = None,
+        new_output_names: list | None = None,
+        new_protocol_arms: list | None = None,
+        new_tasks: list | None = None,
+        new_times: list | None = None,
+    ):
+        args = (
+            new_patient_ids,
+            new_output_names,
+            new_protocol_arms,
+            new_tasks,
+            new_times,
+        )
+        self.full_obs.obs_index = self.full_obs.obs_index.remap_observation_index(*args)
+        for p in self.patients:
+            self.individual_observations[p].obs_index = self.individual_observations[
+                p
+            ].obs_index.remap_observation_index(*args)

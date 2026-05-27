@@ -203,7 +203,7 @@ class StructuralAnalytical(StructuralModel):
         patient_index, timestep_index, task_index = prediction_index
         protocol_overrides = self.task_protocol_tensor[task_index].reshape(
             num_chains, nb_patients, nb_timesteps, self.nb_protocol_overrides
-        )
+        )  # I think this is broken. There is no reason for the task indices to be in the correct order here
         X_with_protocol_overrides = torch.concat((X, protocol_overrides), dim=-1)
 
         nb_obs_per_chain = patient_index.shape[0]
