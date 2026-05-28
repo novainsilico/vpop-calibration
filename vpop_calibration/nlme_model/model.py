@@ -5,6 +5,7 @@ from vpop_calibration.structural_model.base import StructuralModel
 from vpop_calibration.nlme_model.data import ObsData
 from vpop_calibration.nlme_model.params import MixedEffectParameters, ErrorType
 from vpop_calibration.nlme_model.utils import init_transform_function
+from vpop_calibration.nlme_model.residuals import log_likelihood_observation
 from vpop_calibration.config import device
 
 
@@ -434,3 +435,25 @@ class NlmeModel:
         )
 
         return pred_mean, pred_var
+
+    def log_posterior_etas(self, etas: torch.Tensor) -> torch.Tensor:
+        nb_samples = etas.shape[0]
+        assert etas.shape == (nb_samples, self.nb_patients, self.nb_pdu)
+
+        gaussian_params = self.convert_etas_to_gaussian(etas)
+        physical_params = self.convert_gaussian_to_physical(
+            gaussian_params, self.log_mi
+        )
+        thetas = self.convert_physical_to_thetas(physical_params)
+        inputs = self.convert_thetas_to_model_parameters(thetas)
+        pred, _ = self.predict(inputs)
+
+        log_prior = self.log_prior_etas(etas)
+        assert log_prior.shape == (nb_samples, self.nb_patients)
+
+        log_likelihood_obs = log_likelihood_observation(
+            self.data.full_obs, pred, self.error_model_selector, self.residual_var
+        )
+        assert log_likelihood_obs.shape == (nb_samples, self.nb_patients)
+        log_posterior = log_likelihood_obs + log_prior
+        return log_posterior

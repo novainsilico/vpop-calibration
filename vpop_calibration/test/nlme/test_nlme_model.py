@@ -213,3 +213,16 @@ def test_log_prior(sample_nlme_params, obs_data, struct_model):
         log_prior_etas,
         torch.tensor(expected_log_prior).expand(nb_samples, nlme_model.nb_patients),
     )
+
+
+def test_log_posterior(sample_nlme_params, obs_data, struct_model):
+    nlme_model = NlmeModel(
+        structural_model=struct_model, dataset=obs_data, prior_params=sample_nlme_params
+    )
+    nb_samples = 1
+    etas = nlme_model.sample_etas(nb_samples)
+    etas = torch.zeros_like(etas)
+    # Test the log prior function for etas
+    log_post_etas = nlme_model.log_posterior_etas(etas)
+    assert log_post_etas.shape == (nb_samples, nlme_model.nb_patients)
+    # No analytical value here :sadface:, if someone has the courage to write it feel free
