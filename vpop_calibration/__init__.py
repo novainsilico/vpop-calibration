@@ -1,6 +1,7 @@
-from .nlme import NlmeModel
+from .pynlme.model import NlmeModel
 from .saem import PySaem
-from .structural_model_legacy import StructuralGp, StructuralAnalytical
+from .structural_model.analytical import StructuralAnalytical
+from .structural_model.gp import StructuralGp
 from .model import *
 from .vpop import generate_vpop_from_ranges
 from .diagnostics import (

@@ -294,7 +294,6 @@ class NlmeModel:
         etas = self.eta_distribution.sample([nb_samples])
         return etas
 
-    # @torch.compile
     def log_prior_etas(self, etas: torch.Tensor) -> torch.Tensor:
         """Compute log-prior of random effect samples (etas)
 
@@ -416,7 +415,6 @@ class NlmeModel:
         ), f"Unexpected shape {struct_model_inputs.shape}"
         return struct_model_inputs
 
-    @torch.compile
     def predict(self, inputs: torch.Tensor):
         """Return model predictions for all patients
 
