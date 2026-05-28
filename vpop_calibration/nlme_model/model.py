@@ -272,6 +272,7 @@ class NlmeModel:
         self.update_log_mi(log_mi)
         self.update_res_var(res_var)
 
+    @torch.compile
     def sample_etas(self, nb_samples: int) -> torch.Tensor:
         """Sample individual random effects on all from the current estimate of Omega
 
@@ -281,6 +282,25 @@ class NlmeModel:
         etas = self.eta_distribution.sample([nb_samples])
         return etas
 
+    # @torch.compile
+    def log_prior_etas(self, etas: torch.Tensor) -> torch.Tensor:
+        """Compute log-prior of random effect samples (etas)
+
+        Args:
+            etas (torch.Tensor): Individual samples, assuming eta_i ~ N(0, Omega)
+
+        Returns:
+            torch.Tensor [nb_eta_i x nb_PDU]: Values of log-prior, computed according to:
+
+            P(eta) = (1/sqrt((2pi)^k * |Omega|)) * exp(-0.5 * eta.T * omega.inv * eta)
+            log P(eta) = -0.5 * (k * log(2pi) + log|Omega| + eta.T * omega.inv * eta)
+
+        """
+
+        log_priors: torch.Tensor = self.eta_distribution.log_prob(etas).to(device)
+        return log_priors
+
+    @torch.compile
     def convert_etas_to_gaussian(self, etas: torch.Tensor) -> torch.Tensor:
         """Compute individual (gaussian) parameters from random effects chains
 
@@ -300,6 +320,7 @@ class NlmeModel:
 
         return gaussian_params
 
+    @torch.compile
     def convert_gaussian_to_physical(
         self, psi: torch.Tensor, log_mi: torch.Tensor
     ) -> torch.Tensor:
@@ -322,6 +343,7 @@ class NlmeModel:
         phi = torch.cat((pdu, mi), dim=-1).to(device)
         return phi
 
+    @torch.compile
     def convert_physical_to_thetas(self, physical_params: torch.Tensor) -> torch.Tensor:
         """Assemble patient individual parameters
 
@@ -347,6 +369,7 @@ class NlmeModel:
         assert theta.shape == (nb_samples, self.nb_patients, self.nb_descriptors)
         return theta
 
+    @torch.compile
     def convert_thetas_to_model_parameters(self, theta: torch.Tensor) -> torch.Tensor:
         """Assemble model inputs for all patients
 
@@ -381,6 +404,7 @@ class NlmeModel:
         ), f"Unexpected shape {struct_model_inputs.shape}"
         return struct_model_inputs
 
+    @torch.compile
     def predict(self, inputs: torch.Tensor):
         """Return model predictions for all patients
 

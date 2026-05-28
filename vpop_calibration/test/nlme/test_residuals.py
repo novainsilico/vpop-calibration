@@ -1,6 +1,8 @@
 from vpop_calibration.nlme_model.residuals import (
     calculate_residuals,
     compute_error_variance,
+    sum_sq_residuals,
+    log_likelihood_observation,
 )
 from vpop_calibration.nlme_model.params import ErrorType
 from vpop_calibration.nlme_model.indexing import (
@@ -60,3 +62,16 @@ def test_residuals():
     )
     expected_variance = torch.tensor([[1, 4, 1, 4]], dtype=torch.float32)
     torch.testing.assert_close(out_variance, expected_variance)
+
+    sum_sq_res = sum_sq_residuals(
+        observations=obs, prediction=pred, error_model_selector=error_model_selector
+    )
+    expected_sum_sq_res = torch.tensor([[2, 1 / 2]], dtype=torch.float32)
+    torch.testing.assert_close(sum_sq_res, expected_sum_sq_res)
+
+    log_lik = log_likelihood_observation(
+        observations=obs,
+        predictions=pred,
+        error_model_selector=error_model_selector,
+        sigma=sigma,
+    )

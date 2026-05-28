@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 from pandera.typing import DataFrame
 import torch
+import math
 
 from vpop_calibration.nlme_model.data import ObsData
 from vpop_calibration.nlme_model.params import MixedEffectParameters
@@ -29,8 +30,8 @@ def sample_nlme_params() -> MixedEffectParameters:
             },
         },
         "error_model": {
-            "out_1": {"type": "additive", "sigma": 0.1},
-            "out_2": {"type": "proportional", "sigma": 0.5},
+            "out_1": {"error_type": "additive", "sigma": 0.1},
+            "out_2": {"error_type": "proportional", "sigma": 0.5},
         },
         "pdk": ["pdk_1"],
     }
@@ -160,6 +161,7 @@ def test_nlme_simulate(sample_nlme_params, obs_data, struct_model):
     # nullify etas to test the proper PDU and MI transformation
     etas = torch.zeros_like(etas)
     assert etas.shape == (nb_samples, nlme_model.nb_patients, nlme_model.nb_pdu)
+
     psi = nlme_model.convert_etas_to_gaussian(etas)
     assert psi.shape == (nb_samples, nlme_model.nb_patients, nlme_model.nb_pdu)
 
@@ -187,3 +189,27 @@ def test_nlme_simulate(sample_nlme_params, obs_data, struct_model):
     model_inputs = nlme_model.convert_thetas_to_model_parameters(theta)
 
     outs = nlme_model.predict(model_inputs)
+    assert outs[0].shape == (nb_samples, nlme_model.data.nb_total_observations)
+
+
+def test_log_prior(sample_nlme_params, obs_data, struct_model):
+    nlme_model = NlmeModel(
+        structural_model=struct_model, dataset=obs_data, prior_params=sample_nlme_params
+    )
+    nb_samples = 1
+    etas = nlme_model.sample_etas(nb_samples)
+    etas = torch.zeros_like(etas)
+    # Test the log prior function for etas
+    log_prior_etas = nlme_model.log_prior_etas(etas)
+    # Omega is diagonal, computing its determinant is straightforward
+    omega_det = (
+        sample_nlme_params.pdu["pdu_1"].prior_omega
+        * sample_nlme_params.pdu["pdu_2"].prior_omega
+    )
+    k = nlme_model.nb_pdu
+    # Analytical formula for the log probability with samples all = 0
+    expected_log_prior = -0.5 * (k * np.log(2 * math.pi) + np.log(omega_det))
+    torch.testing.assert_close(
+        log_prior_etas,
+        torch.tensor(expected_log_prior).expand(nb_samples, nlme_model.nb_patients),
+    )
