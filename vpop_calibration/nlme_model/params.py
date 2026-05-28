@@ -84,9 +84,12 @@ class PatientDescriptorUnknown(PopulationParameter):
         return transform_param(self.prior, self.constraint)
 
 
+ErrorType = Literal["additive", "proportional"]
+
+
 class ErrorModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    type: Literal["additive", "proportional"]
+    error_type: ErrorType
     sigma: float = Field(ge=0)
 
 

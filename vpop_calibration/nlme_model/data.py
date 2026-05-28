@@ -1,11 +1,10 @@
 import pandera.pandas as pa
 import pandas as pd
 import torch
-from pydantic import BaseModel, ConfigDict
 
 from vpop_calibration.utils import extend_schema
 from vpop_calibration.config import device
-from vpop_calibration.nlme_model.indexing import ObservationIndex
+from vpop_calibration.nlme_model.indexing import ObservationIndex, IndexedObservations
 
 obsDataSchemaLong = pa.DataFrameSchema(
     {
@@ -22,13 +21,6 @@ obsDataSchemaLong = pa.DataFrameSchema(
 patientDataSchema = pa.DataFrameSchema(
     {"id": pa.Column(str, unique=True), "protocol_arm": pa.Column(str, unique=True)}
 )
-
-
-class IndexedObservations(BaseModel):
-    obs_index: ObservationIndex
-    obs_values: torch.Tensor
-
-    model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
 class ObsData:

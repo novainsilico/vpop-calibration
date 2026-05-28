@@ -1,10 +1,9 @@
 import torch
+from typing import get_args
 
 from vpop_calibration.structural_model.base import StructuralModel
 from vpop_calibration.nlme_model.data import ObsData
-from vpop_calibration.nlme_model.params import (
-    MixedEffectParameters,
-)
+from vpop_calibration.nlme_model.params import MixedEffectParameters, ErrorType
 from vpop_calibration.nlme_model.utils import init_transform_function
 from vpop_calibration.config import device
 
@@ -81,6 +80,14 @@ class NlmeModel:
             new_protocol_arms=self.protocol_arms,
             new_tasks=self.task_names,
         )
+        # Map the error model type to the output indices
+        self.error_model_selector: dict[ErrorType, list[int]] = {}
+        for error_type in get_args(ErrorType):
+            self.error_model_selector.update({error_type: []})
+        for i, output in enumerate(self.output_names):
+            self.error_model_selector[
+                self.prior_params.error_model[output].error_type
+            ].append(i)
 
         # -- NLME state initialization
         # Initiate the nlme model parameters in torch tensors
@@ -100,10 +107,7 @@ class NlmeModel:
             ]
         )
         self.init_res_var = torch.as_tensor(
-            [
-                self.prior_params.error_model[out].sigma
-                for out in self.structural_model.output_names
-            ]
+            [self.prior_params.error_model[out].sigma for out in self.output_names]
         )
 
         self.set_current_parameters(

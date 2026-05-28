@@ -1,5 +1,6 @@
 from typing import NamedTuple
 import torch
+from pydantic import BaseModel, ConfigDict
 
 
 class IndexedValues(NamedTuple):
@@ -81,3 +82,10 @@ class ObservationIndex(NamedTuple):
             *tuple(map(lambda args: remap_indexed_values(*args), replacement_map))
         )
         return new_obs_index
+
+
+class IndexedObservations(BaseModel):
+    obs_index: ObservationIndex
+    obs_values: torch.Tensor
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
