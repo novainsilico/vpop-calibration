@@ -1,18 +1,9 @@
-from .pynlme.model import NlmeModel
-from .saem import PySaem
-from .structural_model.analytical import StructuralAnalytical
-from .structural_model.gp import StructuralGp
-from .model import *
-from .vpop import generate_vpop_from_ranges
-from .diagnostics import (
-    check_surrogate_validity_gp,
-    plot_map_estimates,
-    plot_individual_map_estimates,
-    plot_all_individual_map_estimates,
-    plot_map_estimates_gof,
-    plot_weighted_residuals,
-    plot_map_vs_posterior,
-)
+from vpop_calibration.pynlme.model import NlmeModel
+from vpop_calibration.saem import PySaem
+from vpop_calibration.structural_model.analytical import StructuralAnalytical
+from vpop_calibration.structural_model.gp import StructuralGp
+from vpop_calibration.model import *
+from vpop_calibration.vpop import generate_vpop_from_ranges
 
 __all__ = [
     "GP",
@@ -21,11 +12,4 @@ __all__ = [
     "NlmeModel",
     "PySaem",
     "generate_vpop_from_ranges",
-    "check_surrogate_validity_gp",
-    "plot_map_estimates",
-    "plot_individual_map_estimates",
-    "plot_all_individual_map_estimates",
-    "plot_map_estimates_gof",
-    "plot_weighted_residuals",
-    "plot_map_vs_posterior",
 ]
