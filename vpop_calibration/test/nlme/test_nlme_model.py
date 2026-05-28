@@ -223,6 +223,6 @@ def test_log_posterior(sample_nlme_params, obs_data, struct_model):
     etas = nlme_model.sample_etas(nb_samples)
     etas = torch.zeros_like(etas)
     # Test the log prior function for etas
-    log_post_etas = nlme_model.log_posterior_etas(etas)
-    assert log_post_etas.shape == (nb_samples, nlme_model.nb_patients)
+    predictions = nlme_model.log_posterior_etas(etas)
+    assert predictions.log_posterior.shape == (nb_samples, nlme_model.nb_patients)
     # No analytical value here :sadface:, if someone has the courage to write it feel free

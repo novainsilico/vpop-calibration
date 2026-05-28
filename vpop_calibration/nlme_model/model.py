@@ -1,5 +1,5 @@
 import torch
-from typing import get_args
+from typing import get_args, NamedTuple
 
 from vpop_calibration.structural_model.base import StructuralModel
 from vpop_calibration.nlme_model.data import ObsData
@@ -7,6 +7,12 @@ from vpop_calibration.nlme_model.params import MixedEffectParameters, ErrorType
 from vpop_calibration.nlme_model.utils import init_transform_function
 from vpop_calibration.nlme_model.residuals import log_likelihood_observation
 from vpop_calibration.config import device
+
+
+class LogPosteriorPrediction(NamedTuple):
+    log_posterior: torch.Tensor
+    gaussian_params: torch.Tensor
+    predictions: torch.Tensor
 
 
 class NlmeModel:
@@ -436,7 +442,7 @@ class NlmeModel:
 
         return pred_mean, pred_var
 
-    def log_posterior_etas(self, etas: torch.Tensor) -> torch.Tensor:
+    def log_posterior_etas(self, etas: torch.Tensor) -> LogPosteriorPrediction:
         nb_samples = etas.shape[0]
         assert etas.shape == (nb_samples, self.nb_patients, self.nb_pdu)
 
@@ -455,5 +461,11 @@ class NlmeModel:
             self.data.full_obs, pred, self.error_model_selector, self.residual_var
         )
         assert log_likelihood_obs.shape == (nb_samples, self.nb_patients)
+
         log_posterior = log_likelihood_obs + log_prior
-        return log_posterior
+
+        return LogPosteriorPrediction(
+            log_posterior=log_posterior,
+            gaussian_params=gaussian_params,
+            predictions=pred,
+        )
