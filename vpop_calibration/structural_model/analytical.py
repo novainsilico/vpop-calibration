@@ -1,42 +1,12 @@
-import torch
-import pandas as pd
 from typing import Callable, Optional
+import pandas as pd
 import pandera.pandas as pa
+import torch
 
+from vpop_calibration.structural_model.base import StructuralModel
 from vpop_calibration.nlme_model.indexing import ObservationIndex
-from vpop_calibration.config import device
 from vpop_calibration.utils import extend_schema
-
-
-class StructuralModel:
-    def __init__(
-        self,
-        parameter_names: list[str],
-        output_names: list[str],
-        protocol_arms: list[str],
-        task_names: list[str],
-    ):
-        """Initialize a structural model
-
-        Args:
-            parameter_names (list[str]): _description_
-            output_names (list[str]): _description_
-            protocol_arms (list[str]): _description_
-            tasks (list[str]): _description_
-            task_idx_to_output_idx (list[str]): _description_
-            task_idx_to_protocol (list[str]): _description_
-        """
-        self.parameter_names: list[str] = parameter_names
-        self.output_names: list[str] = output_names
-        self.protocol_arms: list[str] = protocol_arms
-        self.task_names: list[str] = task_names
-
-    def simulate(
-        self,
-        X: torch.Tensor,
-        prediction_index: ObservationIndex,
-    ) -> tuple[torch.Tensor, torch.Tensor]:
-        raise ValueError("Not implemented")
+from vpop_calibration.config import device
 
 
 class StructuralAnalytical(StructuralModel):

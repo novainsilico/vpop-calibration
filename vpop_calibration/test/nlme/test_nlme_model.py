@@ -6,8 +6,9 @@ import torch
 
 from vpop_calibration.nlme_model.data import ObsData
 from vpop_calibration.nlme_model.params import MixedEffectParameters
-from vpop_calibration.structural_model import StructuralAnalytical, StructuralModel
 from vpop_calibration.nlme_model.model import NlmeModel
+from vpop_calibration.structural_model.base import StructuralModel
+from vpop_calibration.structural_model.analytical import StructuralAnalytical
 
 
 @pytest.fixture

@@ -1,6 +1,6 @@
 import torch
 
-from vpop_calibration.structural_model import StructuralModel
+from vpop_calibration.structural_model.base import StructuralModel
 from vpop_calibration.nlme_model.data import ObsData
 from vpop_calibration.nlme_model.params import (
     MixedEffectParameters,
@@ -19,7 +19,7 @@ class NlmeModel:
     ):
         """Non-linear mixed effects model
 
-        Create a NLME model from three main elements: structural model, observed data and population parameter priors.
+        Create a NLME model from three main elements: structural model, observed data and population parameter priors. This class is the main user entrypoint for simulating distributed data and computing likelihood.
 
         Args:
             structural_model (StructuralModel): The deterministic model equations

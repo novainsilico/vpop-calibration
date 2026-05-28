@@ -33,6 +33,11 @@ class IndexedObservations(BaseModel):
 
 class ObsData:
     def __init__(self, data: pa.typing.DataFrame):
+        """Load and process an observed data set
+
+        Args:
+            data (pa.typing.DataFrame): The observed data. Should contain at least the columns ["id", "output_name", "time", "value"].
+        """
         # Initial validation
         self.obs_schema = obsDataSchemaLong
         self.input_df = self.obs_schema.validate(data)

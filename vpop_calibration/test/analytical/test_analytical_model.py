@@ -2,7 +2,7 @@ import torch
 import pandas as pd
 from torch.testing import assert_close
 
-from vpop_calibration.structural_model import StructuralAnalytical
+from vpop_calibration.structural_model.analytical import StructuralAnalytical
 from vpop_calibration.nlme_model.indexing import ObservationIndex, IndexedValues
 
 
