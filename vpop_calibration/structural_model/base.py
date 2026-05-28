@@ -1,6 +1,6 @@
 import torch
 
-from vpop_calibration.nlme_model.indexing import ObservationIndex
+from vpop_calibration.pynlme.indexing import ObservationIndex
 
 
 class StructuralModel:

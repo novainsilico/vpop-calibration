@@ -1,8 +1,9 @@
-from vpop_calibration.nlme_model.data import ObsData
+from vpop_calibration.pynlme.data import ObsData
 
 import pytest
 import numpy as np
 import pandas as pd
+import torch
 
 
 @pytest.fixture
@@ -19,8 +20,16 @@ def obs_data() -> pd.DataFrame:
     return df
 
 
-@pytest.mark.parametrize("boostrap_ratio", [1.0, 0.5])
-def test_data_container(obs_data, boostrap_ratio, np_rng):
+def test_data_container(obs_data):
     df = obs_data
-    df_boot = df.sample(frac=boostrap_ratio, random_state=np_rng)
+    ds = ObsData(df)
+
+    torch.testing.assert_close(
+        ds.n_tot_observations_per_output, torch.tensor([6, 6]), check_dtype=False
+    )
+
+
+def test_incomplete_data(obs_data, np_rng):
+    df = obs_data
+    df_boot = df.sample(frac=0.5, random_state=np_rng)
     ds = ObsData(df_boot)

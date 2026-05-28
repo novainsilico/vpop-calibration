@@ -4,7 +4,7 @@ import pandera.pandas as pa
 import torch
 
 from vpop_calibration.structural_model.base import StructuralModel
-from vpop_calibration.nlme_model.indexing import ObservationIndex
+from vpop_calibration.pynlme.indexing import ObservationIndex
 from vpop_calibration.utils import extend_schema
 from vpop_calibration.config import device
 

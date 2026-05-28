@@ -4,7 +4,7 @@ import torch
 
 from vpop_calibration.utils import extend_schema
 from vpop_calibration.config import device
-from vpop_calibration.nlme_model.indexing import ObservationIndex, IndexedObservations
+from vpop_calibration.pynlme.indexing import ObservationIndex, IndexedObservations
 
 obsDataSchemaLong = pa.DataFrameSchema(
     {
@@ -55,6 +55,7 @@ class ObsData:
             obs_index=ObservationIndex.from_dataframe(self.input_df),
             obs_values=torch.as_tensor(self.input_df["value"].to_list(), device=device),
         )
+        self.nb_outputs = len(self.full_obs.obs_index.output_name.ref_values)
         self.global_timesteps = torch.tensor(
             self.full_obs.obs_index.time.ref_values, device=device
         )
@@ -63,6 +64,8 @@ class ObsData:
         self.observed_output_names = self.full_obs.obs_index.output_name.ref_values
 
         self.individual_observations: dict[str, IndexedObservations] = {}
+
+        self.n_tot_observations_per_output = torch.zeros(self.nb_outputs, device=device)
         for p in self.patients:
             patient_data = self.input_df.loc[self.input_df["id"] == p]
             index_values_p = ObservationIndex.from_dataframe(patient_data)
@@ -75,6 +78,15 @@ class ObsData:
                         obs_index=index_values_p, obs_values=obs_values_p
                     )
                 }
+            )
+            self.n_tot_observations_per_output.scatter_add_(
+                0,
+                index_values_p.output_name.index_values,
+                torch.ones_like(
+                    index_values_p.output_name.index_values,
+                    device=device,
+                    dtype=torch.float64,
+                ),
             )
 
     def init_pdk_values(self, pdk_names: list[str]) -> None:

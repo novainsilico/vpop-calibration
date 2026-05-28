@@ -3,7 +3,7 @@ import numpy as np
 from typing import Literal, Optional, get_args, Any
 from typing_extensions import Self
 
-from vpop_calibration.nlme_model.data import ObsData
+from vpop_calibration.pynlme.data import ObsData
 
 TransformFunction = Literal["log", "logit"]
 
@@ -106,6 +106,7 @@ class MixedEffectParameters(BaseModel):
     beta_init: list[float] = []
     beta_names: list[str] = []
     covariate_names: list[str] = []
+    covariate_coeff_names: list[str] = []
 
     @computed_field
     @property
@@ -131,6 +132,7 @@ class MixedEffectParameters(BaseModel):
         covariate_set = set()
         self.beta_init = []
         self.beta_names = []
+        self.covariate_coeff_names = []
         for pdu_name, pdu_val in self.pdu.items():
             self.beta_names.append(pdu_name)
             self.beta_init.append(pdu_val.transformed_prior)
@@ -139,6 +141,7 @@ class MixedEffectParameters(BaseModel):
                     covariate_set.add(cov_name)
                     self.beta_names.append(cov_val.coef_name)
                     self.beta_init.append(cov_val.prior)
+                    self.covariate_coeff_names.append(cov_val.coef_name)
         self.covariate_names = list(covariate_set)
 
     def validate_data(self, data: ObsData) -> None:

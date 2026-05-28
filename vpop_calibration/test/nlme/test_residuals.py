@@ -1,11 +1,11 @@
-from vpop_calibration.nlme_model.residuals import (
+from vpop_calibration.pynlme.residuals import (
     calculate_residuals,
     compute_error_variance,
     sum_sq_residuals,
     log_likelihood_observation,
 )
-from vpop_calibration.nlme_model.params import ErrorType
-from vpop_calibration.nlme_model.indexing import (
+from vpop_calibration.pynlme.params import ErrorType
+from vpop_calibration.pynlme.indexing import (
     ObservationIndex,
     IndexedValues,
     IndexedObservations,

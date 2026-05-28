@@ -8,8 +8,13 @@ from pandas import DataFrame
 import numpy as np
 from IPython.display import display, DisplayHandle
 
-from .config import smoke_test, device
-from .nlme import NlmeModel
+from vpop_calibration.config import smoke_test, device
+from vpop_calibration.pynlme.model import NlmeModel
+from vpop_calibration.metropolis_hastings import MetropolisHastingsState, mh_step
+from vpop_calibration.pynlme.residuals import (
+    sum_sq_residuals,
+    log_likelihood_observation,
+)
 
 
 # Main SAEM Algorithm Class
@@ -17,7 +22,6 @@ class PySaem:
     def __init__(
         self,
         model: NlmeModel,
-        observations_df: DataFrame,
         # MCMC parameters for the E-step
         mcmc_first_burn_in: int = 5,
         mcmc_nb_transitions: int = 1,
@@ -62,7 +66,6 @@ class PySaem:
         """
 
         self.model: NlmeModel = model
-        self.model.add_observations(observations_df)
         # MCMC sampling in the E-step parameters
         self.mcmc_first_burn_in: int = mcmc_first_burn_in
         self.mcmc_nb_transitions: int = mcmc_nb_transitions
@@ -88,7 +91,7 @@ class PySaem:
 
         # Numerical parameters that depend on the iterations phase
         # The learning rate for the step-size adaptation in E-step sampling
-        self.step_size: float = init_step_size / np.sqrt(self.model.nb_PDU)
+        self.step_size: float = init_step_size / np.sqrt(self.model.nb_pdu)
         self.init_step_size_adaptation: float = 0.5
         self.step_size_learning_rate_power: float = 0.5
 
@@ -113,36 +116,39 @@ class PySaem:
         self.plot_indiv_figsize = plot_indiv_figsize
 
         # Initialize the running variables for optimization
-        self.current_etas_chains = self.model.eta_samples_chains
-        (
-            self.current_log_prob_chains,
-            self.current_gaussian_params,
-            self.current_pred,
-        ) = self.model.log_posterior_etas(self.current_etas_chains)
+        current_output = self.model.log_posterior_etas(self.model.eta_samples_chains)
         # Initialize the complete likelihood to a dummy value to avoid messing with the plot scale
-        self.current_complete_likelihood = torch.Tensor([0])
+        complete_lik = torch.Tensor([0])
+        self.current_mh_state = MetropolisHastingsState(
+            etas=self.model.eta_samples_chains,
+            gaussian_params=current_output.gaussian_params,
+            prediction=current_output.predictions,
+            log_prob=current_output.log_posterior,
+            complete_likelihood=complete_lik,
+            step_size=self.step_size,
+        )
 
         # Initialize the optimizer history
         self._init_history(
             self.model.population_betas,
             self.model.omega_pop,
-            self.model.log_MI,
+            self.model.log_mi,
             self.model.residual_var,
-            self.current_complete_likelihood,
+            self.current_mh_state.complete_likelihood,
         )
         self.current_iteration: int = 0
 
         # Initialize the values for convergence checks
         self.prev_params: dict[str, torch.Tensor] = {
-            "log_MI": self.model.log_MI,
+            "log_MI": self.model.log_mi,
             "population_betas": self.model.population_betas,
             "population_omega": self.model.omega_pop,
             "residual_error_var": self.model.residual_var,
         }
 
-        # Store the full design matrix, with shape (num_chains, nb_patient, nb_PDU, nb_betas)
+        # Store the full design matrix, with shape (nb_chains, nb_patient, nb_PDU, nb_betas)
         self.X = self.model.full_design_matrix
-        self.X_chains = self.X.expand(self.model.num_chains, -1, -1, -1)
+        self.X_chains = self.X.expand(self.model.nb_chains, -1, -1, -1)
         # Precompute the batch gram matrix
         # Gram = sum(X_i.T @ X_i, for i in patients)
         self.sufficient_stat_gram_matrix = (
@@ -151,7 +157,7 @@ class PySaem:
 
         # Initialize sufficient statistics by performing one M-step update (without updating beta or omega)
         self.sufficient_stat_cross_product, self.sufficient_stat_outer_product, _, _ = (
-            self.m_step_update(self.current_gaussian_params)
+            self.m_step_update(self.current_mh_state.gaussian_params)
         )
 
         # Store true NLME parameters, if provided
@@ -165,7 +171,7 @@ class PySaem:
             }
         if true_res_var is not None:
             self.true_res_var = {
-                self.model.outputs_names[k]: val for k, val in enumerate(true_res_var)
+                self.model.output_names[k]: val for k, val in enumerate(true_res_var)
             }
 
     def m_step_update(
@@ -189,9 +195,9 @@ class PySaem:
             - omega matrix
         """
         assert gaussian_params.shape == (
-            self.model.num_chains,
+            self.model.nb_chains,
             self.model.nb_patients,
-            self.model.nb_PDU,
+            self.model.nb_pdu,
         )
         cross_product = (
             (self.X_chains.transpose(-1, -2) @ gaussian_params.unsqueeze(-1))
@@ -339,8 +345,8 @@ class PySaem:
         # Initialize the history
         self.history = {}
         # Add the pdus (mean, variance)
-        for i, pdu in enumerate(self.model.PDU_names):
-            beta_index = self.model.population_betas_names.index(pdu)
+        for i, pdu in enumerate(self.model.pdu_names):
+            beta_index = self.model.beta_names.index(pdu)
             self.history.update(
                 {
                     pdu: {
@@ -350,16 +356,16 @@ class PySaem:
                 }
             )
         # Add the covariates
-        for i, cov in enumerate(self.model.covariate_coeffs_names):
-            beta_index = self.model.population_betas_names.index(cov)
+        for i, cov in enumerate(self.model.covariate_coeff_names):
+            beta_index = self.model.beta_names.index(cov)
             self.history.update({cov: [beta[beta_index].cpu()]})
         # Add Omega
         self.history.update({"omega": [omega.cpu()]})
         # Add the model intrinsic params
-        for i, mi in enumerate(self.model.MI_names):
+        for i, mi in enumerate(self.model.mi_names):
             self.history.update({mi: [log_mi[i].cpu()]})
         # Add the residual variance
-        for i, output in enumerate(self.model.outputs_names):
+        for i, output in enumerate(self.model.output_names):
             self.history.update({output: [res_var[i].cpu()]})
         self.history.update({"complete_likelihood": [likelihood.cpu()]})
 
@@ -372,21 +378,21 @@ class PySaem:
         complete_likelihood: torch.Tensor,
     ) -> None:
         # Update the history
-        for i, pdu in enumerate(self.model.PDU_names):
-            beta_index = self.model.population_betas_names.index(pdu)
+        for i, pdu in enumerate(self.model.pdu_names):
+            beta_index = self.model.beta_names.index(pdu)
             self.history[pdu]["mu"].append(beta[beta_index].cpu())
             self.history[pdu]["sigma_sq"].append(omega[i, i].cpu())
 
-        for i, cov in enumerate(self.model.covariate_coeffs_names):
-            beta_index = self.model.population_betas_names.index(cov)
+        for i, cov in enumerate(self.model.covariate_coeff_names):
+            beta_index = self.model.beta_names.index(cov)
             self.history[cov].append(beta[beta_index].cpu())
 
         self.history["omega"].append(omega.cpu())
 
-        for i, mi in enumerate(self.model.MI_names):
+        for i, mi in enumerate(self.model.mi_names):
             self.history[mi].append(log_mi[i].cpu())
 
-        for i, output in enumerate(self.model.outputs_names):
+        for i, output in enumerate(self.model.output_names):
             self.history[output].append(res_var[i].cpu())
         self.history["complete_likelihood"].append(complete_likelihood.cpu())
 
@@ -417,53 +423,31 @@ class PySaem:
             )
 
         # Perform the initial burn-in
-        for _ in range(current_iter_burn_in):
-            (
-                self.current_etas_chains,
-                self.current_log_prob_chains,
-                self.current_complete_likelihood,
-                self.current_pred,
-                self.current_gaussian_params,
-                self.step_size,
-            ) = self.model.mh_step(
-                current_etas=self.current_etas_chains,
-                current_log_prob=self.current_log_prob_chains,
-                current_pred=self.current_pred,
-                current_gaussian_params=self.current_gaussian_params,
-                step_size=self.step_size,
+        for _ in range(current_iter_burn_in + self.mcmc_nb_transitions):
+            self.current_mh_state = mh_step(
+                nlme_model=self.model,
+                previous_state=self.current_mh_state,
                 learning_rate=self.step_size_adaptation,
                 verbose=self.verbose,
             )
 
-        for _ in range(self.mcmc_nb_transitions):
-            (
-                self.current_etas_chains,
-                self.current_log_prob_chains,
-                self.current_complete_likelihood,
-                self.current_pred,
-                self.current_gaussian_params,
-                self.step_size,
-            ) = self.model.mh_step(
-                current_etas=self.current_etas_chains,
-                current_log_prob=self.current_log_prob_chains,
-                current_pred=self.current_pred,
-                current_gaussian_params=self.current_gaussian_params,
-                step_size=self.step_size,
-                learning_rate=self.step_size_adaptation,
-                verbose=self.verbose,
-            )
         # Update the model's eta and thetas
-        self.model.update_eta_samples(self.current_etas_chains)
+        self.model.update_eta_samples(self.current_mh_state.etas)
 
         # --- M-Step: Update Population Means, Omega and Residual variance ---
 
         # 1. Update residual error variances
-        sum_sq_res = self.model.sum_sq_residuals_chains(self.current_pred)
+        sum_sq_res_full = sum_sq_residuals(
+            prediction=self.current_mh_state.prediction,
+            observations=self.model.data.full_obs,
+            error_model_selector=self.model.error_model_selector,
+        )
+        sum_sq_res = sum_sq_res_full.sum(dim=0)
         assert sum_sq_res.shape == (
             self.model.nb_outputs,
         ), f"Unexpected residual shape: {sum_sq_res.shape}"
         target_res_var: torch.Tensor = (
-            sum_sq_res / self.model.n_tot_observations_per_output
+            sum_sq_res / self.model.data.n_tot_observations_per_output
         )
         current_res_var: torch.Tensor = self.model.residual_var
         if k < self.nb_phase1_iterations:
@@ -481,7 +465,7 @@ class PySaem:
             new_beta,
             new_omega,
         ) = self.m_step_update(
-            self.current_gaussian_params,
+            self.current_mh_state.gaussian_params,
             self.sufficient_stat_cross_product,
             self.sufficient_stat_outer_product,
         )
@@ -501,28 +485,28 @@ class PySaem:
         self.model.update_omega(new_omega)
 
         # 3. Update fixed effects MIs
-        if self.model.nb_MI > 0:
+        if self.model.nb_mi > 0:
             # This step is notoriously under-optimized
             self.current_gaussian_params_per_patient = (
-                self.current_gaussian_params.mean(dim=0)
+                self.current_mh_state.gaussian_params.mean(dim=0)
             )
             objective_fun = self.build_mi_objective_function()
             target_log_MI_np = minimize(
                 fun=objective_fun,
-                x0=self.model.log_MI.cpu().squeeze().numpy(),
+                x0=self.model.log_mi.cpu().squeeze().numpy(),
                 method="L-BFGS-B",
                 options={"maxfun": self.optim_max_fun},
             ).x
             target_log_MI = torch.from_numpy(target_log_MI_np).to(device)
             new_log_MI = self._stochastic_approximation(
-                self.model.log_MI, target_log_MI
+                self.model.log_mi, target_log_MI
             )
 
             self.model.update_log_mi(new_log_MI)
 
         if self.verbose:
             print(
-                f"  Updated MIs: {', '.join([f'{torch.exp(logMI).item():.4f}' for logMI in self.model.log_MI.detach().cpu()])}"
+                f"  Updated MIs: {', '.join([f'{torch.exp(logMI).item():.4f}' for logMI in self.model.log_mi.detach().cpu()])}"
             )
             print(
                 f"  Updated Betas: {', '.join([f'{beta:.4f}' for beta in self.model.population_betas.detach().cpu().numpy().flatten()])}"
@@ -536,7 +520,7 @@ class PySaem:
 
         # Convergence check
         new_params: dict[str, torch.Tensor] = {
-            "log_MI": self.model.log_MI,
+            "log_MI": self.model.log_mi,
             "population_betas": self.model.population_betas,
             "population_omega": self.model.omega_pop,
             "residual_error_var": self.model.residual_var,
@@ -547,9 +531,9 @@ class PySaem:
         self._append_history(
             self.model.population_betas,
             self.model.omega_pop,
-            self.model.log_MI,
+            self.model.log_mi,
             self.model.residual_var,
-            self.current_complete_likelihood,
+            self.current_mh_state.complete_likelihood,
         )
 
         # update prev_params for the next iteration's convergence check
@@ -563,14 +547,18 @@ class PySaem:
         def mi_objective_function(log_MI: np.ndarray):
             mi_tensor = torch.from_numpy(log_MI).to(device)
             # Assemble the patient parameters
-            new_physical_params = self.model.gaussian_to_physical_params(
-                self.current_gaussian_params, mi_tensor
+            new_physical_params = self.model.convert_gaussian_to_physical(
+                self.current_mh_state.gaussian_params, mi_tensor
             )
-            new_thetas = self.model.assemble_individual_parameters(new_physical_params)
-            predictions, _ = self.model.predict_outputs_from_theta(new_thetas)
+            new_thetas = self.model.convert_physical_to_thetas(new_physical_params)
+            model_input = self.model.convert_thetas_to_model_parameters(new_thetas)
+            predictions, _ = self.model.predict(model_input)
             total_log_lik = (
-                self.model.log_likelihood_observation(
-                    predictions,
+                log_likelihood_observation(
+                    predictions=predictions,
+                    observations=self.model.data.full_obs,
+                    error_model_selector=self.model.error_model_selector,
+                    sigma=self.model.residual_var,
                 )
                 .cpu()
                 .sum()
@@ -595,7 +583,7 @@ class PySaem:
                 f"Initial Population Betas: {', '.join([f'{beta.item():.2f}' for beta in self.model.population_betas.cpu()])}"
             )
             print(
-                f"Initial Population MIs: {', '.join([f'{torch.exp(logMI).item():.2f}' for logMI in self.model.log_MI.cpu()])}"
+                f"Initial Population MIs: {', '.join([f'{torch.exp(logMI).item():.2f}' for logMI in self.model.log_mi.cpu()])}"
             )
             print(f"Initial Omega:\n{self.model.omega_pop.cpu()}")
             print(f"Initial Residual Variance: {self.model.residual_var.cpu()}")
@@ -707,9 +695,9 @@ class PySaem:
         This method plots the evolution of the estimated parameters (MI, betas, omega, residual error variances) across iterations
         """
         history = self.history
-        nb_MI: int = self.model.nb_MI
+        nb_MI: int = self.model.nb_mi
         nb_betas: int = self.model.nb_betas
-        nb_omega_diag_params: int = self.model.nb_PDU
+        nb_omega_diag_params: int = self.model.nb_pdu
         nb_var_res_params: int = self.model.nb_outputs
         nb_plots = nb_MI + nb_betas + nb_omega_diag_params + nb_var_res_params + 1
         nb_cols = n_cols
@@ -729,7 +717,7 @@ class PySaem:
         self.traces = {}
         plot_idx: int = 0
         # Plot the MI parameters
-        for mi_name in self.model.MI_names:
+        for mi_name in self.model.mi_names:
             row, col = plot_idx // nb_cols, plot_idx % nb_cols
             ax = axes[row, col]
             ax.set_xlim(0, maxiter)
@@ -748,7 +736,7 @@ class PySaem:
             self.traces.update({mi_name: tr})
             plot_idx += 1
         # Plot the PDUs means
-        for pdu in self.model.PDU_names:
+        for pdu in self.model.pdu_names:
             row, col = plot_idx // nb_cols, plot_idx % nb_cols
             ax = axes[row, col]
             ax.set_xlim(0, maxiter)
@@ -768,7 +756,7 @@ class PySaem:
             self.traces.update({pdu: {"mu": tr}})
             plot_idx += 1
         # Plot the PDUs sigma
-        for pdu in self.model.PDU_names:
+        for pdu in self.model.pdu_names:
             row, col = plot_idx // nb_cols, plot_idx % nb_cols
             ax = axes[row, col]
             ax.set_xlim(0, maxiter)
@@ -788,7 +776,7 @@ class PySaem:
             self.traces[pdu].update({"sigma_sq": tr})
             plot_idx += 1
         # Plot the coefficients of covariation
-        for beta_name in self.model.covariate_coeffs_names:
+        for beta_name in self.model.covariate_coeff_names:
             row, col = plot_idx // nb_cols, plot_idx % nb_cols
             ax = axes[row, col]
             ax.set_xlim(0, maxiter)
@@ -808,7 +796,7 @@ class PySaem:
             self.traces.update({beta_name: tr})
             plot_idx += 1
         # Plot the residual variance
-        for res_name in self.model.outputs_names:
+        for res_name in self.model.output_names:
             row, col = plot_idx // nb_cols, plot_idx % nb_cols
             ax = axes[row, col]
             ax.set_xlim(0, maxiter)
@@ -856,23 +844,23 @@ class PySaem:
         history = self.history
         new_xaxis = np.arange(self.current_iteration + 2)
         # Plot the MI parameters
-        for mi_name in self.model.MI_names:
+        for mi_name in self.model.mi_names:
             MI_history = [h.item() for h in history[mi_name]]
             self.traces[mi_name].set_data(new_xaxis, MI_history)
         # Plot the PDUs means
-        for pdu in self.model.PDU_names:
+        for pdu in self.model.pdu_names:
             beta_history = [h.item() for h in history[pdu]["mu"]]
             self.traces[pdu]["mu"].set_data(new_xaxis, beta_history)
         # Plot the PDUs sigma
-        for pdu in self.model.PDU_names:
+        for pdu in self.model.pdu_names:
             beta_history = [h.item() for h in history[pdu]["sigma_sq"]]
             self.traces[pdu]["sigma_sq"].set_data(new_xaxis, beta_history)
         # Plot the coefficients of covariation
-        for beta_name in self.model.covariate_coeffs_names:
+        for beta_name in self.model.covariate_coeff_names:
             beta_history = [h.item() for h in history[beta_name]]
             self.traces[beta_name].set_data(new_xaxis, beta_history)
         # Plot the residual variance
-        for res_name in self.model.outputs_names:
+        for res_name in self.model.output_names:
             var_res_history = [h.item() for h in history[res_name]]
             self.traces[res_name].set_data(new_xaxis, var_res_history)
         conv_ind = [h.item() for h in history["complete_likelihood"]]
@@ -896,17 +884,17 @@ class PySaem:
 
     def print_estimates_console(self) -> None:
         print("Estimated values of population effects:\n")
-        if self.model.nb_MI > 0:
+        if self.model.nb_mi > 0:
             print("------")
             print("Model intrinsic parameters:")
-            for i, mi in enumerate(self.model.MI_names):
-                val_log = self.model.log_MI[i]
+            for i, mi in enumerate(self.model.mi_names):
+                val_log = self.model.log_mi[i]
                 print(f"{mi}: {val_log:.2f}")
-        if self.model.nb_PDU > 0:
+        if self.model.nb_pdu > 0:
             print("------")
             print("PDU parameters:")
-            for i, pdu in enumerate(self.model.PDU_names):
-                beta_index = self.model.population_betas_names.index(pdu)
+            for i, pdu in enumerate(self.model.pdu_names):
+                beta_index = self.model.beta_names.index(pdu)
                 mu_val = self.model.population_betas[beta_index]
                 omega_val = self.model.omega_pop[i, i]
                 std_dev = (torch.exp(omega_val) - 1) * torch.exp(2 * mu_val + omega_val)
@@ -916,12 +904,12 @@ class PySaem:
         if self.model.nb_covariates > 0:
             print("------")
             print("Covariate effect parameters:")
-            for i, coef in enumerate(self.model.covariate_coeffs_names):
-                beta_index = self.model.population_betas_names.index(coef)
+            for i, coef in enumerate(self.model.covariate_coeff_names):
+                beta_index = self.model.beta_names.index(coef)
                 coef_val = self.model.population_betas[beta_index]
                 print(f"{coef}: {coef_val:.2e}")
         print("------")
         print("Residual error model:")
-        for i, output in enumerate(self.model.outputs_names):
+        for i, output in enumerate(self.model.output_names):
             sigma = self.model.residual_var[i]
             print(f"{output}: {sigma:.2e}")

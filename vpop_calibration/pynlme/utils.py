@@ -1,4 +1,4 @@
-from vpop_calibration.nlme_model.params import (
+from vpop_calibration.pynlme.params import (
     PatientDescriptorUnknown,
     ModelIntrinsicParam,
 )

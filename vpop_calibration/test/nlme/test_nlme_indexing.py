@@ -1,6 +1,6 @@
 import torch
 
-from vpop_calibration.nlme_model.indexing import IndexedValues, ObservationIndex
+from vpop_calibration.pynlme.indexing import IndexedValues, ObservationIndex
 
 
 def test_observation_indexing():

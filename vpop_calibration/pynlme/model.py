@@ -2,10 +2,10 @@ import torch
 from typing import get_args, NamedTuple
 
 from vpop_calibration.structural_model.base import StructuralModel
-from vpop_calibration.nlme_model.data import ObsData
-from vpop_calibration.nlme_model.params import MixedEffectParameters, ErrorType
-from vpop_calibration.nlme_model.utils import init_transform_function
-from vpop_calibration.nlme_model.residuals import log_likelihood_observation
+from vpop_calibration.pynlme.data import ObsData
+from vpop_calibration.pynlme.params import MixedEffectParameters, ErrorType
+from vpop_calibration.pynlme.utils import init_transform_function
+from vpop_calibration.pynlme.residuals import log_likelihood_observation
 from vpop_calibration.config import device
 
 
@@ -21,7 +21,7 @@ class NlmeModel:
         structural_model: StructuralModel,
         dataset: ObsData,
         prior_params: MixedEffectParameters,
-        num_chains: int = 1,
+        nb_chains: int = 1,
     ):
         """Non-linear mixed effects model
 
@@ -51,9 +51,10 @@ class NlmeModel:
         self.nb_descriptors = len(self.descriptors)
         self.covariate_names = self.prior_params.covariate_names
         self.nb_covariates = len(self.covariate_names)
+        self.covariate_coeff_names = self.prior_params.covariate_coeff_names
         self.patients = self.data.patients
         self.nb_patients = len(self.patients)
-        self.num_chains = num_chains
+        self.nb_chains = nb_chains
 
         # -- Validation
         # Validate observed data against the user-specified parameters
@@ -123,6 +124,10 @@ class NlmeModel:
             log_mi=self.init_mi,
             res_var=self.init_res_var,
         )
+
+        # Sample some etas to initialize the model state
+        etas = self.sample_etas(self.nb_chains)
+        self.update_eta_samples(etas)
 
         # Create design matrices
         self.design_matrices, self.full_design_matrix = self.init_all_design_matrices()
@@ -252,7 +257,7 @@ class NlmeModel:
         if hasattr(self, "eta_samples_chains"):
             expected_shape = self.eta_samples_chains.shape
         else:
-            expected_shape = (self.num_chains, self.nb_patients, self.nb_pdu)
+            expected_shape = (self.nb_chains, self.nb_patients, self.nb_pdu)
         assert (
             eta.shape == expected_shape
         ), f"Wrong shape in eta samples update: {eta.shape}, expected: {expected_shape}"

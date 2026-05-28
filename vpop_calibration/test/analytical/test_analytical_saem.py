@@ -1,14 +1,19 @@
-from vpop_calibration.pynlme.params import MixedEffectParameters
-from vpop_calibration.pynlme.data import ObsData
-
 import pytest
-import numpy as np
 import pandas as pd
+import numpy as np
 from pandera.typing import DataFrame
+import torch
+
+from vpop_calibration.pynlme.data import ObsData
+from vpop_calibration.pynlme.params import MixedEffectParameters
+from vpop_calibration.pynlme.model import NlmeModel
+from vpop_calibration.structural_model.base import StructuralModel
+from vpop_calibration.structural_model.analytical import StructuralAnalytical
+from vpop_calibration.saem import PySaem
 
 
 @pytest.fixture
-def sample_nlme_params() -> dict:
+def sample_nlme_params() -> MixedEffectParameters:
     input = {
         "model_intrinsic": {"mi_1": {"prior": 10.0}},
         "pdu": {
@@ -30,7 +35,7 @@ def sample_nlme_params() -> dict:
         },
         "pdk": ["pdk_1"],
     }
-    return input
+    return MixedEffectParameters.model_validate(input)
 
 
 @pytest.fixture
@@ -38,7 +43,7 @@ def obs_data(np_rng) -> ObsData:
     protocol_arms = ["arm-A", "arm-B"]
     patients = {
         "id": ["p1", "p2"],
-        "foo": [0.0, 0.0],
+        "foo": [0.0, 5.0],
         "pdk_1": [0.0, 0.0],
         "protocol_arm": protocol_arms,
     }
@@ -52,26 +57,26 @@ def obs_data(np_rng) -> ObsData:
     return data
 
 
-def test_nlme_params(sample_nlme_params, obs_data):
-    nlme_params = MixedEffectParameters.model_validate(sample_nlme_params)
-    assert nlme_params.pdu_names == ["pdu_1", "pdu_2"]
-    assert nlme_params.mi_names == ["mi_1"]
-    assert nlme_params.beta_names == [
-        "pdu_1",
-        "coef_foo_pdu1",
-        "pdu_2",
-        "coef_foo_pdu2",
-    ]
-    transformed_prior_pdu1 = np.log(10.0)
-    shifted_pdu2 = (10.0 - 1.0) / (100.0 - 1.0)
-    transformed_prior_pdu2 = np.log(shifted_pdu2 / (1 - shifted_pdu2))
-    assert nlme_params.beta_init == [
-        transformed_prior_pdu1,
-        0.5,
-        transformed_prior_pdu2,
-        0.5,
-    ]
-    assert nlme_params.covariate_names == ["foo"]
-    assert nlme_params.pdk == ["pdk_1"]
+@pytest.fixture
+def struct_model() -> StructuralModel:
+    def equations(mi_1, pdu_1, pdu_2, pdk_1, t, protocol_ovr_1):
+        out = torch.zeros_like(t)
+        return torch.cat((out, out), dim=-1)
 
-    nlme_params.validate_data(obs_data)
+    protocol_design = pd.DataFrame(
+        {"protocol_arm": ["arm-A", "arm-B"], "protocol_ovr_1": [1, 2]}
+    )
+    struct_model = StructuralAnalytical(
+        equations=equations,
+        variable_names=["out_1", "out_2"],
+        protocol_design=protocol_design,
+    )
+    return struct_model
+
+
+def test_analytical_saem(sample_nlme_params, obs_data, struct_model):
+    nlme_model = NlmeModel(
+        structural_model=struct_model, dataset=obs_data, prior_params=sample_nlme_params
+    )
+    optimizer = PySaem(nlme_model)
+    optimizer.run()

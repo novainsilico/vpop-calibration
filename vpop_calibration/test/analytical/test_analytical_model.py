@@ -3,7 +3,7 @@ import pandas as pd
 from torch.testing import assert_close
 
 from vpop_calibration.structural_model.analytical import StructuralAnalytical
-from vpop_calibration.nlme_model.indexing import ObservationIndex, IndexedValues
+from vpop_calibration.pynlme.indexing import ObservationIndex, IndexedValues
 
 
 def test_analytical_no_protocol():

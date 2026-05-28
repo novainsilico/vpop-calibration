@@ -1,8 +1,8 @@
 import torch
 from typing import get_args
 
-from vpop_calibration.nlme_model.indexing import IndexedObservations
-from vpop_calibration.nlme_model.params import ErrorType
+from vpop_calibration.pynlme.indexing import IndexedObservations
+from vpop_calibration.pynlme.params import ErrorType
 from vpop_calibration.config import device
 
 

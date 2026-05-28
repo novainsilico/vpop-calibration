@@ -4,9 +4,9 @@ import pandas as pd
 from pandera.typing import DataFrame
 import torch
 
-from vpop_calibration.nlme_model.params import MixedEffectParameters
-from vpop_calibration.nlme_model.data import ObsData
-from vpop_calibration.nlme_model.model import NlmeModel
+from vpop_calibration.pynlme.params import MixedEffectParameters
+from vpop_calibration.pynlme.data import ObsData
+from vpop_calibration.pynlme.model import NlmeModel
 from vpop_calibration.structural_model.base import StructuralModel
 from vpop_calibration.structural_model.analytical import StructuralAnalytical
 from vpop_calibration.metropolis_hastings import MetropolisHastingsState, mh_step
