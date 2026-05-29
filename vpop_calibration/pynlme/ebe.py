@@ -7,12 +7,14 @@ from vpop_calibration.config import smoke_test, device
 from vpop_calibration.pynlme.model import NlmeModel
 
 
-def compute_ebe(
+def compute_ebe_nlme(
     nlme_model: NlmeModel,
     max_iter: int = 50,
 ) -> torch.Tensor:
     """
     Returns: ebe_estimates: dim(nb_patients, nb_PDU)
+
+    Stores the estimates in nlme_model.individual_ebe_estimates
     """
 
     init_etas = nlme_model.eta_samples_chains
@@ -52,4 +54,10 @@ def compute_ebe(
     ebe_physical = nlme_model.convert_gaussian_to_physical(
         ebe_gaussian, nlme_model.log_mi
     )
+    assert ebe_physical.shape == (
+        1,
+        nlme_model.nb_patients,
+        nlme_model.nb_mi + nlme_model.nb_pdu,
+    )
+
     return ebe_physical

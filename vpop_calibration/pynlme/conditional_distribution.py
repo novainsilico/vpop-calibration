@@ -7,7 +7,7 @@ from vpop_calibration.config import smoke_test
 from vpop_calibration.metropolis_hastings import MetropolisHastingsState, mh_step
 
 
-def sample_conditional_distribution(
+def sample_conditional_distribution_nlme(
     nlme_model: NlmeModel,
     nb_samples: int = 1000,
     nb_burn_in: int = 50,

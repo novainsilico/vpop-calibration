@@ -9,10 +9,7 @@ from vpop_calibration.pynlme.params import MixedEffectParameters
 from vpop_calibration.pynlme.model import NlmeModel
 from vpop_calibration.structural_model.base import StructuralModel
 from vpop_calibration.structural_model.analytical import StructuralAnalytical
-from vpop_calibration.pynlme.conditional_distribution import (
-    sample_conditional_distribution_nlme,
-)
-from vpop_calibration.pynlme.ebe import compute_ebe_nlme
+from vpop_calibration.pynlme.diagnostics import ModelDiagnostics
 
 
 @pytest.fixture
@@ -77,20 +74,13 @@ def struct_model() -> StructuralModel:
     return struct_model
 
 
-def test_conditional_sampling(sample_nlme_params, obs_data, struct_model):
+def test_diagnostics(sample_nlme_params, obs_data, struct_model):
     nlme_model = NlmeModel(
         structural_model=struct_model, dataset=obs_data, prior_params=sample_nlme_params
     )
-    samples = sample_conditional_distribution_nlme(nlme_model=nlme_model)
-
-
-def test_ebe(sample_nlme_params, obs_data, struct_model):
-    nlme_model = NlmeModel(
-        structural_model=struct_model, dataset=obs_data, prior_params=sample_nlme_params
-    )
-    ebe_estimates = compute_ebe_nlme(nlme_model=nlme_model, max_iter=2)
-    assert ebe_estimates.shape == (
-        1,
-        nlme_model.nb_patients,
-        nlme_model.nb_pdu + nlme_model.nb_mi,
-    )
+    diagnostics = ModelDiagnostics(nlme_model)
+    diagnostics.compute_ebe()
+    diagnostics.sample_conditional_distribution()
+    diagnostics.compute_iwres()
+    diagnostics.compute_pwres()
+    diagnostics.compute_npde()
