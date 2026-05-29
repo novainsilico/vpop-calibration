@@ -43,7 +43,7 @@ def mh_step(
     proposal_etas = previous_state.etas + previous_state.step_size * proposal_noise
     # Compute their log posterior likelihood
     # This is the computation-heavy step:
-    proposal = nlme_model.log_posterior_etas(proposal_etas)
+    proposal = nlme_model.log_posterior_etas_all_patients(proposal_etas)
     proposal_log_prob = proposal.log_posterior
 
     assert proposal_log_prob.shape == previous_state.log_prob.shape

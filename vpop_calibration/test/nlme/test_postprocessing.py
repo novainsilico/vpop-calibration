@@ -12,6 +12,7 @@ from vpop_calibration.structural_model.analytical import StructuralAnalytical
 from vpop_calibration.pynlme.conditional_distribution import (
     sample_conditional_distribution,
 )
+from vpop_calibration.pynlme.ebe import compute_ebe
 
 
 @pytest.fixture
@@ -81,3 +82,15 @@ def test_conditional_sampling(sample_nlme_params, obs_data, struct_model):
         structural_model=struct_model, dataset=obs_data, prior_params=sample_nlme_params
     )
     samples = sample_conditional_distribution(nlme_model=nlme_model)
+
+
+def test_ebe(sample_nlme_params, obs_data, struct_model):
+    nlme_model = NlmeModel(
+        structural_model=struct_model, dataset=obs_data, prior_params=sample_nlme_params
+    )
+    ebe_estimates = compute_ebe(nlme_model=nlme_model)
+    assert ebe_estimates.shape == (
+        1,
+        nlme_model.nb_patients,
+        nlme_model.nb_pdu + nlme_model.nb_mi,
+    )

@@ -11,9 +11,9 @@ def sample_conditional_distribution(
     nlme_model: NlmeModel,
     nb_samples: int = 1000,
     nb_burn_in: int = 50,
-):
+) -> torch.Tensor:
     """
-    Returns: cond_dist_samples: dim(nb_samples, nb_patients, nb_PDU)
+    Sample random effects from the conditional distribution
     """
 
     if smoke_test:
@@ -21,14 +21,14 @@ def sample_conditional_distribution(
         nb_burn_in = 1
 
     init_etas = nlme_model.sample_etas(1)
-    output = nlme_model.log_posterior_etas(init_etas)
+    init_predictions = nlme_model.log_posterior_etas_all_patients(init_etas)
     current_state = MetropolisHastingsState(
         etas=init_etas,
-        gaussian_params=output.gaussian_params,
-        prediction=output.predictions,
-        log_prob=output.log_posterior,
+        gaussian_params=init_predictions.gaussian_params,
+        prediction=init_predictions.predictions,
+        log_prob=init_predictions.log_posterior,
         step_size=0.1,
-        complete_likelihood=output.predictions.sum(dim=0),
+        complete_likelihood=init_predictions.predictions.sum(dim=0),
     )
     sample_list = []
     print(f"Sampling conditional distribution on {nb_samples} samples:")
@@ -42,4 +42,6 @@ def sample_conditional_distribution(
         if i >= nb_burn_in:
             sample_list.append(current_state.etas)
 
-    return torch.stack(sample_list).squeeze(1)
+    output = torch.stack(sample_list).squeeze(1)
+    assert output.shape == (nb_samples, nlme_model.nb_patients, nlme_model.nb_pdu)
+    return output

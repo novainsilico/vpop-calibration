@@ -81,9 +81,9 @@ def test_mh_step(sample_nlme_params, obs_data, struct_model):
     nb_samples = 1
     etas = nlme_model.sample_etas(nb_samples)
     etas = torch.zeros_like(etas)
-    gaussian_params = nlme_model.convert_etas_to_gaussian(etas)
+    gaussian_params = nlme_model.convert_etas_to_gaussian_all_patients(etas)
     # Test the log prior function for etas
-    predictions = nlme_model.log_posterior_etas(etas)
+    predictions = nlme_model.log_posterior_etas_all_patients(etas)
     assert predictions.log_posterior.shape == (nb_samples, nlme_model.nb_patients)
     init_state = MetropolisHastingsState(
         etas=etas,

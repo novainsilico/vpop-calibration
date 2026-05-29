@@ -116,7 +116,9 @@ class PySaem:
         self.plot_indiv_figsize = plot_indiv_figsize
 
         # Initialize the running variables for optimization
-        current_output = self.model.log_posterior_etas(self.model.eta_samples_chains)
+        current_output = self.model.log_posterior_etas_all_patients(
+            self.model.eta_samples_chains
+        )
         # Initialize the complete likelihood to a dummy value to avoid messing with the plot scale
         complete_lik = torch.Tensor([0])
         self.current_mh_state = MetropolisHastingsState(
@@ -550,9 +552,11 @@ class PySaem:
             new_physical_params = self.model.convert_gaussian_to_physical(
                 self.current_mh_state.gaussian_params, mi_tensor
             )
-            new_thetas = self.model.convert_physical_to_thetas(new_physical_params)
+            new_thetas = self.model.convert_physical_to_thetas_all_patients(
+                new_physical_params
+            )
             model_input = self.model.convert_thetas_to_model_parameters(new_thetas)
-            predictions, _ = self.model.predict(model_input)
+            predictions, _ = self.model.predict_all_patients(model_input)
             total_log_lik = (
                 log_likelihood_observation(
                     predictions=predictions,

@@ -94,9 +94,6 @@ def test_nlme_init(sample_nlme_params, obs_data, struct_model):
     )
 
     # Ensure the etas distribution is properly initiated
-    assert nlme_model.eta_distribution.batch_shape == torch.Size(
-        [nlme_model.nb_patients]
-    )
     assert nlme_model.eta_distribution.event_shape == torch.Size([nlme_model.nb_pdu])
 
     # Ensure the residual error tensor is properly initialized
@@ -162,7 +159,7 @@ def test_nlme_simulate(sample_nlme_params, obs_data, struct_model):
     etas = torch.zeros_like(etas)
     assert etas.shape == (nb_samples, nlme_model.nb_patients, nlme_model.nb_pdu)
 
-    psi = nlme_model.convert_etas_to_gaussian(etas)
+    psi = nlme_model.convert_etas_to_gaussian_all_patients(etas)
     assert psi.shape == (nb_samples, nlme_model.nb_patients, nlme_model.nb_pdu)
 
     phi = nlme_model.convert_gaussian_to_physical(psi, nlme_model.log_mi)
@@ -175,7 +172,7 @@ def test_nlme_simulate(sample_nlme_params, obs_data, struct_model):
     assert phi[0, 0, 1].item() == pytest.approx(pdu_2_prior)
     assert phi[0, 0, 2].item() == pytest.approx(mi_1_prior)
 
-    theta = nlme_model.convert_physical_to_thetas(phi)
+    theta = nlme_model.convert_physical_to_thetas_all_patients(phi)
     # Double check the thetas are properly assembled and correspond to the priors for patient 1 (0 random effect, 0 covariate effect)
     p1_pdk = obs_data.patients_df.loc[obs_data.patients_df["id"] == "p1", "pdk_1"].iloc[
         0
@@ -188,7 +185,7 @@ def test_nlme_simulate(sample_nlme_params, obs_data, struct_model):
 
     model_inputs = nlme_model.convert_thetas_to_model_parameters(theta)
 
-    outs = nlme_model.predict(model_inputs)
+    outs = nlme_model.predict_all_patients(model_inputs)
     assert outs[0].shape == (nb_samples, nlme_model.data.nb_total_observations)
 
 
@@ -223,6 +220,6 @@ def test_log_posterior(sample_nlme_params, obs_data, struct_model):
     etas = nlme_model.sample_etas(nb_samples)
     etas = torch.zeros_like(etas)
     # Test the log prior function for etas
-    predictions = nlme_model.log_posterior_etas(etas)
+    predictions = nlme_model.log_posterior_etas_all_patients(etas)
     assert predictions.log_posterior.shape == (nb_samples, nlme_model.nb_patients)
     # No analytical value here :sadface:, if someone has the courage to write it feel free
