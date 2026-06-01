@@ -3,6 +3,7 @@ from vpop_calibration.pynlme.residuals import (
     compute_error_variance,
     sum_sq_residuals,
     log_likelihood_observation,
+    add_predictive_error,
 )
 from vpop_calibration.pynlme.params import ErrorType
 from vpop_calibration.pynlme.indexing import (
@@ -77,14 +78,6 @@ def test_residuals():
         task=task_indices,
     )
 
-    obs_index = ObservationIndex(
-        id=patient_indices,
-        output_name=outputs_indices,
-        protocol_arm=protocol_indices,
-        time=time_indices,
-        task=task_indices,
-    )
-
     vals = torch.tensor([0, 1, 0, 1], dtype=torch.float32)
     pred = torch.tensor([[1, 2, 1, 2]], dtype=torch.float32)
 
@@ -115,6 +108,13 @@ def test_residuals():
     torch.testing.assert_close(sum_sq_res, expected_sum_sq_res)
 
     log_lik = log_likelihood_observation(
+        observations=obs,
+        predictions=pred,
+        error_model_selector=error_model_selector,
+        sigma=sigma,
+    )
+
+    noisy_prediction = add_predictive_error(
         observations=obs,
         predictions=pred,
         error_model_selector=error_model_selector,

@@ -149,3 +149,21 @@ def log_likelihood_observation(
         log_lik_full,
     )
     return log_lik_per_patient
+
+
+# @torch.compile
+def add_predictive_error(
+    observations: IndexedObservations,
+    predictions: torch.Tensor,
+    error_model_selector: dict[ErrorType, list[int]],
+    sigma: torch.Tensor,
+) -> torch.Tensor:
+    out_variance = compute_error_variance(
+        observations=observations,
+        predictions=predictions,
+        error_model_selector=error_model_selector,
+        sigma=sigma,
+    )
+    noisy_predictions = torch.distributions.Normal(predictions, out_variance).sample()
+
+    return noisy_predictions
