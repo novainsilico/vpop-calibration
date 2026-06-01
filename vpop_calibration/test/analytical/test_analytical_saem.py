@@ -1,19 +1,15 @@
 import pytest
 import pandas as pd
 import numpy as np
-from pandera.typing import DataFrame
 import torch
 
-from vpop_calibration.pynlme.data import ObsData
-from vpop_calibration.pynlme.params import MixedEffectParameters
-from vpop_calibration.pynlme.model import NlmeModel
 from vpop_calibration.structural_model.base import StructuralModel
 from vpop_calibration.structural_model.analytical import StructuralAnalytical
-from vpop_calibration.saem import PySaem
+from vpop_calibration.interface import NlmeModel
 
 
 @pytest.fixture
-def sample_nlme_params() -> MixedEffectParameters:
+def sample_nlme_params() -> dict:
     input = {
         "model_intrinsic": {"mi_1": {"prior": 10.0}},
         "pdu": {
@@ -35,11 +31,11 @@ def sample_nlme_params() -> MixedEffectParameters:
         },
         "pdk": ["pdk_1"],
     }
-    return MixedEffectParameters.model_validate(input)
+    return input
 
 
 @pytest.fixture
-def obs_data(np_rng) -> ObsData:
+def obs_data(np_rng) -> pd.DataFrame:
     protocol_arms = ["arm-A", "arm-B"]
     patients = {
         "id": ["p1", "p2"],
@@ -53,8 +49,8 @@ def obs_data(np_rng) -> ObsData:
     df = df.merge(pd.DataFrame(outputs, columns=["output_name"]), how="cross")
     df = df.merge(pd.DataFrame(time_steps, columns=["time"]), how="cross")
     df["value"] = np.abs(np_rng.normal(0, 1, df.shape[0]))
-    data = ObsData(DataFrame(df))
-    return data
+
+    return df
 
 
 @pytest.fixture
@@ -76,7 +72,6 @@ def struct_model() -> StructuralModel:
 
 def test_analytical_saem(sample_nlme_params, obs_data, struct_model):
     nlme_model = NlmeModel(
-        structural_model=struct_model, dataset=obs_data, prior_params=sample_nlme_params
+        structural_model=struct_model, df=obs_data, prior_params=sample_nlme_params
     )
-    optimizer = PySaem(nlme_model)
-    optimizer.run()
+    nlme_model.optimizer.run()

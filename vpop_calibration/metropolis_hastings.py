@@ -2,7 +2,7 @@ import torch
 from typing import NamedTuple
 import numpy as np
 
-from vpop_calibration.pynlme.model import NlmeModel
+from vpop_calibration.pynlme.model import StatisticalModel
 from vpop_calibration.config import device
 
 
@@ -16,7 +16,7 @@ class MetropolisHastingsState(NamedTuple):
 
 
 def mh_step(
-    nlme_model: NlmeModel,
+    nlme_model: StatisticalModel,
     previous_state: MetropolisHastingsState,
     learning_rate: float,
     target_acceptance_rate: float = 0.234,
@@ -25,7 +25,7 @@ def mh_step(
     """Perform one step of a Metropolis-Hastings transition kernel
 
     Args:
-        nlme_model (NlmeModel): The non-linear mixed effects model to use to compute the likelihoods
+        nlme_model (StatisticalModel): The non-linear mixed effects model to use to compute the likelihoods
         previous_state (MetropolisHastingsState): Tuple containing the information from the previous step of Metropolis-Hastings
         target_acceptance_rate (float, optional): Target for the MCMC acceptance rate. Defaults to 0.234 [1]
         verbose (bool, optional): If true, print debug information to the console

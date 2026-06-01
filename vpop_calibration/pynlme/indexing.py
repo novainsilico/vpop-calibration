@@ -8,6 +8,7 @@ import numpy as np
 class IndexedValues(NamedTuple):
     index_values: torch.Tensor
     ref_values: list
+    raw_values: pd.Series
 
 
 def remap_single_index(
@@ -36,6 +37,7 @@ def remap_indexed_values(
     new_index = IndexedValues(
         index_values=new_index_values,
         ref_values=dest_ref_values,
+        raw_values=source_index.raw_values,
     )
     return new_index
 
@@ -56,14 +58,16 @@ class ObservationIndex(NamedTuple):
         indexes = []
         for field in cls._fields:
             # This only works if df contains one column per field in the observation index
-            ref_values = df[field].drop_duplicates().sort_values().tolist()
+            raw_values = df[field]
+            ref_values = raw_values.drop_duplicates().sort_values().tolist()
             indexed_values = torch.tensor(
-                df[field].apply(lambda x: ref_values.index(x)).values
+                raw_values.apply(lambda x: ref_values.index(x)).values
             )
             indexes.append(
                 IndexedValues(
                     index_values=indexed_values,
                     ref_values=ref_values,
+                    raw_values=raw_values,
                 )
             )
 
@@ -114,18 +118,10 @@ class IndexedObservations(BaseModel):
                 prediction.shape[1] == nb_obs
             ), f"Incompatible number of self ({nb_obs}) and predictions ({prediction.shape[1]})"
 
-        id_col = np.array(self.obs_index.id.ref_values)[
-            self.obs_index.id.index_values.cpu().numpy().astype(int)
-        ]
-        output_name_col = np.array(self.obs_index.output_name.ref_values)[
-            self.obs_index.output_name.index_values.cpu().numpy().astype(int)
-        ]
-        protocol_arm_col = np.array(self.obs_index.protocol_arm.ref_values)[
-            self.obs_index.protocol_arm.index_values.cpu().numpy().astype(int)
-        ]
-        time_col = np.array(self.obs_index.time.ref_values)[
-            self.obs_index.time.index_values.cpu().numpy().astype(int)
-        ]
+        id_col = self.obs_index.id.raw_values
+        output_name_col = self.obs_index.output_name.raw_values
+        protocol_arm_col = self.obs_index.protocol_arm.raw_values
+        time_col = self.obs_index.time.raw_values
         value_col = self.obs_values.cpu().numpy()
         df_long = pd.DataFrame(
             {

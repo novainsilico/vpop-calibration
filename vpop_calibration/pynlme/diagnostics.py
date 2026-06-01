@@ -3,7 +3,7 @@ from typing import NamedTuple, Literal
 import numpy as np
 import pandas as pd
 
-from vpop_calibration.pynlme.model import NlmeModel
+from vpop_calibration.pynlme.model import StatisticalModel
 from vpop_calibration.pynlme.residuals import (
     calculate_residuals,
     compute_error_variance,
@@ -25,7 +25,7 @@ ModelResiduals = dict[str, PatientResiduals]
 
 
 class ModelDiagnostics:
-    def __init__(self, nlme_model: NlmeModel):
+    def __init__(self, nlme_model: StatisticalModel):
         self.model = nlme_model
         self.individual_ebe_estimates_tensor: torch.Tensor | None = None
         self.individual_ebe_estimates_df: pd.DataFrame | None = None
@@ -34,7 +34,7 @@ class ModelDiagnostics:
         self.pwres: ModelResiduals | None = None
         self.iwres: ModelResiduals | None = None
         self.npde: ModelResiduals | None = None
-        self.conditional_distribution_samples: torch.Tensor | None
+        self.conditional_distribution_samples: torch.Tensor | None = None
 
     def compute_ebe(self, max_iter: int = 50) -> None:
         self.individual_ebe_estimates_tensor = compute_ebe_nlme(
@@ -105,9 +105,9 @@ class ModelDiagnostics:
             this_patient_iwres = iwres_full[this_patient_rows]
             this_patient_time = self.model.data.individual_observations[
                 patient_id
-            ].obs_index.time.index_values
+            ].obs_index.time.raw_values.to_numpy()
             this_patient_residuals = PatientResiduals(
-                time=this_patient_time.cpu().numpy(),
+                time=this_patient_time,
                 res=this_patient_iwres.squeeze().cpu().numpy(),
             )
             self.iwres.update({patient_id: this_patient_residuals})
@@ -152,7 +152,7 @@ class ModelDiagnostics:
             obs_patient = self.model.data.individual_observations[patient_id].obs_values
             time_steps_patient = self.model.data.individual_observations[
                 patient_id
-            ].obs_index.time.index_values
+            ].obs_index.time.raw_values.to_numpy()
 
             # variance_patient shape: n_obs_patient * n_obs_patient
             variance_patient = torch.cov(obs_patient.T)
@@ -171,7 +171,7 @@ class ModelDiagnostics:
 
             # Compute patient PWRES and add them to dictionnary
             patient_pwres = PatientResiduals(
-                time=time_steps_patient.cpu().numpy(),
+                time=time_steps_patient,
                 res=pwres_patient.squeeze(-1).cpu().numpy(),
             )
             self.pwres.update({patient_id: patient_pwres})
@@ -218,10 +218,10 @@ class ModelDiagnostics:
             this_patient_data = npde[this_patient_rows]
             this_patient_time = self.model.data.individual_observations[
                 patient_id
-            ].obs_index.time.index_values
+            ].obs_index.time.raw_values.to_numpy()
             this_patient_npde = PatientResiduals(
                 res=this_patient_data.squeeze(-1).cpu().numpy(),
-                time=this_patient_time.cpu().numpy(),
+                time=this_patient_time,
             )
             self.npde.update({patient_id: this_patient_npde})
 

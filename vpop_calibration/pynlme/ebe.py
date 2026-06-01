@@ -4,11 +4,11 @@ from tqdm import tqdm
 import numpy as np
 
 from vpop_calibration.config import smoke_test, device
-from vpop_calibration.pynlme.model import NlmeModel
+from vpop_calibration.pynlme.model import StatisticalModel
 
 
 def compute_ebe_nlme(
-    nlme_model: NlmeModel,
+    nlme_model: StatisticalModel,
     max_iter: int = 50,
 ) -> torch.Tensor:
     """

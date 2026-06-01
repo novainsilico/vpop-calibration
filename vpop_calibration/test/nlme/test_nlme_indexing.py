@@ -18,13 +18,49 @@ def test_observation_indexing():
         "output_2_arm-1",
         "output_1_arm-2",
         "output_2_arm-2",
+        "output_1_arm-3",
+        "output_2_arm-3",
     ]
 
-    patient_indices = IndexedValues(torch.tensor([0, 0, 1, 1]), patient_id)
-    outputs_indices = IndexedValues(torch.tensor([0, 1, 0, 1]), outputs)
-    time_indices = IndexedValues(torch.tensor([0, 1, 2, 3]), time)
-    protocol_indices = IndexedValues(torch.tensor([0, 1, 0, 2]), protocols)
-    task_indices = IndexedValues(torch.tensor([0, 1, 2, 3]), tasks)
+    patient_indices = IndexedValues(
+        index_values=torch.tensor([0, 0, 1, 1]),
+        ref_values=patient_id,
+        raw_values=pd.Series(["p1", "p1", "p2", "p2"]),
+    )
+    outputs_indices = IndexedValues(
+        index_values=torch.tensor([0, 1, 0, 1]),
+        ref_values=outputs,
+        raw_values=pd.Series(["output_1", "output_2", "output_1", "output_2"]),
+    )
+    time_indices = IndexedValues(
+        index_values=torch.tensor([0, 1, 2, 3]),
+        ref_values=time,
+        raw_values=pd.Series([0, 1, 2, 3]),
+    )
+    protocol_indices = IndexedValues(
+        index_values=torch.tensor([0, 1, 0, 2]),
+        ref_values=protocols,
+        raw_values=pd.Series(
+            [
+                "arm-1",
+                "arm-2",
+                "arm-1",
+                "arm-3",
+            ]
+        ),
+    )
+    task_indices = IndexedValues(
+        index_values=torch.tensor([0, 3, 0, 5]),
+        ref_values=tasks,
+        raw_values=pd.Series(
+            [
+                "output_1_arm-1",
+                "output_2_arm-2",
+                "output_1_arm-1",
+                "output_2_arm-3",
+            ]
+        ),
+    )
 
     obs_index = ObservationIndex(
         id=patient_indices,
@@ -41,7 +77,7 @@ def test_observation_indexing():
     torch.testing.assert_close(
         obs_index.protocol_arm.index_values, torch.tensor([0, 1, 0, 2])
     )
-    torch.testing.assert_close(obs_index.task.index_values, torch.tensor([0, 1, 2, 3]))
+    torch.testing.assert_close(obs_index.task.index_values, torch.tensor([0, 3, 0, 5]))
 
 
 def test_remapping():
@@ -54,13 +90,49 @@ def test_remapping():
         "output_2_arm-1",
         "output_1_arm-2",
         "output_2_arm-2",
+        "output_1_arm-3",
+        "output_2_arm-3",
     ]
 
-    patient_indices = IndexedValues(torch.tensor([0, 0, 1, 1]), patient_id)
-    outputs_indices = IndexedValues(torch.tensor([0, 1, 0, 1]), outputs)
-    time_indices = IndexedValues(torch.tensor([0, 1, 2, 3]), time)
-    protocol_indices = IndexedValues(torch.tensor([0, 1, 0, 2]), protocols)
-    task_indices = IndexedValues(torch.tensor([0, 1, 2, 3]), tasks)
+    patient_indices = IndexedValues(
+        index_values=torch.tensor([0, 0, 1, 1]),
+        ref_values=patient_id,
+        raw_values=pd.Series(["p1", "p1"]),
+    )
+    outputs_indices = IndexedValues(
+        index_values=torch.tensor([0, 1, 0, 1]),
+        ref_values=outputs,
+        raw_values=pd.Series(["output_1", "output_2", "output_1", "output_2"]),
+    )
+    time_indices = IndexedValues(
+        index_values=torch.tensor([0, 1, 2, 3]),
+        ref_values=time,
+        raw_values=pd.Series([0, 1, 2, 3]),
+    )
+    protocol_indices = IndexedValues(
+        index_values=torch.tensor([0, 1, 0, 2]),
+        ref_values=protocols,
+        raw_values=pd.Series(
+            [
+                "arm_1",
+                "arm_2",
+                "arm_1",
+                "arm_3",
+            ]
+        ),
+    )
+    task_indices = IndexedValues(
+        index_values=torch.tensor([0, 3, 0, 5]),
+        ref_values=tasks,
+        raw_values=pd.Series(
+            [
+                "output_1_arm-1",
+                "output_2_arm-2",
+                "output_1_arm-1",
+                "output_2_arm-3",
+            ]
+        ),
+    )
 
     obs_index = ObservationIndex(
         id=patient_indices,
@@ -79,6 +151,8 @@ def test_remapping():
         "output_2_arm-2",
         "output_1_arm-1",
         "output_2_arm-1",
+        "output_1_arm-3",
+        "output_2_arm-3",
     ]
 
     new_obs_index = obs_index.remap_observation_index(
@@ -102,7 +176,7 @@ def test_remapping():
         new_obs_index.time.index_values, torch.tensor([2, 1, 3, 0])
     )
     torch.testing.assert_close(
-        new_obs_index.task.index_values, torch.tensor([2, 3, 0, 1])
+        new_obs_index.task.index_values, torch.tensor([2, 1, 2, 5])
     )
 
 
@@ -116,13 +190,49 @@ def test_to_pandas():
         "output_2_arm-1",
         "output_1_arm-2",
         "output_2_arm-2",
+        "output_1_arm-3",
+        "output_2_arm-3",
     ]
 
-    patient_indices = IndexedValues(torch.tensor([0, 0, 1, 1]), patient_id)
-    outputs_indices = IndexedValues(torch.tensor([0, 1, 0, 1]), outputs)
-    time_indices = IndexedValues(torch.tensor([0, 1, 2, 3]), time)
-    protocol_indices = IndexedValues(torch.tensor([0, 1, 0, 2]), protocols)
-    task_indices = IndexedValues(torch.tensor([0, 1, 2, 3]), tasks)
+    patient_indices = IndexedValues(
+        index_values=torch.tensor([0, 0, 1, 1]),
+        ref_values=patient_id,
+        raw_values=pd.Series(["p1", "p1", "p2", "p2"]),
+    )
+    outputs_indices = IndexedValues(
+        index_values=torch.tensor([0, 1, 0, 1]),
+        ref_values=outputs,
+        raw_values=pd.Series(["output_1", "output_2", "output_1", "output_2"]),
+    )
+    time_indices = IndexedValues(
+        index_values=torch.tensor([0, 1, 2, 3]),
+        ref_values=time,
+        raw_values=pd.Series([0, 1, 2, 3]),
+    )
+    protocol_indices = IndexedValues(
+        index_values=torch.tensor([0, 1, 0, 2]),
+        ref_values=protocols,
+        raw_values=pd.Series(
+            [
+                "arm-1",
+                "arm-2",
+                "arm-1",
+                "arm-3",
+            ]
+        ),
+    )
+    task_indices = IndexedValues(
+        index_values=torch.tensor([0, 1, 2, 3]),
+        ref_values=tasks,
+        raw_values=pd.Series(
+            [
+                "output_1_arm-1",
+                "output_2_arm-2",
+                "output_1_arm-1",
+                "output_2_arm-3",
+            ]
+        ),
+    )
 
     obs_index = ObservationIndex(
         id=patient_indices,
@@ -136,7 +246,6 @@ def test_to_pandas():
     indexed_obs = IndexedObservations(obs_index=obs_index, obs_values=obs_values)
 
     df = indexed_obs.to_pandas(prediction=pred_values)
-    print(df)
     expected_df = pd.DataFrame(
         {
             "id": ["p1", "p1", "p2", "p2"],
@@ -147,7 +256,6 @@ def test_to_pandas():
             "predicted_value": [4, 5, 6, 7],
         }
     )
-    print(expected_df)
     pd.testing.assert_frame_equal(df, expected_df)
 
 

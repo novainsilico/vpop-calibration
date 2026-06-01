@@ -1,20 +1,15 @@
 import pandas as pd
 import pytest
 import numpy as np
-from pandera.typing import DataFrame
 
-from vpop_calibration.pynlme.params import MixedEffectParameters
-from vpop_calibration.pynlme.data import ObsData
-from vpop_calibration.pynlme.model import NlmeModel
+from vpop_calibration.interface import NlmeModel
 from vpop_calibration.structural_model.gp import StructuralGp
-from vpop_calibration.saem import PySaem
 from vpop_calibration.model.gp import GP
 from vpop_calibration.pynlme.plot import check_surrogate_validity_gp
-from vpop_calibration.pynlme.diagnostics import ModelDiagnostics
 
 
 @pytest.fixture
-def sample_nlme_params() -> MixedEffectParameters:
+def sample_nlme_params() -> dict:
     input = {
         "model_intrinsic": {"k3": {"prior": 10.0}},
         "pdu": {
@@ -36,11 +31,11 @@ def sample_nlme_params() -> MixedEffectParameters:
         },
         "pdk": [],
     }
-    return MixedEffectParameters.model_validate(input)
+    return input
 
 
 @pytest.fixture
-def obs_data(np_rng) -> ObsData:
+def obs_data(np_rng) -> pd.DataFrame:
     protocol_arms = ["arm-A", "arm-B"]
     patients = {
         "id": ["p1", "p2"],
@@ -53,8 +48,7 @@ def obs_data(np_rng) -> ObsData:
     df = df.merge(pd.DataFrame(outputs, columns=["output_name"]), how="cross")
     df = df.merge(pd.DataFrame(time_steps, columns=["time"]), how="cross")
     df["value"] = np.abs(np_rng.normal(0, 1, df.shape[0]))
-    data = ObsData(DataFrame(df))
-    return data
+    return df
 
 
 def test_gp_saem(np_rng, obs_data, sample_nlme_params):
@@ -79,11 +73,10 @@ def test_gp_saem(np_rng, obs_data, sample_nlme_params):
 
     nlme_model = NlmeModel(
         structural_model=struct_model,
-        dataset=obs_data,
+        df=obs_data,
         prior_params=sample_nlme_params,
     )
-    optimizer = PySaem(nlme_model)
-    optimizer.run()
+    nlme_model.optimizer.run()
 
 
 def test_gp_diagnostics(np_rng, obs_data, sample_nlme_params):
@@ -108,8 +101,7 @@ def test_gp_diagnostics(np_rng, obs_data, sample_nlme_params):
 
     nlme_model = NlmeModel(
         structural_model=struct_model,
-        dataset=obs_data,
+        df=obs_data,
         prior_params=sample_nlme_params,
     )
-    model_diagnostics = ModelDiagnostics(nlme_model)
-    check_surrogate_validity_gp(model_diagnostics)
+    check_surrogate_validity_gp(nlme_model.diagnostics)

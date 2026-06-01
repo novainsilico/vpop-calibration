@@ -142,15 +142,50 @@ def test_analytical_two_arms_two_overrides():
     assert_close(
         struct_model.protocol_overrides_tensor, torch.tensor([[1.05, 1.1], [1.2, 1.25]])
     )
-    patient_index = IndexedValues(torch.tensor([0, 0, 0, 1, 1, 1]), ["p1", "p2"])
-    timestep_index = IndexedValues(torch.tensor([0, 1, 2, 0, 1, 2]), [0, 1, 2])
-    output_index = IndexedValues(torch.tensor([0, 0, 0, 0, 0, 0]), ["circumference"])
+    patient_index = IndexedValues(
+        index_values=torch.tensor([0, 0, 0, 1, 1, 1]),
+        ref_values=["p1", "p2"],
+        raw_values=pd.Series(["p1", "p1", "p1", "p2", "p2", "p2"]),
+    )
+    timestep_index = IndexedValues(
+        index_values=torch.tensor([0, 1, 2, 0, 1, 2]),
+        ref_values=[0, 1, 2],
+        raw_values=pd.Series([0, 1, 2, 0, 1, 2]),
+    )
+    output_index = IndexedValues(
+        index_values=torch.tensor([0, 0, 0, 0, 0, 0]),
+        ref_values=["circumference"],
+        raw_values=pd.Series(
+            [
+                "circumference",
+                "circumference",
+                "circumference",
+                "circumference",
+                "circumference",
+                "circumference",
+            ]
+        ),
+    )
     protocol_index = IndexedValues(
-        torch.tensor([0, 0, 0, 1, 1, 1]), ["Italy", "Morocco"]
+        index_values=torch.tensor([0, 0, 0, 1, 1, 1]),
+        ref_values=["Italy", "Morocco"],
+        raw_values=pd.Series(
+            ["Italy", "Italy", "Italy", "Morocco", "Morocco", "Morocco"]
+        ),
     )
     task_index = IndexedValues(
-        torch.tensor([0, 0, 0, 1, 1, 1]),
-        ["circumference_Italy", "circumference_Morocco"],
+        index_values=torch.tensor([0, 0, 0, 1, 1, 1]),
+        ref_values=["circumference_Italy", "circumference_Morocco"],
+        raw_values=pd.Series(
+            [
+                "circumference_Italy",
+                "circumference_Italy",
+                "circumference_Italy",
+                "circumference_Morocco",
+                "circumference_Morocco",
+                "circumference_Morocco",
+            ]
+        ),
     )
 
     obs_index = ObservationIndex(

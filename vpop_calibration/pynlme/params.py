@@ -76,7 +76,7 @@ class Covariate(BaseModel):
 class PatientDescriptorUnknown(PopulationParameter):
     # A PDU is a PopulationParameter with an omega prior and some covariates
     prior_omega: float = Field(ge=0)
-    covariates: Optional[dict[str, Covariate]]
+    covariates: Optional[dict[str, Covariate]] = None
 
     @computed_field
     @property
@@ -97,9 +97,9 @@ class MixedEffectParameters(BaseModel):
     """Main configuration class for mixed effects parameters (population parameters)"""
 
     model_config = ConfigDict(extra="forbid")
-    model_intrinsic: dict[str, ModelIntrinsicParam]
-    pdu: dict[str, PatientDescriptorUnknown]
-    pdk: list[str]
+    model_intrinsic: dict[str, ModelIntrinsicParam] = {}
+    pdu: dict[str, PatientDescriptorUnknown] = {}
+    pdk: list[str] = []
     error_model: dict[str, ErrorModel]
 
     # Properties to be assigned after initialization

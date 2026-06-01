@@ -6,7 +6,7 @@ from vpop_calibration.pynlme.params import ErrorType
 from vpop_calibration.config import device
 
 
-@torch.compile
+# @torch.compile
 def calculate_residuals(
     observed_data: IndexedObservations,
     predictions: torch.Tensor,
@@ -49,7 +49,7 @@ def calculate_residuals(
     return residuals
 
 
-@torch.compile
+# @torch.compile
 def sum_sq_residuals(
     observations: IndexedObservations,
     prediction: torch.Tensor,
@@ -75,7 +75,7 @@ def sum_sq_residuals(
     return sum_residuals_per_sample
 
 
-@torch.compile
+# @torch.compile
 def compute_error_variance(
     observations: IndexedObservations,
     predictions: torch.Tensor,
@@ -105,7 +105,7 @@ def compute_error_variance(
     return out_variance
 
 
-@torch.compile
+# @torch.compile
 def log_likelihood_observation(
     observations: IndexedObservations,
     predictions: torch.Tensor,

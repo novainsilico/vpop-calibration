@@ -17,7 +17,7 @@ class LogPosteriorPrediction(NamedTuple):
     predictions: torch.Tensor
 
 
-class NlmeModel:
+class StatisticalModel:
     def __init__(
         self,
         structural_model: StructuralModel,
@@ -173,9 +173,7 @@ class NlmeModel:
             assert (
                 self.nb_betas == self.nb_pdu
             ), "No covariates are identified, yet the number of PDUs and the number of betas differ."
-            ind_design_matrix = torch.diag(
-                torch.ones((self.nb_pdu, self.nb_pdu), device=device)
-            )
+            ind_design_matrix = torch.diag(torch.ones((self.nb_pdu), device=device))
             for ind_id in self.patients:
                 design_matrices[ind_id] = ind_design_matrix
         else:
@@ -286,7 +284,7 @@ class NlmeModel:
         self.update_log_mi(log_mi)
         self.update_res_var(res_var)
 
-    @torch.compile
+    # @torch.compile
     def sample_etas(self, nb_samples: int) -> torch.Tensor:
         """Sample individual random effects on all from the current estimate of Omega
 
@@ -319,7 +317,7 @@ class NlmeModel:
         return log_priors
 
     # --- Parameter transformation methods
-    @torch.compile
+    # @torch.compile
     def _etas_to_gaussian(
         self, etas: torch.Tensor, design_matrix: torch.Tensor
     ) -> torch.Tensor:
@@ -330,7 +328,7 @@ class NlmeModel:
         gaussian_params = expanded_design_matrix @ self.population_betas + etas
         return gaussian_params
 
-    @torch.compile
+    # @torch.compile
     def convert_etas_to_gaussian_all_patients(self, etas: torch.Tensor) -> torch.Tensor:
         """Compute individual (gaussian) parameters from random effects chains
 
@@ -351,7 +349,7 @@ class NlmeModel:
 
         return gaussian_params
 
-    @torch.compile
+    # @torch.compile
     def convert_gaussian_to_physical(
         self, psi: torch.Tensor, log_mi: torch.Tensor
     ) -> torch.Tensor:
@@ -375,7 +373,7 @@ class NlmeModel:
         phi = torch.cat((pdu, mi), dim=-1).to(device)
         return phi
 
-    @torch.compile
+    # @torch.compile
     def _combine_physical_pdk(
         self, physical_params: torch.Tensor, pdk: torch.Tensor
     ) -> torch.Tensor:
@@ -393,7 +391,7 @@ class NlmeModel:
 
         return theta
 
-    @torch.compile
+    # @torch.compile
     def convert_physical_to_thetas_all_patients(
         self, physical_params: torch.Tensor
     ) -> torch.Tensor:
@@ -419,7 +417,7 @@ class NlmeModel:
         assert theta.shape == (nb_samples, self.nb_patients, self.nb_descriptors)
         return theta
 
-    @torch.compile
+    # @torch.compile
     def convert_thetas_to_model_parameters(self, theta: torch.Tensor) -> torch.Tensor:
         """Assemble model inputs
 

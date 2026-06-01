@@ -19,7 +19,7 @@ obsDataSchemaLong = pa.DataFrameSchema(
 )
 
 patientDataSchema = pa.DataFrameSchema(
-    {"id": pa.Column(str, unique=True), "protocol_arm": pa.Column(str, unique=True)}
+    {"id": pa.Column(str, unique=True), "protocol_arm": pa.Column(str)}
 )
 
 

@@ -6,7 +6,7 @@ import torch
 
 from vpop_calibration.pynlme.data import ObsData
 from vpop_calibration.pynlme.params import MixedEffectParameters
-from vpop_calibration.pynlme.model import NlmeModel
+from vpop_calibration.pynlme.model import StatisticalModel
 from vpop_calibration.structural_model.base import StructuralModel
 from vpop_calibration.structural_model.analytical import StructuralAnalytical
 from vpop_calibration.pynlme.conditional_distribution import (
@@ -78,14 +78,14 @@ def struct_model() -> StructuralModel:
 
 
 def test_conditional_sampling(sample_nlme_params, obs_data, struct_model):
-    nlme_model = NlmeModel(
+    nlme_model = StatisticalModel(
         structural_model=struct_model, dataset=obs_data, prior_params=sample_nlme_params
     )
     samples = sample_conditional_distribution_nlme(nlme_model=nlme_model)
 
 
 def test_ebe(sample_nlme_params, obs_data, struct_model):
-    nlme_model = NlmeModel(
+    nlme_model = StatisticalModel(
         structural_model=struct_model, dataset=obs_data, prior_params=sample_nlme_params
     )
     ebe_estimates = compute_ebe_nlme(nlme_model=nlme_model, max_iter=2)

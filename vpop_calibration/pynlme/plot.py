@@ -494,7 +494,7 @@ def plot_weighted_residuals(
             compare_to_pop_pred = True
         case "iwres":
             if model_diag.iwres is None:
-                model_diag.compute_pwres()
+                model_diag.compute_iwres()
             assert model_diag.iwres is not None
             wres_results = model_diag.iwres
             compare_to_pop_pred = False
@@ -512,12 +512,10 @@ def plot_weighted_residuals(
         assert model_diag.population_parameters_predictions_df is not None
         comparison_df = model_diag.population_parameters_predictions_df
     else:
-
         if model_diag.individual_ebe_predictions_df is None:
             model_diag.compute_ebe()
         assert model_diag.individual_ebe_predictions_df is not None
         comparison_df = model_diag.individual_ebe_predictions_df
-
     plot_residual_values(
         res=wres_results,
         comparison=comparison_df,

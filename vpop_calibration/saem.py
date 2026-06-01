@@ -9,7 +9,7 @@ import numpy as np
 from IPython.display import display, DisplayHandle
 
 from vpop_calibration.config import smoke_test, device
-from vpop_calibration.pynlme.model import NlmeModel
+from vpop_calibration.pynlme.model import StatisticalModel
 from vpop_calibration.metropolis_hastings import MetropolisHastingsState, mh_step
 from vpop_calibration.pynlme.residuals import (
     sum_sq_residuals,
@@ -21,7 +21,7 @@ from vpop_calibration.pynlme.residuals import (
 class PySaem:
     def __init__(
         self,
-        model: NlmeModel,
+        model: StatisticalModel,
         # MCMC parameters for the E-step
         mcmc_first_burn_in: int = 5,
         mcmc_nb_transitions: int = 1,
@@ -46,7 +46,7 @@ class PySaem:
         """Instantiate an SAEM optimizer for an NLME model
 
         Args:
-            model (NlmeModel): The model to be optimized
+            model (StatisticalModel): The model to be optimized
             observations_df (DataFrame): The data set containing observations
             mcmc_first_burn_in (int, optional): Number of discarded samples in the first iteration. Defaults to 5.
             mcmc_nb_transitions (int, optional): Number of kernel transitions computed at each iteration. Defaults to 1.
@@ -65,7 +65,7 @@ class PySaem:
             plot_indiv_figsize (tuple[float,float]): individual figure size in the convergence plot (width, height).
         """
 
-        self.model: NlmeModel = model
+        self.model: StatisticalModel = model
         # MCMC sampling in the E-step parameters
         self.mcmc_first_burn_in: int = mcmc_first_burn_in
         self.mcmc_nb_transitions: int = mcmc_nb_transitions

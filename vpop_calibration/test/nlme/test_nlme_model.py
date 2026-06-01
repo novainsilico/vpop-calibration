@@ -7,7 +7,7 @@ import math
 
 from vpop_calibration.pynlme.data import ObsData
 from vpop_calibration.pynlme.params import MixedEffectParameters
-from vpop_calibration.pynlme.model import NlmeModel
+from vpop_calibration.pynlme.model import StatisticalModel
 from vpop_calibration.structural_model.base import StructuralModel
 from vpop_calibration.structural_model.analytical import StructuralAnalytical
 
@@ -75,7 +75,7 @@ def struct_model() -> StructuralModel:
 
 
 def test_nlme_init(sample_nlme_params, obs_data, struct_model):
-    nlme_model = NlmeModel(
+    nlme_model = StatisticalModel(
         structural_model=struct_model, dataset=obs_data, prior_params=sample_nlme_params
     )
     assert nlme_model.descriptors == ["pdk_1", "pdu_1", "pdu_2", "mi_1"]
@@ -150,7 +150,7 @@ def test_nlme_init(sample_nlme_params, obs_data, struct_model):
 
 
 def test_nlme_simulate(sample_nlme_params, obs_data, struct_model):
-    nlme_model = NlmeModel(
+    nlme_model = StatisticalModel(
         structural_model=struct_model, dataset=obs_data, prior_params=sample_nlme_params
     )
     nb_samples = 1
@@ -190,7 +190,7 @@ def test_nlme_simulate(sample_nlme_params, obs_data, struct_model):
 
 
 def test_log_prior(sample_nlme_params, obs_data, struct_model):
-    nlme_model = NlmeModel(
+    nlme_model = StatisticalModel(
         structural_model=struct_model, dataset=obs_data, prior_params=sample_nlme_params
     )
     nb_samples = 1
@@ -213,7 +213,7 @@ def test_log_prior(sample_nlme_params, obs_data, struct_model):
 
 
 def test_log_posterior(sample_nlme_params, obs_data, struct_model):
-    nlme_model = NlmeModel(
+    nlme_model = StatisticalModel(
         structural_model=struct_model, dataset=obs_data, prior_params=sample_nlme_params
     )
     nb_samples = 1

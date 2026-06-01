@@ -2,13 +2,13 @@ from tqdm import tqdm
 import torch
 
 
-from vpop_calibration.pynlme.model import NlmeModel
+from vpop_calibration.pynlme.model import StatisticalModel
 from vpop_calibration.config import smoke_test
 from vpop_calibration.metropolis_hastings import MetropolisHastingsState, mh_step
 
 
 def sample_conditional_distribution_nlme(
-    nlme_model: NlmeModel,
+    nlme_model: StatisticalModel,
     nb_samples: int = 1000,
     nb_burn_in: int = 50,
 ) -> torch.Tensor:
