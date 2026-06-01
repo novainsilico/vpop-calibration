@@ -53,7 +53,7 @@ addopts = [
     "--profile",
     "--durations=5",
 ]
-testpaths = ["vpop_calibration/test"]
+testpaths = ["vpop_calibration/test", "examples/benchmarking"]
 filterwarnings = ["error", "ignore::UserWarning", "ignore::DeprecationWarning"]
 env = ["IS_PYTEST_RUNNING=True", "CUDA_VISIBLE_DEVICES=", "MPLBACKEND=agg"]
 
