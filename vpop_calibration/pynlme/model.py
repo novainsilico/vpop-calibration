@@ -1,5 +1,6 @@
 import torch
 from typing import get_args, NamedTuple, Callable
+import pandas as pd
 
 from vpop_calibration.structural_model.base import StructuralModel
 from vpop_calibration.pynlme.data import ObsData
@@ -569,3 +570,10 @@ class NlmeModel:
             )
 
         return log_posterior_etas_single_patient
+
+    def convert_theta_to_dataframe(self, theta: torch.Tensor) -> pd.DataFrame:
+        assert theta.shape[0] == 1, "Cannot convert batched parameters to dataframe."
+        vpop = pd.DataFrame(theta.squeeze(0).cpu().numpy(), columns=self.descriptors)
+        vpop["id"] = self.patients
+
+        return vpop

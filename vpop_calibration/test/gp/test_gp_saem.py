@@ -9,6 +9,8 @@ from vpop_calibration.pynlme.model import NlmeModel
 from vpop_calibration.structural_model.gp import StructuralGp
 from vpop_calibration.saem import PySaem
 from vpop_calibration.model.gp import GP
+from vpop_calibration.pynlme.plot import check_surrogate_validity_gp
+from vpop_calibration.pynlme.diagnostics import ModelDiagnostics
 
 
 @pytest.fixture
@@ -82,3 +84,32 @@ def test_gp_saem(np_rng, obs_data, sample_nlme_params):
     )
     optimizer = PySaem(nlme_model)
     optimizer.run()
+
+
+def test_gp_diagnostics(np_rng, obs_data, sample_nlme_params):
+    time_steps = pd.DataFrame({"time": [0.0, 1.0]})
+    params = ["k1", "k2", "k3", "time"]
+    patients_training = pd.DataFrame(
+        {"id": ["p1", "p2"], "k1": [1.0, 2.0], "k2": [3.0, 4.0], "k3": [5.0, 6.0]}
+    )
+    outputs = pd.DataFrame({"output_name": ["s1", "s2"]})
+    protocol_arms = pd.DataFrame({"protocol_arm": ["arm-A", "arm-B"]})
+
+    training_df = (
+        patients_training.merge(outputs, how="cross")
+        .merge(protocol_arms, how="cross")
+        .merge(time_steps, how="cross")
+    )
+    training_df["value"] = np_rng.normal()
+
+    gp = GP(training_df, params)
+
+    struct_model = StructuralGp(gp)
+
+    nlme_model = NlmeModel(
+        structural_model=struct_model,
+        dataset=obs_data,
+        prior_params=sample_nlme_params,
+    )
+    model_diagnostics = ModelDiagnostics(nlme_model)
+    check_surrogate_validity_gp(model_diagnostics)

@@ -1,7 +1,7 @@
 import torch
-from typing import NamedTuple
+from typing import NamedTuple, Literal
 import numpy as np
-from tqdm import tqdm
+import pandas as pd
 
 from vpop_calibration.pynlme.model import NlmeModel
 from vpop_calibration.pynlme.residuals import (
@@ -20,21 +20,35 @@ class PatientResiduals(NamedTuple):
     res: np.ndarray
 
 
+ResidualType = Literal["pwres", "iwres", "npde"]
 ModelResiduals = dict[str, PatientResiduals]
 
 
 class ModelDiagnostics:
     def __init__(self, nlme_model: NlmeModel):
         self.model = nlme_model
-        self.individual_ebe_estimates: torch.Tensor | None = None
+        self.individual_ebe_estimates_tensor: torch.Tensor | None = None
+        self.individual_ebe_estimates_df: pd.DataFrame | None = None
+        self.individual_ebe_predictions_df: pd.DataFrame | None = None
+        self.population_parameters_predictions_df: pd.DataFrame | None = None
         self.pwres: ModelResiduals | None = None
         self.iwres: ModelResiduals | None = None
         self.npde: ModelResiduals | None = None
         self.conditional_distribution_samples: torch.Tensor | None
 
     def compute_ebe(self, max_iter: int = 50) -> None:
-        self.individual_ebe_estimates = compute_ebe_nlme(
+        self.individual_ebe_estimates_tensor = compute_ebe_nlme(
             nlme_model=self.model, max_iter=max_iter
+        )
+        # Compute predictions for these estimates, and store in a data frame
+        theta = self.model.convert_physical_to_thetas_all_patients(
+            self.individual_ebe_estimates_tensor
+        )
+        self.individual_ebe_estimates_df = self.model.convert_theta_to_dataframe(theta)
+        model_inputs = self.model.convert_thetas_to_model_parameters(theta)
+        individual_ebe_pred, _ = self.model.predict_all_patients(model_inputs)
+        self.individual_ebe_predictions_df = self.model.data.full_obs.to_pandas(
+            prediction=individual_ebe_pred
         )
 
     def compute_iwres(self) -> None:
@@ -46,12 +60,12 @@ class ModelDiagnostics:
         Returns:
             dict: IWRES with patientId as key, with IWRES and timesteps for each patient
         """
-        if self.individual_ebe_estimates is None:
+        if self.individual_ebe_estimates_tensor is None:
             print("No EBEs available, computing them...")
             self.compute_ebe()
-        assert self.individual_ebe_estimates is not None
+        assert self.individual_ebe_estimates_tensor is not None
 
-        assert self.individual_ebe_estimates.shape == (
+        assert self.individual_ebe_estimates_tensor.shape == (
             1,
             self.model.nb_patients,
             self.model.nb_pdu + self.model.nb_mi,
@@ -59,7 +73,7 @@ class ModelDiagnostics:
 
         # Assemble the thetas by adding the PDKs
         theta = self.model.convert_physical_to_thetas_all_patients(
-            physical_params=self.individual_ebe_estimates
+            physical_params=self.individual_ebe_estimates_tensor
         )
         model_inputs = self.model.convert_thetas_to_model_parameters(theta=theta)
         simulated_tensor, _ = self.model.predict_all_patients(inputs=model_inputs)
@@ -219,3 +233,17 @@ class ModelDiagnostics:
         self.conditional_distribution_samples = sample_conditional_distribution_nlme(
             nlme_model=self.model, nb_samples=nb_samples, nb_burn_in=nb_burn_in
         )
+
+    def zero_random_effect_predictions(self) -> None:
+        eta = torch.zeros((1, self.model.nb_patients, self.model.nb_pdu))
+        gaussian = self.model.convert_etas_to_gaussian_all_patients(eta)
+        physical = self.model.convert_gaussian_to_physical(
+            psi=gaussian, log_mi=self.model.log_mi
+        )
+        theta = self.model.convert_physical_to_thetas_all_patients(
+            physical_params=physical
+        )
+        inputs = self.model.convert_thetas_to_model_parameters(theta)
+        pred, _ = self.model.predict_all_patients(inputs)
+        pred_df = self.model.data.full_obs.to_pandas(prediction=pred)
+        self.population_parameters_predictions_df = pred_df

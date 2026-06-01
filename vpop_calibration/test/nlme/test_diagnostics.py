@@ -10,6 +10,14 @@ from vpop_calibration.pynlme.model import NlmeModel
 from vpop_calibration.structural_model.base import StructuralModel
 from vpop_calibration.structural_model.analytical import StructuralAnalytical
 from vpop_calibration.pynlme.diagnostics import ModelDiagnostics
+from vpop_calibration.pynlme.plot import (
+    plot_map_estimates,
+    plot_individual_map_estimates,
+    plot_all_individual_map_estimates,
+    plot_map_estimates_gof,
+    plot_weighted_residuals,
+    plot_map_vs_posterior,
+)
 
 
 @pytest.fixture
@@ -84,3 +92,11 @@ def test_diagnostics(sample_nlme_params, obs_data, struct_model):
     diagnostics.compute_iwres()
     diagnostics.compute_pwres()
     diagnostics.compute_npde()
+    plot_map_estimates(diagnostics)
+    plot_individual_map_estimates(diagnostics)
+    plot_all_individual_map_estimates(diagnostics)
+    plot_map_estimates_gof(diagnostics)
+    plot_weighted_residuals(model_diag=diagnostics, res_type="iwres")
+    plot_weighted_residuals(model_diag=diagnostics, res_type="pwres")
+    plot_weighted_residuals(model_diag=diagnostics, res_type="npde")
+    plot_map_vs_posterior(model_diag=diagnostics)
