@@ -35,6 +35,7 @@ def mh_step(
     Returns:
         MetropolisHastingsState: the algorithm state to use for next iteration
     """
+    nb_chains = previous_state.etas.shape[0]
     # Propose new etas
     proposal_noise = (
         torch.randn_like(previous_state.etas, device=device)
@@ -52,7 +53,7 @@ def mh_step(
     deltas: torch.Tensor = proposal_log_prob - previous_state.log_prob
     log_u: torch.Tensor = torch.log(torch.rand_like(deltas, device=device))
     accept_mask: torch.Tensor = log_u < deltas
-    assert accept_mask.shape == (nlme_model.nb_chains, nlme_model.nb_patients)
+    assert accept_mask.shape == (nb_chains, nlme_model.nb_patients)
     # Create a mask for parameters: last dimension of size nb of pdus
     accept_mask_parameters = accept_mask.unsqueeze(-1).expand(
         -1, -1, previous_state.etas.shape[-1]

@@ -79,7 +79,10 @@ def struct_model() -> StructuralModel:
 
 def test_conditional_sampling(sample_nlme_params, obs_data, struct_model):
     nlme_model = StatisticalModel(
-        structural_model=struct_model, dataset=obs_data, prior_params=sample_nlme_params
+        structural_model=struct_model,
+        dataset=obs_data,
+        prior_params=sample_nlme_params,
+        nb_chains=2,
     )
     samples = sample_conditional_distribution_nlme(nlme_model=nlme_model)
 

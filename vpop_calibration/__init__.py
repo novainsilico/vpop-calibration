@@ -1,5 +1,4 @@
-from vpop_calibration.interface import NlmeModel
-from vpop_calibration.saem import PySaem
+from vpop_calibration.interface import NlmeModel, Config, NlmeConfigDict, SaemConfigDict
 from vpop_calibration.structural_model import StructuralAnalytical, StructuralGp
 from vpop_calibration.model import GP
 from vpop_calibration.vpop import generate_vpop_from_ranges
@@ -9,6 +8,8 @@ __all__ = [
     "StructuralGp",
     "StructuralAnalytical",
     "NlmeModel",
-    "PySaem",
+    "Config",
     "generate_vpop_from_ranges",
+    "NlmeConfigDict",
+    "SaemConfigDict",
 ]
