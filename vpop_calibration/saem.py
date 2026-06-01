@@ -73,6 +73,8 @@ class PySaem:
         # phase 1 = exploratory: learning rate = 0 and simulated annealing on
         # phase 2 = smoothing: learning rate 1/phase2_iter^factor
         if smoke_test:
+            self.mcmc_first_burn_in = 1
+            self.mcmc_nb_transitions = 1
             self.nb_phase1_iterations = 1
             self.nb_phase2_iterations = 2
         else:

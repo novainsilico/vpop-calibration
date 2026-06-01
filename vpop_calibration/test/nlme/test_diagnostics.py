@@ -60,7 +60,7 @@ def obs_data(np_rng) -> ObsData:
 @pytest.fixture
 def struct_model() -> StructuralModel:
     def equations(mi_1, pdu_1, pdu_2, pdk_1, t, protocol_ovr_1):
-        out = torch.zeros_like(t)
+        out = torch.ones_like(t)
         return torch.cat((out, out), dim=-1)
 
     protocol_design = pd.DataFrame(
