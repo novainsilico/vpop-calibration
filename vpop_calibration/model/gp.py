@@ -16,7 +16,7 @@ from .plot import (
     plot_obs_vs_predicted,
     LossPlot,
 )
-from ..utils import smoke_test, device
+from ..config import smoke_test, device
 
 torch.set_default_dtype(torch.float64)
 gpytorch.settings.cholesky_jitter(1e-6)

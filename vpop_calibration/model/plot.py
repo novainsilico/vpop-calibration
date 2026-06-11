@@ -5,7 +5,7 @@ from matplotlib.figure import Figure
 from typing import Optional
 from IPython.display import display, DisplayHandle
 
-from ..utils import smoke_test
+from ..config import smoke_test
 
 
 def plot_all_solutions(

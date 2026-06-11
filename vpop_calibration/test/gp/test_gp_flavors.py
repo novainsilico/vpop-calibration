@@ -5,7 +5,7 @@ import pandas as pd
 import numpy as np
 import itertools
 
-from vpop_calibration import *
+from vpop_calibration.model import GP
 
 
 @pytest.fixture(scope="session")

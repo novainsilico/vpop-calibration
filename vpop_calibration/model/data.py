@@ -2,9 +2,19 @@ import math
 import torch
 import numpy as np
 import pandas as pd
+import pandera.pandas as pa
 from functools import reduce
+from typing import Optional
 
-from ..utils import device
+from ..config import device
+
+
+class TrainingDataSchema(pa.DataFrameModel):
+    id: str = pa.Field(coerce=True)
+    output_name: str
+    protocol_arm: Optional[str] = pa.Field(default="identity")
+    time: float = pa.Field(ge=0, coerce=True)
+    value: float = pa.Field(coerce=True)
 
 
 class TrainingDataSet:
@@ -33,7 +43,7 @@ class TrainingDataSet:
         """
 
         # Process the supplied data set
-        self.full_df_raw = training_df
+        self.full_df_raw = TrainingDataSchema.validate(training_df)
 
         declared_columns = self.full_df_raw.columns.to_list()
         # Input validation
@@ -236,7 +246,7 @@ class TrainingDataSet:
         norm_data[selected_columns] = (norm_data[selected_columns] - mean) / std
         return norm_data, mean, std
 
-    @torch.compile
+    # @torch.compile
     def unnormalize_output_wide(self, data: torch.Tensor) -> torch.Tensor:
         """Unnormalize wide outputs (all tasks included) from the model."""
         unnormalized = data * self.normalizing_output_std + self.normalizing_output_mean
@@ -246,7 +256,7 @@ class TrainingDataSet:
 
         return unnormalized
 
-    @torch.compile
+    # @torch.compile
     def unnormalize_output_long(
         self, data: torch.Tensor, task_indices: torch.LongTensor
     ) -> torch.Tensor:
@@ -263,7 +273,7 @@ class TrainingDataSet:
                 rescaled_data[mask] = torch.exp(rescaled_data[mask])
         return rescaled_data
 
-    @torch.compile
+    # @torch.compile
     def normalize_inputs_tensor(self, inputs: torch.Tensor) -> torch.Tensor:
         """Normalize new inputs provided to the model as a tensor. The columns of the input tensor should be the same as [self.descriptors]"""
         X = inputs.to(device)

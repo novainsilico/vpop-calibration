@@ -1,15 +1,20 @@
 import pytest
 import pandas as pd
 import numpy as np
+from pandera.typing import DataFrame
 import torch
 
+from vpop_calibration.pynlme.data import ObsData
+from vpop_calibration.pynlme.params import MixedEffectParameters
+from vpop_calibration.pynlme.model import StatisticalModel
 from vpop_calibration.structural_model.base import StructuralModel
 from vpop_calibration.structural_model.analytical import StructuralAnalytical
-from vpop_calibration.interface import NlmeModel
+from vpop_calibration.pynlme.diagnostics import ModelDiagnostics
+from vpop_calibration.pynlme.plot import PlottingUtility
 
 
 @pytest.fixture
-def sample_nlme_params() -> dict:
+def sample_nlme_params() -> MixedEffectParameters:
     input = {
         "model_intrinsic": {"mi_1": {"prior": 10.0}},
         "pdu": {
@@ -31,11 +36,11 @@ def sample_nlme_params() -> dict:
         },
         "pdk": ["pdk_1"],
     }
-    return input
+    return MixedEffectParameters.model_validate(input)
 
 
 @pytest.fixture
-def obs_data(np_rng) -> pd.DataFrame:
+def obs_data(np_rng) -> ObsData:
     protocol_arms = ["arm-A", "arm-B"]
     patients = {
         "id": ["p1", "p2"],
@@ -49,15 +54,14 @@ def obs_data(np_rng) -> pd.DataFrame:
     df = df.merge(pd.DataFrame(outputs, columns=["output_name"]), how="cross")
     df = df.merge(pd.DataFrame(time_steps, columns=["time"]), how="cross")
     df["value"] = np.abs(np_rng.normal(0, 1, df.shape[0]))
-    df["task"] = df.apply(lambda r: r["output_name"] + "_" + r["protocol_arm"], axis=1)
-
-    return df
+    data = ObsData(DataFrame(df))
+    return data
 
 
 @pytest.fixture
 def struct_model() -> StructuralModel:
     def equations(mi_1, pdu_1, pdu_2, pdk_1, t, protocol_ovr_1):
-        out = torch.zeros_like(t)
+        out = torch.ones_like(t)
         return torch.cat((out, out), dim=-1)
 
     protocol_design = pd.DataFrame(
@@ -71,8 +75,22 @@ def struct_model() -> StructuralModel:
     return struct_model
 
 
-def test_analytical_saem(sample_nlme_params, obs_data, struct_model):
-    nlme_model = NlmeModel(
-        structural_model=struct_model, df=obs_data, prior_params=sample_nlme_params
+def test_diagnostics(sample_nlme_params, obs_data, struct_model):
+    nlme_model = StatisticalModel(
+        structural_model=struct_model, dataset=obs_data, prior_params=sample_nlme_params
     )
-    nlme_model.optimizer.run()
+    diagnostics = ModelDiagnostics(nlme_model)
+    diagnostics.compute_ebe()
+    diagnostics.sample_conditional_distribution()
+    diagnostics.compute_iwres()
+    diagnostics.compute_pwres()
+    diagnostics.compute_npde()
+    plotter = PlottingUtility(diagnostics=diagnostics)
+    plotter.map_estimates()
+    plotter.individual_map_estimates()
+    plotter.all_individual_map_estimates()
+    plotter.map_estimates_gof()
+    plotter.weighted_residuals(res_type="iwres")
+    plotter.weighted_residuals(res_type="pwres")
+    plotter.weighted_residuals(res_type="npde")
+    plotter.map_vs_posterior()

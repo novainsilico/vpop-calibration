@@ -1,194 +1,215 @@
-import numpy as np
 import pandas as pd
-from typing import Optional
+import uuid
+import numpy as np
+from scipy.stats.qmc import Sobol, scale
+from pydantic import BaseModel, TypeAdapter
+from pandera.typing import DataFrame
 
-from .ode import OdeModel
-from .vpop import generate_vpop_from_ranges
-from .structural_model import StructuralOdeModel
-from .nlme import NlmeModel
+from vpop_calibration.structural_model import StructuralModel
+from vpop_calibration.pynlme.schemas import ObsDataSchema, patientDataSchema
+from vpop_calibration.pynlme.params import MixedEffectParameters
+from vpop_calibration.pynlme.model import StatisticalModel
+from vpop_calibration.pynlme.data import ObsData
+from vpop_calibration.pynlme.residuals import add_predictive_error
+from vpop_calibration.config import smoke_test
 
 
-def simulate_dataset_from_ranges(
-    ode_model: OdeModel,
-    log_nb_individuals: int,
-    param_ranges: dict[str, dict[str, float | bool]],
-    time_steps: np.ndarray,
-    protocol_design: Optional[pd.DataFrame] = None,
-    residual_error_variance: Optional[np.ndarray] = None,
-    error_model: Optional[str] = None,  # "additive" or "proportional"
-    output_names: Optional[list[str]] = None,
+class ParamBounds(BaseModel):
+    low: float
+    high: float
+    log: bool
+
+
+ParamRanges = dict[str, ParamBounds]
+paramRangesAdapter = TypeAdapter(ParamRanges)
+
+
+def init_patient_ids(nb_individuals: int) -> pd.DataFrame:
+    """Initiate a single column data frame with unique patient ids."""
+    ids = [str(uuid.uuid4()) for _ in range(nb_individuals)]
+    return pd.DataFrame({"id": ids})
+
+
+def sample_descriptors_sobol_sequences(
+    log_nb_individuals: int, param_ranges: ParamRanges
 ) -> pd.DataFrame:
-    """Generate a simulated data set with an ODE model
-
-    Simulates a dataset for training a surrogate model. Timesteps can be different for each output.
-    The parameter space is explored with Sobol sequences.
-
-    Args:
-        log_nb_individuals (int): The number of simulated patients will be 2^this parameter
-        param_ranges (list[dict]): For each parameter in the model, a dict describing the search space 'low': low bound, 'high': high bound, and 'log': True if the search space is log-scaled
-        initial_conditions (array): set of initial conditions, one for each variable
-        protocol_design (optional): a DataFrame with a `protocol_arm` column, and one column per parameter override
-        residual_error_variance (np.array): A 1D array of residual error variances for each output.
-        error_model (str): the type of error model ("additive" or "proportional").
-        time_steps (np.array): an array with the time points
-    Returns:
-        pd.DataFrame: A DataFrame with columns 'id', parameter names, 'time', 'output_name', and 'value'.
-
-    Notes:
-        If a parameter appears both in the ranges and in the protocol design, the ranges take precedence.
-    """
-
-    # Validate input data
+    """Given parameter ranges, generate individual patients by Sobol sampling"""
+    nb_individuals = np.power(2, log_nb_individuals)
     params_to_explore = list(param_ranges.keys())
+    nb_parameters = len(params_to_explore)
+    if nb_parameters != 0:
 
-    if protocol_design is None:
-        print("No protocol")
-        params = params_to_explore
-        params_in_protocol = []
-        protocol_design_filt = pd.DataFrame({"protocol_arm": ["identity"]})
-    else:
-        params_in_protocol = protocol_design.drop(
-            "protocol_arm", axis=1
-        ).columns.tolist()
-        # Find the paramaters that appear both in the ranges and the protocol
-        overlap = set(params_to_explore) & set(params_in_protocol)
-        if overlap != set():
-            protocol_design_filt = protocol_design.drop(list(overlap), axis=1)
-            print(
-                f"Warning: ignoring entries {overlap} from the protocol design (already defined in the ranges)."
-            )
-        else:
-            protocol_design_filt = protocol_design
-
-        params = params_to_explore + params_in_protocol
-    if set(params) != set(ode_model.param_names):
-        raise ValueError(
-            f"Under-defined system: missing {set(ode_model.param_names) - set(params)}"
+        # Create a sobol sampler to generate parameter values
+        sobol_engine = Sobol(d=nb_parameters, scramble=True)
+        sobol_sequence = sobol_engine.random_base2(log_nb_individuals)
+        samples = scale(
+            sobol_sequence,
+            [param_ranges[param_name].low for param_name in params_to_explore],
+            [param_ranges[param_name].high for param_name in params_to_explore],
         )
-    # Generate the vpop using sobol sequences
-    patients_df = generate_vpop_from_ranges(log_nb_individuals, param_ranges)
 
-    # Add a choice of protocol arm for each patient
-    protocol_arms = pd.DataFrame(protocol_design_filt["protocol_arm"].drop_duplicates())
-    patients_df = patients_df.merge(protocol_arms, how="cross")
-
-    if output_names is None:
-        outputs_list = ode_model.variable_names
+        # Handle log-scaled parameters
+        for j, param_name in enumerate(params_to_explore):
+            if param_ranges[param_name].log:
+                samples[:, j] = np.exp(samples[:, j])
+        # Create the full data frame of patient descriptors
+        patients_df = pd.DataFrame(data=samples, columns=params_to_explore)
     else:
-        outputs_list = output_names
+        # No parameter requested, create empty data frame
+        patients_df = pd.DataFrame()
 
-    # Add the outputs for each patient
-    outputs = pd.DataFrame({"output_name": outputs_list})
-    patients_df = patients_df.merge(outputs, how="cross")
-    # Simulate the ODE model
-    output_df = ode_model.run_trial(patients_df, protocol_design_filt, time_steps)
-    # Pivot to wide to add noise per model output
-    wide_output = output_df.pivot_table(
-        index=["id", *ode_model.param_names, "time", "protocol_arm"],
-        columns="output_name",
-        values="predicted_value",
-    ).reset_index()
-
-    if error_model is None:
-        pass
-    else:
-        if residual_error_variance is None:
-            raise ValueError("Undefined residual error variance.")
-        else:
-            # Add noise to the data
-            noise = np.random.normal(
-                np.zeros_like(residual_error_variance),
-                np.sqrt(residual_error_variance),
-                (wide_output.shape[0], ode_model.nb_outputs),
-            )
-            if error_model == "additive":
-                wide_output[outputs_list] += noise
-            elif error_model == "proportional":
-                wide_output[outputs_list] += noise * wide_output[outputs_list]
-            else:
-                raise ValueError(f"Incorrect error_model choice: {error_model}")
-    # Pivot back to long format
-    long_output = wide_output.melt(
-        id_vars=[
-            "id",
-            "protocol_arm",
-            "time",
-            *ode_model.param_names,
-        ],
-        value_vars=outputs_list,
-        var_name="output_name",
-        value_name="value",
-    )
-    # Remove the protocol arm overrides from the data set, they described by the protocol_arm column now
-    long_output = long_output.drop(params_in_protocol, axis=1)
-    return long_output
+    ids_df = init_patient_ids(nb_individuals)
+    patients_df = pd.concat((ids_df, patients_df), axis=1)
+    return patients_df
 
 
-def simulate_dataset_from_omega(
-    ode_model: OdeModel,
-    protocol_design: pd.DataFrame,
-    time_steps: np.ndarray,
-    log_mi: dict[str, float],
-    log_pdu: dict[str, dict[str, float]],
-    error_model: str,
-    res_var: list[float],
-    covariate_map: dict[str, dict[str, dict[str, str | float]]] | None,
-    patient_covariates: pd.DataFrame,
-    output_names: Optional[list[str]] = None,
+def sample_protocol_arms(
+    patients: pd.DataFrame,
+    protocol_arms: list[str],
+    np_rng: np.random.Generator | None = None,
 ) -> pd.DataFrame:
-    """Generate synthetic data set using an ODE model and population distributions of parameters
+    """Given a set of patients and a set of protocol arms, associate each patient with a single arm randomly."""
+    if np_rng == None:
+        rng = np.random.default_rng()
+    else:
+        rng = np_rng
+    nb_protocols = len(protocol_arms)
+    new_patients = patients.assign(
+        protocol_arm=np.array(protocol_arms)[
+            rng.integers(nb_protocols, size=patients.shape[0])
+        ]
+    )
+    return new_patients
 
-    Args:
-        ode_model (OdeModel): The equations to be simulated
-        protocol_design (pd.DataFrame): _description_
-        time_steps (np.ndarray): _description_
-        init_conditions (np.ndarray): _description_
-        log_mi (dict[str, float]): _description_
-        log_pdu (dict[str, dict[str, float]]): _description_
-        error_model (str): _description_
-        res_var (list[float]): _description_
-        covariate_map (dict[str, dict[str, dict[str, str  |  float]]]): _description_
-        patient_covariates (pd.DataFrame): _description_
 
-    Returns:
-        pd.DataFrame: _description_
+def cross_join_protocol_arms(
+    patients: pd.DataFrame,
+    protocol_arms: list[str],
+):
+    """Given a set of patients and a set of protocol arms, cross join the set of protocol arms to have all patients simulated on all arms. A new `id` column is created to uniquely identify them, storing the existing id in `previous_id`."""
+
+    new_patients = patients.merge(
+        pd.DataFrame({"protocol_arm": protocol_arms}), how="cross"
+    ).rename(columns={"id": "previous_id"})
+    # A new id column is created to have the 1:1 patient-protocol arm structure
+    new_patients["id"] = [str(uuid.uuid4()) for _ in range(new_patients.shape[0])]
+
+    return new_patients
+
+
+def patients_to_obs_df(
+    vpop: pd.DataFrame,
+    time_steps: list[float],
+    output_names: list[str],
+    dummy_value: float = 0.0,
+) -> pd.DataFrame:
+    """Add necessary columns to transform a patient data frame to an observation data frame.
+
+    Patients will be simulated on all output_names and all time_steps, and a dummy observed value of 0 is added.
     """
+    patients = patientDataSchema.validate(vpop)
+    outputs_df = pd.DataFrame({"output_name": output_names})
+    time_df = pd.DataFrame({"time": time_steps})
 
-    if output_names is None:
-        output_names = ode_model.variable_names
+    obs_df = patients.merge(outputs_df, how="cross").merge(time_df, how="cross")
+    obs_df["value"] = dummy_value
+    obs_df = obs_df.assign(task=lambda r: r.output_name + "_" + r.protocol_arm)
+    validated_output = ObsDataSchema.validate(obs_df)
+    return validated_output
 
-    structural_model = StructuralOdeModel(ode_model, protocol_design, output_names)
-    nlme_model = NlmeModel(
-        structural_model,
-        patient_covariates,
-        log_mi,
-        log_pdu,
-        res_var,
-        covariate_map,
-        error_model,
-        num_chains=1,
+
+def generate_training_data(
+    struct_model: StructuralModel,
+    ranges: dict,
+    log_nb_ind: int,
+    time: list[float],
+) -> pd.DataFrame:
+    """Given a structural model and parameter ranges, generate a training data set."""
+    if smoke_test:
+        log_nb_ind = 1
+
+    param_ranges = paramRangesAdapter.validate_python(ranges)
+    # Sample the patient descriptors using Sobol sequences
+    vpop = sample_descriptors_sobol_sequences(
+        log_nb_individuals=log_nb_ind, param_ranges=param_ranges
     )
-    etas = nlme_model.sample_etas(nlme_model.num_chains, nlme_model.nb_patients)
-    phi = nlme_model.etas_to_gaussian_params(etas)
-    pdu = nlme_model.gaussian_to_physical_params(phi, nlme_model.log_MI)
-    theta = nlme_model.assemble_individual_parameters(pdu).squeeze(0)
-    vpop = pd.DataFrame(data=theta.cpu().numpy(), columns=nlme_model.descriptors)
-    vpop["id"] = nlme_model.patients
-    protocol_arms = patient_covariates[["id", "protocol_arm"]]
-    vpop = vpop.merge(protocol_arms, on=["id"], how="left")
-    vpop = vpop.merge(
-        pd.DataFrame(data=nlme_model.outputs_names, columns=["output_name"]),
-        how="cross",
+    # Assign each patient to all arms of the protocol design
+    extended_vpop = cross_join_protocol_arms(
+        patients=vpop, protocol_arms=struct_model.protocol_arms
     )
-    time_df = pd.DataFrame(data=time_steps, columns=["time"])
-    vpop = vpop.merge(time_df, how="cross")
-    # add a dummy observation value
-    vpop["value"] = 1.0
-    nlme_model.add_observations(vpop)
+    # Add output names and timepoints
+    obs_df = patients_to_obs_df(
+        vpop=extended_vpop, time_steps=time, output_names=struct_model.output_names
+    )
+    # Simulate the structural model
+    sim_df = (
+        struct_model.simulate_from_df(vpop=extended_vpop, obs_df=obs_df)
+        .drop(columns=["value"])
+        .rename(columns={"predicted_value": "value"})
+    )
+    # Rename the previous id into `id` (not unique)
+    training_df = (
+        sim_df[["previous_id", "output_name", "time", "id", "value"]]
+        .merge(extended_vpop, on=["id", "previous_id"])
+        .drop(columns=["id"])
+        .rename(columns={"previous_id": "id"})
+    )
+    return training_df
 
-    out_tensor, _ = nlme_model.predict_outputs_from_theta(theta)
-    out_with_noise = nlme_model.add_residual_error(out_tensor)
-    out_df = nlme_model.outputs_to_df(out_with_noise)
-    out_df = out_df.rename(columns={"predicted_value": "value"})
 
-    return out_df
+def generate_synthetic_data(
+    struct_model: StructuralModel,
+    param_distrib: dict,
+    nb_patients: int,
+    time: list[float],
+    np_rng: np.random.Generator | None = None,
+) -> pd.DataFrame:
+    if smoke_test:
+        nb_patients = 2
+    # Initiate the patient data frame
+    raw_vpop = init_patient_ids(nb_individuals=nb_patients)
+    # Sample a protocol arm for each patient
+    patients_with_protocol = sample_protocol_arms(
+        patients=raw_vpop, protocol_arms=struct_model.protocol_arms, np_rng=np_rng
+    )
+    # Add output names and time steps to create an actual observation df
+    obs_df = patients_to_obs_df(
+        vpop=patients_with_protocol,
+        time_steps=time,
+        output_names=struct_model.output_names,
+    )
+    # Initiate the elements required to construct a mixed effects model
+    data = ObsData(DataFrame(obs_df))
+    params = MixedEffectParameters.model_validate(param_distrib)
+    assert params.pdk == [], "PDK are not yet supported in data generation."
+    assert params.covariate_names == [], "Covariates are not yet supported."
+    # Create the nlme model
+    nlme_model = StatisticalModel(
+        structural_model=struct_model, dataset=data, prior_params=params, nb_chains=1
+    )
+    # Prepare model inputs
+    eta = nlme_model.eta_samples_chains
+    gaussian = nlme_model.convert_etas_to_gaussian_all_patients(eta)
+    physical = nlme_model.convert_gaussian_to_physical(
+        psi=gaussian, log_mi=nlme_model.log_mi
+    )
+    theta = nlme_model.convert_physical_to_thetas_all_patients(physical_params=physical)
+    inputs = nlme_model.convert_thetas_to_model_parameters(theta)
+    # Run the model
+    outputs, _ = nlme_model.predict_all_patients(inputs)
+    # Add noise
+    noisy_pred = add_predictive_error(
+        observations=nlme_model.data.full_obs,
+        predictions=outputs,
+        error_model_selector=nlme_model.error_model_selector,
+        sigma=nlme_model.residual_var,
+    )
+    # Convert back to pandas
+    df = (
+        nlme_model.data.full_obs.to_pandas(prediction=noisy_pred)
+        .drop(columns=["value"])
+        .rename(columns={"predicted_value": "value"})
+    )
+    # validate the output
+    validated_out = ObsDataSchema.validate(df)
+    return validated_out

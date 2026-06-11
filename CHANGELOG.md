@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.0.0] - 2026-06-11
+
+### Breaking
+
+- ODE simulations are not supported in Python anymore. All example cases are now refactored to use analytical models written in torch. The end users are expected to come with their own simulation software
+- GP training ranges cannot be used a NLME parameter constraints out of the box anymore. This will be fixed in a future release
+
+### Modified
+
+- Re-structuration of the NLME interface, see examples for details on how to use the API
+- Typing enforced everywhere possible in the NLME and structural model classes. The whole platform is now stricter about typing. Most of these changes should be silent to the user, except for the parameter and configuration of NLME models
+
 ## [3.0.4] - 2026-03-23
 
 - Diagnostics: fix PWRES calculation, use variance of _observations_
