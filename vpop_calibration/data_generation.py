@@ -2,7 +2,7 @@ import pandas as pd
 import uuid
 import numpy as np
 from scipy.stats.qmc import Sobol, scale
-from pydantic import BaseModel
+from pydantic import BaseModel, TypeAdapter
 from pandera.typing import DataFrame
 
 from vpop_calibration.structural_model import StructuralModel
@@ -19,8 +19,8 @@ class ParamBounds(BaseModel):
     log: bool
 
 
-class ParamRanges(BaseModel):
-    ranges: dict[str, ParamBounds]
+ParamRanges = dict[str, ParamBounds]
+paramRangesAdapter = TypeAdapter(ParamRanges)
 
 
 def init_patient_ids(nb_individuals: int) -> pd.DataFrame:
@@ -34,7 +34,7 @@ def sample_descriptors_sobol_sequences(
 ) -> pd.DataFrame:
     """Given parameter ranges, generate individual patients by Sobol sampling"""
     nb_individuals = np.power(2, log_nb_individuals)
-    params_to_explore = list(param_ranges.ranges.keys())
+    params_to_explore = list(param_ranges.keys())
     nb_parameters = len(params_to_explore)
     if nb_parameters != 0:
 
@@ -43,13 +43,13 @@ def sample_descriptors_sobol_sequences(
         sobol_sequence = sobol_engine.random_base2(log_nb_individuals)
         samples = scale(
             sobol_sequence,
-            [param_ranges.ranges[param_name].low for param_name in params_to_explore],
-            [param_ranges.ranges[param_name].high for param_name in params_to_explore],
+            [param_ranges[param_name].low for param_name in params_to_explore],
+            [param_ranges[param_name].high for param_name in params_to_explore],
         )
 
         # Handle log-scaled parameters
         for j, param_name in enumerate(params_to_explore):
-            if param_ranges.ranges[param_name].log:
+            if param_ranges[param_name].log:
                 samples[:, j] = np.exp(samples[:, j])
         # Create the full data frame of patient descriptors
         patients_df = pd.DataFrame(data=samples, columns=params_to_explore)
@@ -125,7 +125,7 @@ def generate_training_data(
 ) -> pd.DataFrame:
     """Given a structural model and parameter ranges, generate a training data set."""
 
-    param_ranges = ParamRanges.model_validate(ranges)
+    param_ranges = paramRangesAdapter.validate_python(ranges)
     # Sample the patient descriptors using Sobol sequences
     vpop = sample_descriptors_sobol_sequences(
         log_nb_individuals=log_nb_ind, param_ranges=param_ranges

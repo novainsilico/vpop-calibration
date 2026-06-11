@@ -44,12 +44,11 @@ def structural_model() -> StructuralModel:
 @pytest.fixture
 def param_ranges() -> dict:
     ranges = {
-        "ranges": {
-            "v": {"low": 0.0, "high": 100, "log": False},
-            "ka": {"low": -2, "high": 1, "log": True},
-            "cl": {"low": 0.0, "high": 3, "log": True},
-        }
+        "v": {"low": 0.0, "high": 100, "log": False},
+        "ka": {"low": -2, "high": 1, "log": True},
+        "cl": {"low": 0.0, "high": 3, "log": True},
     }
+
     return ranges
 
 
