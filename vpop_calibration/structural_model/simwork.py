@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Callable
 import pandas as pd
 import pandera.pandas as pa
 import numpy as np
@@ -10,26 +10,16 @@ from vpop_calibration.utils import extend_schema
 from vpop_calibration.config import device
 
 
-def run_haskell_model_placeholder(
-    patients: pd.DataFrame, time_points: list[float], outputs: list[str]
-) -> np.ndarray:
-    nb_patients = patients.shape[0]
-    nb_timesteps = len(time_points)
-    nb_outputs = len(outputs)
-    dummy_output = np.zeros((nb_patients, nb_timesteps, nb_outputs))
-    return dummy_output
-
-
 class SimworkModelBinding:
-    def __init__(self, id: str, inputs: list[str], outputs: list[str]):
-        self.id = id
+    def __init__(
+        self, haskell_callback: Callable, inputs: list[str], outputs: list[str]
+    ):
+        self.model = haskell_callback
         self.inputs = inputs
         self.outputs = outputs
 
     def run(self, vpop: pd.DataFrame, time: list[float]) -> np.ndarray:
-        outputs = run_haskell_model_placeholder(
-            patients=vpop, time_points=time, outputs=self.outputs
-        )
+        outputs = self.model(patients=vpop, time_points=time, outputs=self.outputs)
         # Expect an array of size (nb_patients, nb_timesteps, nb_outputs)
         return outputs
 
@@ -81,11 +71,10 @@ class StructuralSimwork(StructuralModel):
         self.nb_protocol_overrides = len(self.protocol_parameters)
 
         # Ordered list of parameters that the NLME model expects to find in the function arguments
-        input_parameters = (
+        self.input_parameters = (
             parameter_names_without_protocol_overrides + self.protocol_parameters
         )
-        self.nb_parameters = len(input_parameters)
-        self.input_to_function_arg = [input_parameters.index(a) for a in model.inputs]
+        self.nb_parameters = len(self.input_parameters)
 
         self.task_names = [
             output + "_" + protocol
@@ -127,7 +116,7 @@ class StructuralSimwork(StructuralModel):
         # protocol overrides: size (nb_patients, nb_protocol_overrides)
 
         # Remove time from the X tensor (keeping only time 0 for patient overrides)
-        X_without_time = X[:, :, 0, :-1].squeeze(2)
+        X_without_time = X[:, :, 0, :-1]
         # now size (nb_chains, nb_patients, nb_parameters)
 
         # expand protocol overrides tensor to (num_chains, nb_patients, nb_protocol_overrides)
@@ -141,7 +130,7 @@ class StructuralSimwork(StructuralModel):
         # melt the tensor to be 2d, and assemble it in a dataframe - assuming parameters are in the correct order
         vpop = pd.DataFrame(
             data=X_with_protocol_overrides.view(-1, self.nb_parameters).numpy(),
-            columns=self.parameter_names,
+            columns=self.input_parameters,
         )
         # Assemble the time values
         time = prediction_index.time.raw_values.to_list()
