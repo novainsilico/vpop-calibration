@@ -11,6 +11,7 @@ from vpop_calibration.pynlme.params import MixedEffectParameters
 from vpop_calibration.pynlme.model import StatisticalModel
 from vpop_calibration.pynlme.data import ObsData
 from vpop_calibration.pynlme.residuals import add_predictive_error
+from vpop_calibration.config import smoke_test
 
 
 class ParamBounds(BaseModel):
@@ -124,6 +125,8 @@ def generate_training_data(
     time: list[float],
 ) -> pd.DataFrame:
     """Given a structural model and parameter ranges, generate a training data set."""
+    if smoke_test:
+        log_nb_ind = 1
 
     param_ranges = paramRangesAdapter.validate_python(ranges)
     # Sample the patient descriptors using Sobol sequences
@@ -161,6 +164,8 @@ def generate_synthetic_data(
     time: list[float],
     np_rng: np.random.Generator | None = None,
 ) -> pd.DataFrame:
+    if smoke_test:
+        nb_patients = 2
     # Initiate the patient data frame
     raw_vpop = init_patient_ids(nb_individuals=nb_patients)
     # Sample a protocol arm for each patient
@@ -176,6 +181,8 @@ def generate_synthetic_data(
     # Initiate the elements required to construct a mixed effects model
     data = ObsData(DataFrame(obs_df))
     params = MixedEffectParameters.model_validate(param_distrib)
+    assert params.pdk == [], "PDK are not yet supported in data generation."
+    assert params.covariate_names == [], "Covariates are not yet supported."
     # Create the nlme model
     nlme_model = StatisticalModel(
         structural_model=struct_model, dataset=data, prior_params=params, nb_chains=1

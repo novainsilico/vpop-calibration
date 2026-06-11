@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import pandera.pandas as pa
 from functools import reduce
+from typing import Optional
 
 from ..config import device
 
@@ -11,7 +12,7 @@ from ..config import device
 class TrainingDataSchema(pa.DataFrameModel):
     id: str = pa.Field(coerce=True)
     output_name: str
-    protocol_arm: str = pa.Field(default="identity")
+    protocol_arm: Optional[str] = pa.Field(default="identity")
     time: float = pa.Field(ge=0, coerce=True)
     value: float = pa.Field(coerce=True)
 
