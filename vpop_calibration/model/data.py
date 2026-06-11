@@ -2,9 +2,18 @@ import math
 import torch
 import numpy as np
 import pandas as pd
+import pandera.pandas as pa
 from functools import reduce
 
 from ..config import device
+
+
+class TrainingDataSchema(pa.DataFrameModel):
+    id: str = pa.Field(coerce=True)
+    output_name: str
+    protocol_arm: str = pa.Field(default="identity")
+    time: float = pa.Field(ge=0, coerce=True)
+    value: float = pa.Field(coerce=True)
 
 
 class TrainingDataSet:
@@ -33,7 +42,7 @@ class TrainingDataSet:
         """
 
         # Process the supplied data set
-        self.full_df_raw = training_df
+        self.full_df_raw = TrainingDataSchema.validate(training_df)
 
         declared_columns = self.full_df_raw.columns.to_list()
         # Input validation

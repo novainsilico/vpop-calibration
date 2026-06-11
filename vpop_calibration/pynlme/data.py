@@ -1,26 +1,11 @@
 import pandera.pandas as pa
-import pandas as pd
+from pandera.typing import DataFrame
 import torch
 
 from vpop_calibration.utils import extend_schema
 from vpop_calibration.config import device
 from vpop_calibration.pynlme.indexing import ObservationIndex, IndexedObservations
-
-obsDataSchemaLong = pa.DataFrameSchema(
-    {
-        "id": pa.Column(str),
-        "output_name": pa.Column(str),
-        "time": pa.Column(pd.Float64Dtype),
-        "protocol_arm": pa.Column(str, default="identity"),
-        "value": pa.Column(pd.Float64Dtype),
-    },
-    coerce=True,
-    add_missing_columns=True,
-)
-
-patientDataSchema = pa.DataFrameSchema(
-    {"id": pa.Column(str, unique=True), "protocol_arm": pa.Column(str)}
-)
+from vpop_calibration.pynlme.schemas import ObsDataSchema, patientDataSchema
 
 
 class ObsData:
@@ -31,13 +16,12 @@ class ObsData:
             data (pa.typing.DataFrame): The observed data. Should contain at least the columns ["id", "output_name", "time", "value"].
         """
         # Initial validation
-        self.obs_schema = obsDataSchemaLong
-        self.input_df = self.obs_schema.validate(data)
+        self.input_df = ObsDataSchema.validate(data)
         self.patients: list[str] = self.input_df.id.drop_duplicates().to_list()
 
         # Create the patient data frame (id, protocol_arm and descriptors)
         patients_df_raw = self.input_df.drop(
-            columns=["output_name", "time", "value"]
+            columns=["output_name", "time", "value", "task"]
         ).drop_duplicates()
         self.descriptors_known: list[str] = patients_df_raw.columns.to_list()
         self.descriptors_known.remove("id")
@@ -46,10 +30,6 @@ class ObsData:
             patientDataSchema, self.descriptors_known, "float"
         )
         self.patients_df = self.patients_schema.validate(patients_df_raw)
-
-        self.input_df = self.input_df.assign(
-            task=lambda x: x.output_name + "_" + x.protocol_arm
-        )
 
         self.full_obs = IndexedObservations(
             obs_index=ObservationIndex.from_dataframe(self.input_df),

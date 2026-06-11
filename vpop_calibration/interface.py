@@ -1,6 +1,7 @@
 import pandas as pd
 from pandera.typing import DataFrame
 from typing import Literal, NamedTuple
+from functools import wraps
 
 from vpop_calibration.pynlme.model import StatisticalModel
 from vpop_calibration.structural_model import StructuralModel
@@ -8,15 +9,7 @@ from vpop_calibration.pynlme.data import ObsData
 from vpop_calibration.pynlme.params import MixedEffectParameters
 from vpop_calibration.pynlme.diagnostics import ModelDiagnostics
 from vpop_calibration.saem import PySaem
-from vpop_calibration.pynlme.plot import (
-    check_surrogate_validity_gp,
-    plot_individual_map_estimates,
-    plot_all_individual_map_estimates,
-    plot_map_vs_posterior,
-    plot_map_estimates,
-    plot_weighted_residuals,
-    plot_map_estimates_gof,
-)
+from vpop_calibration.pynlme.plot import PlottingUtility
 
 
 class SaemConfigDict(NamedTuple):
@@ -70,24 +63,4 @@ class NlmeModel:
         else:
             raise NotImplemented
         self.diagnostics = ModelDiagnostics(self.statistical_model)
-
-    def plot_individual_map_estimates(self, *args, **kwargs):
-        plot_individual_map_estimates(self.diagnostics, *args, **kwargs)
-
-    def plot_all_individual_map_estimates(self, *args, **kwargs):
-        plot_all_individual_map_estimates(self.diagnostics, *args, **kwargs)
-
-    def plot_map_vs_posterior(self, *args, **kwargs):
-        plot_map_vs_posterior(self.diagnostics, *args, **kwargs)
-
-    def plot_map_estimates(self, *args, **kwargs):
-        plot_map_estimates(self.diagnostics, *args, **kwargs)
-
-    def plot_weighted_residuals(self, *args, **kwargs):
-        plot_weighted_residuals(self.diagnostics, *args, **kwargs)
-
-    def plot_map_estimates_gof(self, *args, **kwargs):
-        plot_map_estimates_gof(self.diagnostics, *args, **kwargs)
-
-    def check_surrogate_validity_gp(self, *args, **kwargs):
-        check_surrogate_validity_gp(self.diagnostics, *args, **kwargs)
+        self.plot = PlottingUtility(self.diagnostics)

@@ -5,7 +5,7 @@ import numpy as np
 from vpop_calibration.interface import NlmeModel
 from vpop_calibration.structural_model.gp import StructuralGp
 from vpop_calibration.model.gp import GP
-from vpop_calibration.pynlme.plot import check_surrogate_validity_gp
+from vpop_calibration.pynlme.plot import PlottingUtility
 
 
 @pytest.fixture
@@ -104,4 +104,4 @@ def test_gp_diagnostics(np_rng, obs_data, sample_nlme_params):
         df=obs_data,
         prior_params=sample_nlme_params,
     )
-    check_surrogate_validity_gp(nlme_model.diagnostics)
+    nlme_model.plot.check_surrogate_validity_gp()

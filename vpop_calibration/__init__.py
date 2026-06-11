@@ -1,7 +1,10 @@
 from vpop_calibration.interface import NlmeModel, Config, NlmeConfigDict, SaemConfigDict
 from vpop_calibration.structural_model import StructuralAnalytical, StructuralGp
 from vpop_calibration.model import GP
-from vpop_calibration.vpop import generate_vpop_from_ranges
+from vpop_calibration.data_generation import (
+    generate_synthetic_data,
+    generate_training_data,
+)
 
 __all__ = [
     "GP",
@@ -9,7 +12,8 @@ __all__ = [
     "StructuralAnalytical",
     "NlmeModel",
     "Config",
-    "generate_vpop_from_ranges",
     "NlmeConfigDict",
     "SaemConfigDict",
+    "generate_synthetic_data",
+    "generate_training_data",
 ]

@@ -2,7 +2,9 @@ from typing import NamedTuple
 import torch
 from pydantic import BaseModel, ConfigDict
 import pandas as pd
-import numpy as np
+from pandera.typing import DataFrame
+
+from vpop_calibration.pynlme.schemas import ObsDataSchema
 
 
 class IndexedValues(NamedTuple):
@@ -53,11 +55,10 @@ class ObservationIndex(NamedTuple):
     time: IndexedValues
 
     @classmethod
-    def from_dataframe(cls, df: pd.DataFrame):
+    def from_dataframe(cls, df: DataFrame[ObsDataSchema]):
         """Instantiate an ObservationIndex from an observed dataframe."""
         indexes = []
         for field in cls._fields:
-            # This only works if df contains one column per field in the observation index
             raw_values = df[field]
             ref_values = raw_values.drop_duplicates().sort_values().tolist()
             indexed_values = torch.tensor(
