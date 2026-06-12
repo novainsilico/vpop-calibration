@@ -2,11 +2,12 @@ import torch
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 from scipy.optimize import minimize
-from tqdm.notebook import tqdm
 from typing import Union, Optional, Callable
 from pandas import DataFrame
 import numpy as np
 from IPython.display import display, DisplayHandle
+
+def tqdm(x): return x
 
 from vpop_calibration.config import smoke_test, device
 from vpop_calibration.pynlme.model import StatisticalModel
