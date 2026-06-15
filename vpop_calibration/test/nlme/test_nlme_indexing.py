@@ -6,6 +6,7 @@ from vpop_calibration.pynlme.indexing import (
     ObservationIndex,
     IndexedObservations,
 )
+from vpop_calibration.pynlme.schemas import ObsDataSchema
 
 
 def test_observation_indexing():
@@ -275,10 +276,10 @@ def test_from_pandas():
     df_in["task"] = df_in.apply(
         lambda r: r["output_name"] + "_" + r["protocol_arm"], axis=1
     )
-
-    obs_index = ObservationIndex.from_dataframe(df_in)
-    value = torch.as_tensor(df_in.value.values)
+    df_in_val = ObsDataSchema.validate(df_in)
+    obs_index = ObservationIndex.from_dataframe(df_in_val)
+    value = torch.as_tensor(df_in_val.value.values)
     indexed_value = IndexedObservations(obs_index=obs_index, obs_values=value)
     df_out = indexed_value.to_pandas()
 
-    pd.testing.assert_frame_equal(df_in.drop(columns=["task"]), df_out)
+    pd.testing.assert_frame_equal(df_in_val.drop(columns=["task"]), df_out)

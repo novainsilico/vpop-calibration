@@ -1,8 +1,14 @@
-from typing import Optional, Callable
+from typing import Optional
 import pandas as pd
 import pandera.pandas as pa
 import numpy as np
 import torch
+from pydantic import BaseModel, TypeAdapter
+import itertools
+import subprocess
+import tempfile
+import uuid
+import json
 
 from vpop_calibration.structural_model.base import StructuralModel
 from vpop_calibration.pynlme.indexing import ObservationIndex
@@ -10,18 +16,115 @@ from vpop_calibration.utils import extend_schema
 from vpop_calibration.config import device
 
 
+class TimeseriesOutput(BaseModel):
+    id: str
+    unit: str
+    values: list[float]
+
+
+PatientOutput = tuple[list[float], list[TimeseriesOutput]]
+ModelOutput = dict[str, PatientOutput]
+model_output_adapter = TypeAdapter(ModelOutput)
+
+
+def nix_run_command(
+    model_path: str,
+    solving_options_path: str,
+    outputs: list[str],
+    times: list[float],
+    vpop_path: str,
+) -> list[str]:
+
+    concat_outputs = list(
+        itertools.chain.from_iterable(["--output", o] for o in outputs)
+    )
+    cmd = [
+        "nix",
+        "run",
+        "simwork#run-model",
+        "--",
+        "--model",
+        model_path,
+        "--explicit-time",
+        ",".join(str(t) for t in times),
+        "--options",
+        solving_options_path,
+        *concat_outputs,
+        "--vpop",
+        vpop_path,
+    ]
+    return cmd
+
+
 class SimworkModelBinding:
     def __init__(
-        self, haskell_callback: Callable, inputs: list[str], outputs: list[str]
+        self,
+        path_to_model: str,
+        path_to_solving_options: str,
+        inputs: list[str],
+        outputs: list[str],
     ):
-        self.model = haskell_callback
+        self.model_path = path_to_model
+        self.solving_options = path_to_solving_options
         self.inputs = inputs
         self.outputs = outputs
+        self.nb_outputs = len(outputs)
 
-    def run(self, vpop: pd.DataFrame, time: list[float]) -> np.ndarray:
-        outputs = self.model(patients=vpop, time_points=time, outputs=self.outputs)
-        # Expect an array of size (nb_patients, nb_timesteps, nb_outputs)
-        return outputs
+    def run(self, vpop: pd.DataFrame, time: list[float]) -> pd.DataFrame:
+        vpop_json = self.df_to_json_vpop(vpop)
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json") as tmp_file:
+            vpop_path = tmp_file.name
+            tmp_file.write(json.dumps(vpop_json))
+            tmp_file.seek(0)
+            result = subprocess.run(
+                nix_run_command(
+                    model_path=self.model_path,
+                    solving_options_path=self.solving_options,
+                    outputs=self.outputs,
+                    times=time,
+                    vpop_path=vpop_path,
+                ),
+                capture_output=True,
+            )
+        if result.returncode != 0:
+            print(f"Fatal error: {result.stderr}")
+        model_output = model_output_adapter.validate_json(result.stdout)
+        output_df = self.parse_output_to_pandas(model_output)
+        return output_df
+
+    def df_to_json_vpop(self, vpop_df: pd.DataFrame) -> dict:
+        vpop = {
+            "patients": [
+                {
+                    "patientIndex": row["id"],
+                    "patientCategoricalAttributes": [],
+                    "patientAttributes": [
+                        {"id": param, "val": row[param]} for param in self.inputs
+                    ],
+                }
+                for index, row in vpop_df.iterrows()
+            ]
+        }
+        return vpop
+
+    def parse_output_to_pandas(self, simwork_output: ModelOutput) -> pd.DataFrame:
+        df_list = []
+        for patient_id, patient_data in simwork_output.items():
+            for timeseries in patient_data[1]:
+                temp_df = pd.DataFrame(
+                    {
+                        "id": patient_id,
+                        "time": patient_data[0],
+                        "output_name": timeseries.id,
+                        "value": timeseries.values,
+                    }
+                )
+                df_list.append(temp_df)
+        full_df = pd.concat(df_list)
+        full_df_wide = full_df.pivot(
+            index=["id", "time"], columns="output_name", values="value"
+        ).reset_index()
+        return full_df_wide
 
 
 class StructuralSimwork(StructuralModel):
@@ -132,13 +235,25 @@ class StructuralSimwork(StructuralModel):
             data=X_with_protocol_overrides.view(-1, self.nb_parameters).numpy(),
             columns=self.input_parameters,
         )
+        # Add a temp patient id, to cover the fact that a single patient is simulated on each chain
+        temporary_ids = [str(uuid.uuid4()) for _ in range(vpop.shape[0])]
+        vpop["id"] = temporary_ids
         # Assemble the time values
-        time = prediction_index.time.raw_values.to_list()
+        time = prediction_index.time.raw_values.drop_duplicates().to_list()
         # Run the model
-        outputs = self.model.run(vpop=vpop, time=time)
-        outputs_tensor = torch.as_tensor(outputs, device=device)
+        outputs_df = self.model.run(vpop=vpop, time=time)
+        patient_id_ordered = pd.DataFrame({"id": temporary_ids})
+        outputs_df_ordered = patient_id_ordered.merge(outputs_df, on="id", how="left")
+        outputs_tensor = torch.as_tensor(
+            outputs_df_ordered[self.output_names].values, device=device
+        )
         # Pivot to a wide tensor
-        outputs_wide = outputs_tensor.view(nb_chains, nb_patients, nb_timesteps, -1)
+        outputs_wide = outputs_tensor.view(
+            nb_chains,
+            nb_patients,
+            nb_timesteps,
+            self.model.nb_outputs,
+        )
         # Build the 4d tensor index for row observations
         nb_obs_per_chain = prediction_index.id.index_values.shape[0]
         prediction_index_expanded = (
