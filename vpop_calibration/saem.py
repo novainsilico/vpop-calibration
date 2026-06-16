@@ -75,7 +75,7 @@ class PySaem:
             self.mcmc_first_burn_in = 1
             self.mcmc_nb_transitions = 1
             self.nb_phase1_iterations = 1
-            self.nb_phase2_iterations = 2
+            self.nb_phase2_iterations = 1
         else:
             self.nb_phase1_iterations: int = nb_phase1_iterations
             self.nb_phase2_iterations: int = (
@@ -489,6 +489,8 @@ class PySaem:
 
         # 3. Update fixed effects MIs
         if self.model.nb_mi > 0:
+            if self.verbose:
+                print("  Optimizing model intrinsic parameters:")
             # This step is notoriously under-optimized
             self.current_gaussian_params_per_patient = (
                 self.current_mh_state.gaussian_params.mean(dim=0)
