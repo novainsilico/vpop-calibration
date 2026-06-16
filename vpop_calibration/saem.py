@@ -499,8 +499,8 @@ class PySaem:
             target_log_MI_np = minimize(
                 fun=objective_fun,
                 x0=self.model.log_mi.cpu().squeeze().numpy(),
-                method="L-BFGS-B",
-                options={"maxfun": self.optim_max_fun},
+                method="BFGS",
+                options={"maxiter": self.optim_max_fun},
             ).x
             target_log_MI = torch.from_numpy(target_log_MI_np).to(device)
             new_log_MI = self._stochastic_approximation(

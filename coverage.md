@@ -27,5 +27,5 @@
 | vpop\_calibration/structural\_model/base.py           |       29 |        1 |        0 |        0 |     97% |        37 |
 | vpop\_calibration/structural\_model/gp.py             |       26 |        0 |        2 |        0 |    100% |           |
 | vpop\_calibration/structural\_model/simwork.py        |       98 |        1 |        8 |        1 |     98% |        92 |
-| vpop\_calibration/utils.py                            |       12 |        5 |        6 |        0 |     50% |      7-12 |
-| **TOTAL**                                             | **2353** |  **191** |  **540** |  **114** | **88%** |           |
+| vpop\_calibration/utils.py                            |        6 |        0 |        2 |        0 |    100% |           |
+| **TOTAL**                                             | **2347** |  **186** |  **536** |  **114** | **88%** |           |
