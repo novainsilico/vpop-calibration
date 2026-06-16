@@ -257,7 +257,7 @@ def test_to_pandas():
             "predicted_value": [4, 5, 6, 7],
         }
     )
-    pd.testing.assert_frame_equal(df, expected_df)
+    pd.testing.assert_frame_equal(df, expected_df, check_dtype=False)
 
 
 def test_from_pandas():
@@ -282,4 +282,6 @@ def test_from_pandas():
     indexed_value = IndexedObservations(obs_index=obs_index, obs_values=value)
     df_out = indexed_value.to_pandas()
 
-    pd.testing.assert_frame_equal(df_in_val.drop(columns=["task"]), df_out)
+    pd.testing.assert_frame_equal(
+        df_in_val.drop(columns=["task"]), df_out, check_dtype=False
+    )

@@ -72,10 +72,12 @@ class SimworkModelBinding:
 
     def run(self, vpop: pd.DataFrame, time: list[float]) -> pd.DataFrame:
         vpop_json = self.df_to_json_vpop(vpop)
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".json") as tmp_file:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".json", delete_on_close=False
+        ) as tmp_file:
             vpop_path = tmp_file.name
             tmp_file.write(json.dumps(vpop_json))
-            tmp_file.seek(0)
+            tmp_file.close()
             result = subprocess.run(
                 nix_run_command(
                     model_path=self.model_path,
