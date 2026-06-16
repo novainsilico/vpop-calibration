@@ -41,7 +41,7 @@ def nix_run_command(
     cmd = [
         "nix",
         "run",
-        "simwork#run-model",
+        ".#simwork.legacyPackages.x86_64-linux.scripts.run-model-simple",
         "--",
         "--model",
         model_path,
@@ -89,7 +89,7 @@ class SimworkModelBinding:
                 capture_output=True,
             )
         if result.returncode != 0:
-            print(f"Fatal error: {result.stderr}")
+            raise RuntimeError(f"Fatal error: {result.stderr}")
         model_output = model_output_adapter.validate_json(result.stdout)
         output_df = self.parse_output_to_pandas(model_output)
         return output_df
