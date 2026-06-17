@@ -16,7 +16,7 @@ def simwork_model() -> StructuralModel:
     model = SimworkModelBinding(
         path_to_model="vpop_calibration/test/simwork_model/assets/model.json",
         path_to_solving_options="vpop_calibration/test/simwork_model/assets/options.json",
-        inputs=["k_12", "k_21", "k_el", "dose"],
+        inputs=["k_12", "k_21", "k_el", "dose", "k_a"],
         outputs=["A0", "A1", "A2"],
     )
 
@@ -49,7 +49,7 @@ def obs_data(np_rng) -> pd.DataFrame:
 @pytest.fixture
 def sample_nlme_params() -> dict:
     input = {
-        # "model_intrinsic": {"k_a": {"prior": 10.0}},
+        "model_intrinsic": {"k_a": {"prior": 10.0}},
         "pdu": {
             "k_12": {
                 "prior": 10.0,

@@ -21,11 +21,11 @@
 | vpop\_calibration/pynlme/residuals.py                 |       57 |        2 |       12 |        2 |     94% |   48, 103 |
 | vpop\_calibration/pynlme/schemas.py                   |       14 |        0 |        0 |        0 |    100% |           |
 | vpop\_calibration/pynlme/utils.py                     |       18 |        0 |        0 |        0 |    100% |           |
-| vpop\_calibration/saem.py                             |      413 |       53 |      158 |       21 |     81% |80-81, 113, 170, 176, 251->260, 493, 610->606, 613->643, 627, 630-640, 652-694, 735->741, 737, 754->760, 756, 774->780, 776, 795-796, 815-816, 844-845, 876-880, 887-890, 900->911 |
+| vpop\_calibration/saem.py                             |      413 |       52 |      158 |       23 |     81% |80-81, 113, 170, 176, 251->260, 252->251, 491->512, 610->606, 613->643, 627, 630-640, 652-694, 735->741, 737, 754->760, 756, 774->780, 776, 795-796, 815-816, 844-845, 876-880, 887-890, 894->900, 900->911 |
 | vpop\_calibration/structural\_model/\_\_init\_\_.py   |        5 |        0 |        0 |        0 |    100% |           |
 | vpop\_calibration/structural\_model/analytical.py     |       41 |        0 |        2 |        0 |    100% |           |
 | vpop\_calibration/structural\_model/base.py           |       29 |        1 |        0 |        0 |     97% |        37 |
 | vpop\_calibration/structural\_model/gp.py             |       26 |        0 |        2 |        0 |    100% |           |
-| vpop\_calibration/structural\_model/simwork.py        |       98 |        1 |        8 |        1 |     98% |        92 |
+| vpop\_calibration/structural\_model/simwork.py        |      102 |        2 |       10 |        2 |     96% |   81, 106 |
 | vpop\_calibration/utils.py                            |        6 |        0 |        2 |        0 |    100% |           |
-| **TOTAL**                                             | **2347** |  **186** |  **536** |  **114** | **88%** |           |
+| **TOTAL**                                             | **2351** |  **186** |  **538** |  **117** | **88%** |           |

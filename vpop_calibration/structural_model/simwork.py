@@ -28,6 +28,7 @@ model_output_adapter = TypeAdapter(ModelOutput)
 
 
 def nix_run_command(
+    executable: str,
     model_path: str,
     solving_options_path: str,
     outputs: list[str],
@@ -39,10 +40,7 @@ def nix_run_command(
         itertools.chain.from_iterable(["--output", o] for o in outputs)
     )
     cmd = [
-        "nix",
-        "run",
-        ".#simwork.legacyPackages.x86_64-linux.scripts.run-model-simple",
-        "--",
+        executable,
         "--model",
         model_path,
         "--explicit-time",
@@ -70,6 +68,21 @@ class SimworkModelBinding:
         self.outputs = outputs
         self.nb_outputs = len(outputs)
 
+        build_result = subprocess.run(
+            [
+                "nix",
+                "build",
+                ".#simwork.legacyPackages.x86_64-linux.perf.scripts.run-model-simple",
+                "--print-out-paths",
+            ],
+            capture_output=True,
+        )
+        if build_result.returncode != 0:
+            raise RuntimeError(build_result.stderr)
+        self.executable = (
+            build_result.stdout.decode().strip("\n") + "/bin/scripts.run-model-simple"
+        )
+
     def run(self, vpop: pd.DataFrame, time: list[float]) -> pd.DataFrame:
         vpop_json = self.df_to_json_vpop(vpop)
         with tempfile.NamedTemporaryFile(
@@ -80,6 +93,7 @@ class SimworkModelBinding:
             tmp_file.close()
             result = subprocess.run(
                 nix_run_command(
+                    executable=self.executable,
                     model_path=self.model_path,
                     solving_options_path=self.solving_options,
                     outputs=self.outputs,
