@@ -101,10 +101,17 @@ class SimworkModelBinding:
                     vpop_path=vpop_path,
                 ),
                 capture_output=True,
+                text=True,
             )
         if result.returncode != 0:
             raise RuntimeError(f"Fatal error: {result.stderr}")
-        model_output = model_output_adapter.validate_json(result.stdout)
+        filt_result = subprocess.run(
+            ["jq", "-s", "last"],
+            input=result.stdout,
+            capture_output=True,
+            text=True,
+        )
+        model_output = model_output_adapter.validate_json(filt_result.stdout)
         output_df = self.parse_output_to_pandas(model_output)
         return output_df
 
