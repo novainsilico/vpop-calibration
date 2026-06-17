@@ -9,8 +9,8 @@ from vpop_calibration.metropolis_hastings import MetropolisHastingsState, mh_ste
 
 def sample_conditional_distribution_nlme(
     nlme_model: StatisticalModel,
-    nb_samples: int = 1000,
-    nb_burn_in: int = 50,
+    nb_samples: int = 100,
+    nb_burn_in: int = 0,
 ) -> torch.Tensor:
     """
     Sample random effects from the conditional distribution

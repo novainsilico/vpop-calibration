@@ -9,7 +9,7 @@ from vpop_calibration.pynlme.model import StatisticalModel
 
 def compute_ebe_nlme(
     nlme_model: StatisticalModel,
-    max_iter: int = 50,
+    max_iter: int = 10,
 ) -> torch.Tensor:
     """
     Returns: ebe_estimates: dim(nb_patients, nb_PDU)
@@ -27,7 +27,7 @@ def compute_ebe_nlme(
 
     ebe_etas = torch.zeros((nlme_model.nb_patients, nlme_model.nb_pdu))
     print("Computing EBEs for each patient:")
-    for i, p in tqdm(enumerate(nlme_model.patients)):
+    for i, p in enumerate(tqdm(nlme_model.patients)):
         log_posterior_function = nlme_model.single_patient_likelihood_factory(id=p)
 
         def objective_function(eta_array: np.ndarray) -> float:
@@ -44,7 +44,7 @@ def compute_ebe_nlme(
         res = minimize(
             objective_function,
             x0,
-            method="L-BFGS-B",
+            method="Nelder-Mead",
             options={"maxiter": max_iter},
         )
         ebe_etas[i] = torch.from_numpy(res.x).to(device)

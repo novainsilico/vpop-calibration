@@ -499,7 +499,7 @@ class PySaem:
             target_log_MI_np = minimize(
                 fun=objective_fun,
                 x0=self.model.log_mi.cpu().squeeze().numpy(),
-                method="BFGS",
+                method="Nelder-Mead",
                 options={"maxiter": self.optim_max_fun},
             ).x
             target_log_MI = torch.from_numpy(target_log_MI_np).to(device)
