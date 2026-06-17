@@ -255,7 +255,7 @@ class StructuralSimwork(StructuralModel):
         temporary_ids = [str(uuid.uuid4()) for _ in range(vpop.shape[0])]
         vpop["id"] = temporary_ids
         # Assemble the time values
-        time = prediction_index.time.raw_values.drop_duplicates().to_list()
+        time = prediction_index.time.ref_values
         # Run the model
         outputs_df = self.model.run(vpop=vpop, time=time)
         patient_id_ordered = pd.DataFrame({"id": temporary_ids})
