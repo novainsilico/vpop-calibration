@@ -1,14 +1,13 @@
 import pandera.pandas as pa
 import pandas as pd
-from pandera.api.pandas.model_config import BaseConfig
 
 
 class ObsDataSchema(pa.DataFrameModel):
     id: str = pa.Field(coerce=True)
     output_name: str
-    time: pd.Float64Dtype = pa.Field(coerce=True)
+    time: float = pa.Field(coerce=True)
     protocol_arm: str = pa.Field(default="identity")
-    value: pd.Float64Dtype = pa.Field(coerce=True)
+    value: float = pa.Field(coerce=True)
     task: str
 
     @pa.dataframe_parser

@@ -1,6 +1,6 @@
 [project]
 name = "vpop-calibration"
-version = "4.0.0"
+version = "4.1.0"
 description = ""
 authors = [{ name = "Paul Lemarre", email = "paul.lemarre@novainsilico.ai" }]
 readme = "README.md"
@@ -35,6 +35,7 @@ pytest-env = "^1.2.0"
 pytest-profiling = "^1.8.1"
 pre-commit = "^4.5.0"
 pytest-subtests = "^0.15.0"
+py-spy = "^0.4.2"
 
 
 [build-system]

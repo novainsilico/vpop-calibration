@@ -50,7 +50,7 @@ def obs_data(np_rng) -> pd.DataFrame:
     df = df.merge(pd.DataFrame(time_steps, columns=["time"]), how="cross")
     df["value"] = np.abs(np_rng.normal(0, 1, df.shape[0]))
     df["task"] = df.apply(lambda r: r["output_name"] + "_" + r["protocol_arm"], axis=1)
-
+    df = df.sample(frac=0.9, random_state=np_rng)
     return df
 
 
@@ -76,3 +76,5 @@ def test_analytical_saem(sample_nlme_params, obs_data, struct_model):
         structural_model=struct_model, df=obs_data, prior_params=sample_nlme_params
     )
     nlme_model.optimizer.run()
+    nlme_model.diagnostics.compute_ebe()
+    nlme_model.diagnostics.sample_conditional_distribution()

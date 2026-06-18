@@ -1,0 +1,553 @@
+{
+    "coreVersion": "35.29.0",
+    "modelCore": {
+        "bioReactionSet": [],
+        "odeSet": [
+            {
+                "odeVar": "A0",
+                "odeRhs": {
+                    "tag": "BinaryNode",
+                    "contents": [
+                        "Times",
+                        {
+                            "tag": "UnaryNode",
+                            "contents": [
+                                "Neg",
+                                {
+                                    "tag": "Var",
+                                    "contents": {
+                                        "tag": "Constituent",
+                                        "contents": "k_a"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "tag": "Var",
+                            "contents": {
+                                "tag": "Constituent",
+                                "contents": "A0"
+                            }
+                        }
+                    ]
+                },
+                "odeName": "dA_absorption_dt",
+                "odeNumber": "",
+                "odeRef": "",
+                "odeDesc": "",
+                "tags": [
+                    {
+                        "key": "Status",
+                        "value": "Reviewed"
+                    }
+                ],
+                "odeFilter": null,
+                "odePhenomena": []
+            },
+            {
+                "odeVar": "A1",
+                "odeRhs": {
+                    "tag": "BinaryNode",
+                    "contents": [
+                        "Minus",
+                        {
+                            "tag": "BinaryNode",
+                            "contents": [
+                                "Minus",
+                                {
+                                    "tag": "BinaryNode",
+                                    "contents": [
+                                        "Plus",
+                                        {
+                                            "tag": "BinaryNode",
+                                            "contents": [
+                                                "Times",
+                                                {
+                                                    "tag": "Var",
+                                                    "contents": {
+                                                        "tag": "Constituent",
+                                                        "contents": "k_a"
+                                                    }
+                                                },
+                                                {
+                                                    "tag": "Var",
+                                                    "contents": {
+                                                        "tag": "Constituent",
+                                                        "contents": "A0"
+                                                    }
+                                                }
+                                            ]
+                                        },
+                                        {
+                                            "tag": "BinaryNode",
+                                            "contents": [
+                                                "Times",
+                                                {
+                                                    "tag": "Var",
+                                                    "contents": {
+                                                        "tag": "Constituent",
+                                                        "contents": "k_21"
+                                                    }
+                                                },
+                                                {
+                                                    "tag": "Var",
+                                                    "contents": {
+                                                        "tag": "Constituent",
+                                                        "contents": "A2"
+                                                    }
+                                                }
+                                            ]
+                                        }
+                                    ]
+                                },
+                                {
+                                    "tag": "BinaryNode",
+                                    "contents": [
+                                        "Times",
+                                        {
+                                            "tag": "Var",
+                                            "contents": {
+                                                "tag": "Constituent",
+                                                "contents": "k_12"
+                                            }
+                                        },
+                                        {
+                                            "tag": "Var",
+                                            "contents": {
+                                                "tag": "Constituent",
+                                                "contents": "A1"
+                                            }
+                                        }
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "tag": "BinaryNode",
+                            "contents": [
+                                "Times",
+                                {
+                                    "tag": "Var",
+                                    "contents": {
+                                        "tag": "Constituent",
+                                        "contents": "k_el"
+                                    }
+                                },
+                                {
+                                    "tag": "Var",
+                                    "contents": {
+                                        "tag": "Constituent",
+                                        "contents": "A1"
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                "odeName": "dA_central_dt",
+                "odeNumber": "",
+                "odeRef": "",
+                "odeDesc": "",
+                "tags": [
+                    {
+                        "key": "Status",
+                        "value": "Reviewed"
+                    }
+                ],
+                "odeFilter": null,
+                "odePhenomena": []
+            },
+            {
+                "odeVar": "A2",
+                "odeRhs": {
+                    "tag": "BinaryNode",
+                    "contents": [
+                        "Minus",
+                        {
+                            "tag": "BinaryNode",
+                            "contents": [
+                                "Times",
+                                {
+                                    "tag": "Var",
+                                    "contents": {
+                                        "tag": "Constituent",
+                                        "contents": "k_12"
+                                    }
+                                },
+                                {
+                                    "tag": "Var",
+                                    "contents": {
+                                        "tag": "Constituent",
+                                        "contents": "A1"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "tag": "BinaryNode",
+                            "contents": [
+                                "Times",
+                                {
+                                    "tag": "Var",
+                                    "contents": {
+                                        "tag": "Constituent",
+                                        "contents": "k_21"
+                                    }
+                                },
+                                {
+                                    "tag": "Var",
+                                    "contents": {
+                                        "tag": "Constituent",
+                                        "contents": "A2"
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                "odeName": "dA_peripheral_dt",
+                "odeNumber": "",
+                "odeRef": "",
+                "odeDesc": "",
+                "tags": [
+                    {
+                        "key": "Status",
+                        "value": "Reviewed"
+                    }
+                ],
+                "odeFilter": null,
+                "odePhenomena": []
+            }
+        ]
+    },
+    "modelParams": [
+        {
+            "_Iname": "A0",
+            "_Idescription": "",
+            "_Ivalue": {
+                "tag": "Var",
+                "contents": {
+                    "tag": "Constituent",
+                    "contents": "dose"
+                }
+            },
+            "_Iunit": "mol / L",
+            "_Iuri": "",
+            "_IcalibrationOptions": {
+                "_distribution": null,
+                "_toCalibrate": false
+            },
+            "_Itags": [
+                {
+                    "key": "Status",
+                    "value": "Reviewed"
+                },
+                {
+                    "key": "InputTag",
+                    "value": "Formulaic"
+                }
+            ],
+            "_IisConstant": false,
+            "_Iscale": {
+                "tag": "Const",
+                "contents": 1.0
+            },
+            "_Itolerance": 1.0
+        },
+        {
+            "_Iname": "A1",
+            "_Idescription": "",
+            "_Ivalue": {
+                "tag": "Const",
+                "contents": 0.0
+            },
+            "_Iunit": "mol / L",
+            "_Iuri": "",
+            "_IcalibrationOptions": {
+                "_distribution": null,
+                "_toCalibrate": false
+            },
+            "_Itags": [
+                {
+                    "key": "Status",
+                    "value": "Reviewed"
+                },
+                {
+                    "key": "InputTag",
+                    "value": "ModelIntrinsic"
+                }
+            ],
+            "_IisConstant": false,
+            "_Iscale": {
+                "tag": "Const",
+                "contents": 1.0
+            },
+            "_Itolerance": 1.0
+        },
+        {
+            "_Iname": "A2",
+            "_Idescription": "",
+            "_Ivalue": {
+                "tag": "Const",
+                "contents": 0.0
+            },
+            "_Iunit": "mol / L",
+            "_Iuri": "",
+            "_IcalibrationOptions": {
+                "_distribution": null,
+                "_toCalibrate": false
+            },
+            "_Itags": [
+                {
+                    "key": "Status",
+                    "value": "Reviewed"
+                },
+                {
+                    "key": "InputTag",
+                    "value": "ModelIntrinsic"
+                }
+            ],
+            "_IisConstant": false,
+            "_Iscale": {
+                "tag": "Const",
+                "contents": 1.0
+            },
+            "_Itolerance": 1.0
+        },
+        {
+            "_Iname": "dose",
+            "_Idescription": "",
+            "_Ivalue": {
+                "tag": "Const",
+                "contents": 0.5
+            },
+            "_Iunit": "mol / L",
+            "_Iuri": "",
+            "_IcalibrationOptions": {
+                "_distribution": null,
+                "_toCalibrate": false
+            },
+            "_Itags": [
+                {
+                    "key": "Status",
+                    "value": "Reviewed"
+                },
+                {
+                    "key": "InputTag",
+                    "value": "ProtocolSpecific"
+                }
+            ],
+            "_IisConstant": false,
+            "_Iscale": {
+                "tag": "Const",
+                "contents": 1.0
+            },
+            "_Itolerance": 1.0
+        },
+        {
+            "_Iname": "k_12",
+            "_Idescription": "",
+            "_Ivalue": {
+                "tag": "Const",
+                "contents": 0.5
+            },
+            "_Iunit": "1 / h",
+            "_Iuri": "",
+            "_IcalibrationOptions": {
+                "_distribution": null,
+                "_toCalibrate": false
+            },
+            "_Itags": [
+                {
+                    "key": "Status",
+                    "value": "Reviewed"
+                },
+                {
+                    "key": "InputTag",
+                    "value": "PatientDescriptorUnknown"
+                }
+            ],
+            "_IisConstant": false,
+            "_Iscale": {
+                "tag": "Const",
+                "contents": 1.0
+            },
+            "_Itolerance": 1.0
+        },
+        {
+            "_Iname": "k_21",
+            "_Idescription": "",
+            "_Ivalue": {
+                "tag": "Const",
+                "contents": 0.5
+            },
+            "_Iunit": "1 / h",
+            "_Iuri": "",
+            "_IcalibrationOptions": {
+                "_distribution": null,
+                "_toCalibrate": false
+            },
+            "_Itags": [
+                {
+                    "key": "Status",
+                    "value": "Reviewed"
+                },
+                {
+                    "key": "InputTag",
+                    "value": "PatientDescriptorUnknown"
+                }
+            ],
+            "_IisConstant": false,
+            "_Iscale": {
+                "tag": "Const",
+                "contents": 1.0
+            },
+            "_Itolerance": 1.0
+        },
+        {
+            "_Iname": "k_a",
+            "_Idescription": "",
+            "_Ivalue": {
+                "tag": "Const",
+                "contents": 0.5
+            },
+            "_Iunit": "1 / h",
+            "_Iuri": "",
+            "_IcalibrationOptions": {
+                "_distribution": null,
+                "_toCalibrate": false
+            },
+            "_Itags": [
+                {
+                    "key": "Status",
+                    "value": "Reviewed"
+                },
+                {
+                    "key": "InputTag",
+                    "value": "ModelIntrinsic"
+                }
+            ],
+            "_IisConstant": false,
+            "_Iscale": {
+                "tag": "Const",
+                "contents": 1.0
+            },
+            "_Itolerance": 1.0
+        },
+        {
+            "_Iname": "k_el",
+            "_Idescription": "",
+            "_Ivalue": {
+                "tag": "Const",
+                "contents": 0.1
+            },
+            "_Iunit": "1 / h",
+            "_Iuri": "",
+            "_IcalibrationOptions": {
+                "_distribution": null,
+                "_toCalibrate": false
+            },
+            "_Itags": [
+                {
+                    "key": "Status",
+                    "value": "Reviewed"
+                },
+                {
+                    "key": "InputTag",
+                    "value": "ModelIntrinsic"
+                }
+            ],
+            "_IisConstant": false,
+            "_Iscale": {
+                "tag": "Const",
+                "contents": 1.0
+            },
+            "_Itolerance": 1.0
+        },
+        {
+            "_Iname": "time",
+            "_Idescription": "Defines the simulation time parameter.",
+            "_Ivalue": {
+                "tag": "Var",
+                "contents": {
+                    "tag": "Constituent",
+                    "contents": "time"
+                }
+            },
+            "_Iunit": "h",
+            "_Iuri": "",
+            "_IcalibrationOptions": {
+                "_distribution": null,
+                "_toCalibrate": false
+            },
+            "_Itags": [
+                {
+                    "key": "Status",
+                    "value": "Reviewed"
+                },
+                {
+                    "key": "InputTag",
+                    "value": "Technical"
+                }
+            ],
+            "_IisConstant": false,
+            "_Iscale": {
+                "tag": "Const",
+                "contents": 1.0
+            },
+            "_Itolerance": 1.0
+        }
+    ],
+    "compartments": [],
+    "species": [],
+    "events": [],
+    "algebraicRules": [],
+    "modelName": "unnamedModel",
+    "baselineChecks": [],
+    "categoricalParams": [],
+    "immutableIds": {
+        "1718bb7c-0661-4cb9-a4f9-e6adaefb35e3": "time",
+        "2cfd91b4-66a7-4ef3-adea-0336002f2ff5": "k_a",
+        "4772d5e2-1541-44c9-a2b9-1a1c2ab06d57": "k_21",
+        "61e5bdf6-46a6-47e6-b336-5cb6366ffc10": "dA_absorption_dt",
+        "684ebcf6-82eb-4ee4-9662-95b30f561ba9": "A1",
+        "7483eef7-2568-49dc-9686-ca5a44a64f88": "k_12",
+        "81a7ea81-1e99-46fd-b7f9-5bccd0726e51": "dose",
+        "acfc7e77-d9ba-46c3-ae18-cf689ae1fc59": "dA_peripheral_dt",
+        "da7ed118-069a-40b7-93db-522b2528a164": "k_el",
+        "df6b6911-6914-4333-9787-16e39aa3542c": "dA_central_dt",
+        "e96dcc9b-c66c-434e-bd85-033d20619d0c": "A2",
+        "fcc3b64f-97a3-4f71-8d96-1c8eb06f1458": "A0"
+    },
+    "customTags": [],
+    "mergeConflicts": {
+        "direct": {
+            "algebraicRules": [],
+            "baselineChecks": [],
+            "categoricalParams": [],
+            "compartments": [],
+            "customTags": [],
+            "events": [],
+            "modelCore": {
+                "bioReactionSet": [],
+                "odeSet": []
+            },
+            "modelParams": [],
+            "species": []
+        },
+        "indirect": {
+            "algebraicRules": [],
+            "baselineChecks": [],
+            "categoricalParams": [],
+            "compartments": [],
+            "customTags": [],
+            "events": [],
+            "modelCore": {
+                "bioReactionSet": [],
+                "odeSet": []
+            },
+            "modelParams": [],
+            "species": []
+        }
+    }
+}

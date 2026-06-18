@@ -2,11 +2,10 @@ import torch
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 from scipy.optimize import minimize
-from tqdm.notebook import tqdm
 from typing import Union, Optional, Callable
-from pandas import DataFrame
 import numpy as np
 from IPython.display import display, DisplayHandle
+from tqdm import tqdm
 
 from vpop_calibration.config import smoke_test, device
 from vpop_calibration.pynlme.model import StatisticalModel
@@ -76,7 +75,7 @@ class PySaem:
             self.mcmc_first_burn_in = 1
             self.mcmc_nb_transitions = 1
             self.nb_phase1_iterations = 1
-            self.nb_phase2_iterations = 2
+            self.nb_phase2_iterations = 1
         else:
             self.nb_phase1_iterations: int = nb_phase1_iterations
             self.nb_phase2_iterations: int = (
@@ -490,6 +489,8 @@ class PySaem:
 
         # 3. Update fixed effects MIs
         if self.model.nb_mi > 0:
+            if self.verbose:
+                print("  Optimizing model intrinsic parameters:")
             # This step is notoriously under-optimized
             self.current_gaussian_params_per_patient = (
                 self.current_mh_state.gaussian_params.mean(dim=0)
@@ -498,8 +499,8 @@ class PySaem:
             target_log_MI_np = minimize(
                 fun=objective_fun,
                 x0=self.model.log_mi.cpu().squeeze().numpy(),
-                method="L-BFGS-B",
-                options={"maxfun": self.optim_max_fun},
+                method="Nelder-Mead",
+                options={"maxiter": self.optim_max_fun},
             ).x
             target_log_MI = torch.from_numpy(target_log_MI_np).to(device)
             new_log_MI = self._stochastic_approximation(
@@ -557,7 +558,9 @@ class PySaem:
             new_thetas = self.model.convert_physical_to_thetas_all_patients(
                 new_physical_params
             )
-            model_input = self.model.convert_thetas_to_model_parameters(new_thetas)
+            model_input = self.model.convert_thetas_to_model_parameters_all_patients(
+                new_thetas
+            )
             predictions, _ = self.model.predict_all_patients(model_input)
             total_log_lik = (
                 log_likelihood_observation(
