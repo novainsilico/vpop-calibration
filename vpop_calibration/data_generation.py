@@ -194,7 +194,7 @@ def generate_synthetic_data(
         psi=gaussian, log_mi=nlme_model.log_mi
     )
     theta = nlme_model.convert_physical_to_thetas_all_patients(physical_params=physical)
-    inputs = nlme_model.convert_thetas_to_model_parameters(theta)
+    inputs = nlme_model.convert_thetas_to_model_parameters_all_patients(theta)
     # Run the model
     outputs, _ = nlme_model.predict_all_patients(inputs)
     # Add noise

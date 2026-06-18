@@ -183,7 +183,7 @@ def test_nlme_simulate(sample_nlme_params, obs_data, struct_model):
         check_dtype=False,
     )
 
-    model_inputs = nlme_model.convert_thetas_to_model_parameters(theta)
+    model_inputs = nlme_model.convert_thetas_to_model_parameters_all_patients(theta)
 
     outs = nlme_model.predict_all_patients(model_inputs)
     assert outs[0].shape == (nb_samples, nlme_model.data.nb_total_observations)

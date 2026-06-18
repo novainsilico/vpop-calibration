@@ -558,7 +558,9 @@ class PySaem:
             new_thetas = self.model.convert_physical_to_thetas_all_patients(
                 new_physical_params
             )
-            model_input = self.model.convert_thetas_to_model_parameters(new_thetas)
+            model_input = self.model.convert_thetas_to_model_parameters_all_patients(
+                new_thetas
+            )
             predictions, _ = self.model.predict_all_patients(model_input)
             total_log_lik = (
                 log_likelihood_observation(

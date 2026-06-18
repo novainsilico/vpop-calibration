@@ -41,7 +41,7 @@ def obs_data(np_rng) -> pd.DataFrame:
     df = df.merge(pd.DataFrame(outputs, columns=["output_name"]), how="cross")
     df = df.merge(pd.DataFrame(time_steps, columns=["time"]), how="cross")
     df["value"] = np.abs(np_rng.normal(0, 1, df.shape[0]))
-    df["task"] = df.apply(lambda r: r["output_name"] + "_" + r["protocol_arm"], axis=1)
+    df = df.sample(frac=0.7, random_state=np_rng)
 
     return df
 
@@ -79,3 +79,5 @@ def test_simwork_saem(sample_nlme_params, obs_data, simwork_model):
         config=config,
     )
     nlme_model.optimizer.run()
+    nlme_model.diagnostics.compute_ebe()
+    nlme_model.diagnostics.sample_conditional_distribution()

@@ -417,8 +417,41 @@ class StatisticalModel:
         assert theta.shape == (nb_samples, self.nb_patients, self.nb_descriptors)
         return theta
 
+    def _combine_thetas_and_time(
+        self, theta: torch.Tensor, time: torch.Tensor
+    ) -> torch.Tensor:
+        nb_samples = theta.shape[0]
+        nb_patients_local = theta.shape[1]
+
+        assert theta.shape[2] == self.nb_descriptors
+
+        assert time.dim() == 1
+        nb_time_steps = time.shape[0]
+
+        theta_expanded = (
+            theta[:, :, self.nlme_descriptor_to_struct_model_input]
+            .unsqueeze(-2)
+            .expand((-1, -1, nb_time_steps, -1))
+        )
+        time_steps_expanded = (
+            time.unsqueeze(0).unsqueeze(-1).repeat((nb_patients_local, 1, 1))
+        )
+        struct_model_inputs = torch.cat(
+            (theta_expanded, time_steps_expanded.expand(nb_samples, -1, -1, -1)), dim=-1
+        )
+        assert struct_model_inputs.shape == (
+            nb_samples,
+            nb_patients_local,
+            nb_time_steps,
+            self.nb_descriptors + 1,
+        ), f"Unexpected shape {struct_model_inputs.shape}"
+
+        return struct_model_inputs
+
     # @torch.compile
-    def convert_thetas_to_model_parameters(self, theta: torch.Tensor) -> torch.Tensor:
+    def convert_thetas_to_model_parameters_all_patients(
+        self, theta: torch.Tensor
+    ) -> torch.Tensor:
         """Assemble model inputs
 
         Args:
@@ -427,31 +460,9 @@ class StatisticalModel:
         Returns:
             torch.Tensor: the full inputs required to simulate all patients on all time steps. Size (nb_samples, nb_patients, nb_time_steps, nb_descriptors+1).
         """
-        nb_samples = theta.shape[0]
-        nb_patients_local = theta.shape[1]
-
-        assert theta.shape[2] == self.nb_descriptors
-
-        theta_expanded = (
-            theta[:, :, self.nlme_descriptor_to_struct_model_input]
-            .unsqueeze(-2)
-            .expand((-1, -1, self.data.nb_global_timesteps, -1))
+        struct_model_inputs = self._combine_thetas_and_time(
+            theta=theta, time=self.data.global_timesteps
         )
-        time_steps_expanded = (
-            self.data.global_timesteps.unsqueeze(0)
-            .unsqueeze(-1)
-            .repeat((nb_patients_local, 1, 1))
-        )
-        struct_model_inputs = torch.cat(
-            (theta_expanded, time_steps_expanded.expand(nb_samples, -1, -1, -1)), dim=-1
-        )
-
-        assert struct_model_inputs.shape == (
-            nb_samples,
-            nb_patients_local,
-            self.data.nb_global_timesteps,
-            self.nb_descriptors + 1,
-        ), f"Unexpected shape {struct_model_inputs.shape}"
         return struct_model_inputs
 
     def _predict(
@@ -503,7 +514,7 @@ class StatisticalModel:
             gaussian_params, self.log_mi
         )
         thetas = self.convert_physical_to_thetas_all_patients(physical_params)
-        inputs = self.convert_thetas_to_model_parameters(thetas)
+        inputs = self.convert_thetas_to_model_parameters_all_patients(thetas)
         pred, _ = self.predict_all_patients(inputs)
 
         log_prior = self.log_prior_etas(etas)
@@ -526,6 +537,9 @@ class StatisticalModel:
         self, id: str
     ) -> Callable[[torch.Tensor], LogPosteriorPrediction]:
         observations = self.data.individual_observations[id]
+        time_steps = torch.as_tensor(
+            observations.obs_index.time.ref_values, device=device
+        )
         design_matrix = self.design_matrices[id].unsqueeze(0)
         pdk = self.data.patients_pdk[id]
 
@@ -545,7 +559,7 @@ class StatisticalModel:
             thetas = self._combine_physical_pdk(
                 physical_params=physical_params, pdk=pdk
             )
-            inputs = self.convert_thetas_to_model_parameters(thetas)
+            inputs = self._combine_thetas_and_time(theta=thetas, time=time_steps)
             pred, _ = self._predict(inputs=inputs, pred_index=observations.obs_index)
 
             log_prior = self.log_prior_etas(etas)

@@ -45,7 +45,7 @@ class ModelDiagnostics:
             self.individual_ebe_estimates_tensor
         )
         self.individual_ebe_estimates_df = self.model.convert_theta_to_dataframe(theta)
-        model_inputs = self.model.convert_thetas_to_model_parameters(theta)
+        model_inputs = self.model.convert_thetas_to_model_parameters_all_patients(theta)
         individual_ebe_pred, _ = self.model.predict_all_patients(model_inputs)
         self.individual_ebe_predictions_df = self.model.data.full_obs.to_pandas(
             prediction=individual_ebe_pred
@@ -75,7 +75,9 @@ class ModelDiagnostics:
         theta = self.model.convert_physical_to_thetas_all_patients(
             physical_params=self.individual_ebe_estimates_tensor
         )
-        model_inputs = self.model.convert_thetas_to_model_parameters(theta=theta)
+        model_inputs = self.model.convert_thetas_to_model_parameters_all_patients(
+            theta=theta
+        )
         simulated_tensor, _ = self.model.predict_all_patients(inputs=model_inputs)
 
         # Compute residuals and variance
@@ -132,7 +134,9 @@ class ModelDiagnostics:
         mc_thetas = self.model.convert_physical_to_thetas_all_patients(
             physical_params=mc_physical
         )
-        inputs = self.model.convert_thetas_to_model_parameters(theta=mc_thetas)
+        inputs = self.model.convert_thetas_to_model_parameters_all_patients(
+            theta=mc_thetas
+        )
         # Simulate model
         simulated_tensor, _ = self.model.predict_all_patients(inputs=inputs)
 
@@ -187,7 +191,7 @@ class ModelDiagnostics:
             psi=mc_gaussian, log_mi=self.model.log_mi
         )
         mc_thetas = self.model.convert_physical_to_thetas_all_patients(mc_physical)
-        inputs = self.model.convert_thetas_to_model_parameters(mc_thetas)
+        inputs = self.model.convert_thetas_to_model_parameters_all_patients(mc_thetas)
 
         # Simulate outputs
         simulated_tensor, _ = self.model.predict_all_patients(inputs)
@@ -227,8 +231,8 @@ class ModelDiagnostics:
 
     def sample_conditional_distribution(
         self,
-        nb_samples: int = 1000,
-        nb_burn_in: int = 50,
+        nb_samples: int = 100,
+        nb_burn_in: int = 0,
     ) -> None:
         self.conditional_distribution_samples = sample_conditional_distribution_nlme(
             nlme_model=self.model, nb_samples=nb_samples, nb_burn_in=nb_burn_in
@@ -243,7 +247,7 @@ class ModelDiagnostics:
         theta = self.model.convert_physical_to_thetas_all_patients(
             physical_params=physical
         )
-        inputs = self.model.convert_thetas_to_model_parameters(theta)
+        inputs = self.model.convert_thetas_to_model_parameters_all_patients(theta)
         pred, _ = self.model.predict_all_patients(inputs)
         pred_df = self.model.data.full_obs.to_pandas(prediction=pred)
         self.population_parameters_predictions_df = pred_df
