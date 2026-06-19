@@ -1,3 +1,5 @@
+from numpy import inf
+
 from vpop_calibration.structural_model.simwork import (
     SimworkModelBinding,
     model_output_adapter,
@@ -28,9 +30,10 @@ def test_simwork_binding(dummy_simwork_model):
 
 
 def test_handle_payload(dummy_simwork_model):
+    timepoints = [0, 1, 2]
     model_output_json = {
         "p1": (
-            [0, 1, 2],
+            timepoints,
             [
                 {"id": "A0", "unit": "mg", "values": [0, 1, 2]},
                 {"id": "A1", "unit": "mg", "values": [0, 1, 2]},
@@ -38,23 +41,25 @@ def test_handle_payload(dummy_simwork_model):
             ],
         ),
         "p2": (
-            [0, 1, 2],
+            timepoints,
             [
                 {"id": "A0", "unit": "mg", "values": [0, 1, 2]},
                 {"id": "A1", "unit": "mg", "values": [0, 1, 2]},
                 {"id": "A2", "unit": "mg", "values": [0, 1, 2]},
             ],
         ),
+        "p3": None, # simwork returns None when it cannot simulate, for instance if the ODE solver fails
     }
     validated_output = model_output_adapter.validate_python(model_output_json)
-    parsed_output = dummy_simwork_model.parse_output_to_pandas(validated_output)
+    
+    parsed_output = dummy_simwork_model.parse_output_to_pandas(validated_output, timepoints)
     expected_output = pd.DataFrame(
         {
-            "id": ["p1", "p1", "p1", "p2", "p2", "p2"],
-            "time": [0, 1, 2, 0, 1, 2],
-            "A0": [0, 1, 2, 0, 1, 2],
-            "A1": [0, 1, 2, 0, 1, 2],
-            "A2": [0, 1, 2, 0, 1, 2],
+            "id": ["p1", "p1", "p1", "p2", "p2", "p2", "p3", "p3", "p3"],
+            "time": timepoints * 3,
+            "A0": [0, 1, 2, 0, 1, 2, inf, inf, inf],
+            "A1": [0, 1, 2, 0, 1, 2, inf, inf, inf],
+            "A2": [0, 1, 2, 0, 1, 2, inf, inf, inf],
         }
     )
 

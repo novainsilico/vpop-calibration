@@ -34,6 +34,7 @@ def calculate_residuals(
     ), f"Non-matching shapes in `calculate_residuals`: {predictions.shape=}, {obs_vals.shape=}"
 
     residuals = torch.zeros_like(predictions, device=device)
+    nan_or_inf_mask = torch.logical_not(torch.isfinite(predictions))
     for error_type in get_args(ErrorType):
         mask = torch.as_tensor(
             sum(output_indices == i for i in error_model_selector[error_type]),
@@ -46,6 +47,9 @@ def calculate_residuals(
             residuals[mask] = (obs_vals[mask] - predictions[mask]) / predictions[mask]
         else:
             raise NotImplemented(f"Unknown error model type {error_type}")
+    # when the error type is proportional, a infinite predicted value will result in a NaN residual
+    # so here we special case infinite (and NaN) and force the residual to be -Inf as if it were an additive error type
+    residuals[nan_or_inf_mask] = - torch.inf
     return residuals
 
 
@@ -89,6 +93,7 @@ def compute_error_variance(
     sigma_expanded = sigma.expand(nb_samples, -1).index_select(1, output_index)
 
     out_variance = torch.zeros_like(predictions, device=device)
+    nan_or_inf_mask = torch.logical_not(torch.isfinite(predictions))
     for error_type in get_args(ErrorType):
         mask = torch.as_tensor(
             sum(output_index_expanded == i for i in error_model_selector[error_type]),
@@ -101,7 +106,9 @@ def compute_error_variance(
             out_variance[mask] = sigma_expanded[mask] * torch.square(predictions[mask])
         else:
             raise NotImplemented(f"Unknown error model type {error_type}")
-
+    # if one of the predictions is Inf or NaN, the patient will be discarded but we do not want it to pollute 
+    # the overall variance. In such a case, we do not multiply sigma by the predicted value when the error type is proportional
+    out_variance[nan_or_inf_mask] = sigma_expanded[nan_or_inf_mask]
     return out_variance
 
 
@@ -136,7 +143,6 @@ def log_likelihood_observation(
     log_lik_full = -0.5 * (
         torch.log(2 * torch.pi * variance) + (residuals**2 / variance)
     )
-
     log_lik_per_patient = torch.zeros(
         (nb_samples, nb_patients), device=device, dtype=predictions.dtype
     )

@@ -124,9 +124,10 @@ class PlottingUtility:
         self,
         facet_width: float = 5.0,
         facet_height: float = 4.0,
+        max_iter: int = 100,
     ) -> None:
         if self.model_diag.individual_ebe_predictions_df is None:
-            self.model_diag.compute_ebe()
+            self.model_diag.compute_ebe(max_iter)
         assert self.model_diag.individual_ebe_predictions_df is not None
         obs_vs_simulated = self.model_diag.individual_ebe_predictions_df
 
