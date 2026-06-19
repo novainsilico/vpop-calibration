@@ -8,10 +8,10 @@ from vpop_calibration.pynlme.residuals import (
     calculate_residuals,
     compute_error_variance,
 )
-from vpop_calibration.pynlme.ebe import compute_ebe_nlme
 from vpop_calibration.config import smoke_test
 from vpop_calibration.pynlme.conditional_distribution import (
     sample_conditional_distribution_nlme,
+    ConditionalDistribSamples,
 )
 
 
@@ -34,11 +34,31 @@ class ModelDiagnostics:
         self.pwres: ModelResiduals | None = None
         self.iwres: ModelResiduals | None = None
         self.npde: ModelResiduals | None = None
-        self.conditional_distribution_samples: torch.Tensor | None = None
+        self.conditional_distribution_samples: ConditionalDistribSamples | None = None
 
-    def compute_ebe(self, max_iter: int = 50) -> None:
-        self.individual_ebe_estimates_tensor = compute_ebe_nlme(
-            nlme_model=self.model, max_iter=max_iter
+    def compute_ebe(self, nb_samples: int = 50) -> None:
+        if self.conditional_distribution_samples is None:
+            self.sample_conditional_distribution(nb_samples=nb_samples)
+        else:
+            print(
+                "Conditional distribution samples are already stored. Rerun `self.sample_conditional_distribution` if you wish to override them."
+            )
+        assert self.conditional_distribution_samples is not None
+
+        _, best_sample_id = self.conditional_distribution_samples.log_prob.max(
+            dim=0,
+        )
+        range_indexing = torch.arange(self.model.nb_patients)
+        ebe_pdus = self.conditional_distribution_samples.samples[
+            best_sample_id, range_indexing, :
+        ].unsqueeze(0)
+        assert ebe_pdus.shape == (
+            1,
+            self.model.nb_patients,
+            self.model.nb_pdu,
+        ), ebe_pdus.shape
+        self.individual_ebe_estimates_tensor = self.model.convert_gaussian_to_physical(
+            ebe_pdus, self.model.log_mi
         )
         # Compute predictions for these estimates, and store in a data frame
         theta = self.model.convert_physical_to_thetas_all_patients(

@@ -1,5 +1,6 @@
 from tqdm import tqdm
 import torch
+from typing import NamedTuple
 
 
 from vpop_calibration.pynlme.model import StatisticalModel
@@ -7,11 +8,16 @@ from vpop_calibration.config import smoke_test
 from vpop_calibration.metropolis_hastings import MetropolisHastingsState, mh_step
 
 
+class ConditionalDistribSamples(NamedTuple):
+    samples: torch.Tensor
+    log_prob: torch.Tensor
+
+
 def sample_conditional_distribution_nlme(
     nlme_model: StatisticalModel,
     nb_samples: int = 100,
     nb_burn_in: int = 0,
-) -> torch.Tensor:
+) -> ConditionalDistribSamples:
     """
     Sample random effects from the conditional distribution
     """
@@ -31,6 +37,7 @@ def sample_conditional_distribution_nlme(
         complete_likelihood=init_predictions.predictions.sum(dim=0),
     )
     sample_list = []
+    log_prob_list = []
     print(f"Sampling conditional distribution on {nb_samples} samples:")
     for i in tqdm(range(nb_burn_in + nb_samples)):
         current_state = mh_step(
@@ -41,7 +48,17 @@ def sample_conditional_distribution_nlme(
 
         if i >= nb_burn_in:
             sample_list.append(current_state.etas)
+            log_prob_list.append(current_state.log_prob)
 
-    output = torch.stack(sample_list).squeeze(1)
-    assert output.shape == (nb_samples, nlme_model.nb_patients, nlme_model.nb_pdu)
-    return output
+    samples = torch.stack(sample_list).squeeze(1)
+    log_probs = torch.stack(log_prob_list).squeeze(1)
+    assert samples.shape == (
+        nb_samples,
+        nlme_model.nb_patients,
+        nlme_model.nb_pdu,
+    )
+    assert log_probs.shape == (
+        nb_samples,
+        nlme_model.nb_patients,
+    ), f"{log_probs.shape},({nb_samples, nlme_model.nb_patients})"
+    return ConditionalDistribSamples(samples=samples, log_prob=log_probs)
