@@ -126,7 +126,7 @@ def generate_training_data(
 ) -> pd.DataFrame:
     """Given a structural model and parameter ranges, generate a training data set."""
     if smoke_test:
-        log_nb_ind = 1
+        log_nb_ind = 2
 
     param_ranges = paramRangesAdapter.validate_python(ranges)
     # Sample the patient descriptors using Sobol sequences
@@ -149,8 +149,8 @@ def generate_training_data(
     )
     # Rename the previous id into `id` (not unique)
     training_df = (
-        sim_df[["previous_id", "output_name", "time", "id", "value"]]
-        .merge(extended_vpop, on=["id", "previous_id"])
+        sim_df[["previous_id", "output_name", "protocol_arm", "time", "id", "value"]]
+        .merge(extended_vpop, on=["id", "previous_id", "protocol_arm"])
         .drop(columns=["id"])
         .rename(columns={"previous_id": "id"})
     )

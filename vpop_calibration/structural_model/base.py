@@ -52,7 +52,7 @@ class StructuralModel:
             order_patient_data[self.parameter_names].values, device=device
         )
         nb_patients, nb_parameters = patient_descriptors.shape
-        timesteps = obs_index.time.index_values
+        timesteps = torch.as_tensor(obs_index.time.ref_values, device=device)
         nb_timesteps = timesteps.shape[0]
         X = torch.cat(
             (

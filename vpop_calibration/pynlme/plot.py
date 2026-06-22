@@ -661,7 +661,7 @@ class PlottingUtility:
         if self.model_diag.conditional_distribution_samples is None:
             self.model_diag.sample_conditional_distribution()
         assert self.model_diag.conditional_distribution_samples is not None
-        sample_etas = self.model_diag.conditional_distribution_samples
+        sample_etas = self.model_diag.conditional_distribution_samples.samples
 
         sample_gaussian = self.model_diag.model.convert_etas_to_gaussian_all_patients(
             sample_etas

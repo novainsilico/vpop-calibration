@@ -52,7 +52,7 @@ def param_ranges() -> dict:
     return ranges
 
 
-def test_generate_training_data(structural_model, param_ranges):
+def test_generate_training_data_from_analytical(structural_model, param_ranges):
     log_nb_patients = 2
     time: list[float] = [0, 1, 2]
     df = generate_training_data(
@@ -77,7 +77,9 @@ def param_distribs() -> dict:
     return params
 
 
-def test_generate_synthetic_data(structural_model, param_distribs, np_rng):
+def test_generate_synthetic_data_from_analytical(
+    structural_model, param_distribs, np_rng
+):
     nb_patients = 3
     time: list[float] = [0, 1, 2]
     df = generate_synthetic_data(
