@@ -164,6 +164,8 @@ def add_predictive_error(
         error_model_selector=error_model_selector,
         sigma=sigma,
     )
-    noisy_predictions = torch.distributions.Normal(predictions, out_variance).sample()
+    noisy_predictions = torch.distributions.Normal(
+        predictions, torch.sqrt(out_variance)
+    ).sample()
 
     return noisy_predictions

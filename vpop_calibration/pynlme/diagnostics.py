@@ -49,9 +49,10 @@ class ModelDiagnostics:
             dim=0,
         )
         range_indexing = torch.arange(self.model.nb_patients)
-        ebe_pdus = self.conditional_distribution_samples.samples[
+        ebe_etas = self.conditional_distribution_samples.samples[
             best_sample_id, range_indexing, :
         ].unsqueeze(0)
+        ebe_pdus = self.model.convert_etas_to_gaussian_all_patients(ebe_etas)
         assert ebe_pdus.shape == (
             1,
             self.model.nb_patients,
