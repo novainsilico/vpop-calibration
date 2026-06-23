@@ -4,6 +4,7 @@ import numpy as np
 from pandera.typing import DataFrame
 import torch
 import math
+import cloudpickle
 
 from vpop_calibration.pynlme.data import ObsData
 from vpop_calibration.pynlme.params import MixedEffectParameters
@@ -74,7 +75,7 @@ def struct_model() -> StructuralModel:
     return struct_model
 
 
-def test_nlme_init(sample_nlme_params, obs_data, struct_model):
+def test_nlme_init(sample_nlme_params, obs_data, struct_model, tmp_path):
     nlme_model = StatisticalModel(
         structural_model=struct_model, dataset=obs_data, prior_params=sample_nlme_params
     )
@@ -147,6 +148,10 @@ def test_nlme_init(sample_nlme_params, obs_data, struct_model):
     torch.testing.assert_close(
         nlme_model.data.patients_pdk_full, torch.tensor([[p1_pdk], [p2_pdk]])
     )
+    # Test the pickling of the statistical model
+    model_file = tmp_path / "model.pickle"
+    with open(model_file, "wb") as f:
+        cloudpickle.dump(nlme_model, f)
 
 
 def test_nlme_simulate(sample_nlme_params, obs_data, struct_model):
