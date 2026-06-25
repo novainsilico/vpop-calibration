@@ -109,41 +109,26 @@ pbpk <- function(){
   })
 }
 
-fit_nlmixr <- function() {
+fit <- nlmixr2(
+  pbpk,
+  dat,
+  options <- saemControl(
+    print = 100,
+    nBurn = 100,
+    nEm = 100,
+    nmc = 1,
+    nu = c(1, 1, 1),
+    logLik = F
+  ),
+  est = "saem",
+  control = list(print = 0),
+  table = list(cwres = FALSE, npde = FALSE)
+)
 
-  dat <- read.csv(
-    "~/git/vpop-calibration/examples/benchmarking/Mavoglurant/Mavoglurant_Benchmark_Dataset.csv"
-  )
+ebe <- fit %>%
+  as.data.frame() %>%
+  select(ID, CLint, KbBR, KbMU, KbAD, KbBO, KbRB) %>%
+  distinct()
 
-  fit <- nlmixr2(
-    pbpk,
-    dat,
-    options <- saemControl(
-      print = 100,
-      nBurn = 100,
-      nEm = 100,
-      nmc = 1,
-      nu = c(1, 1, 1),
-      logLik = F
-    ),
-    est = "saem",
-    control = list(print = 0),
-    table = list(cwres = FALSE, npde = FALSE)
-  )
-  pop_params <- c(fit$fixef, diag(fit$omega))
-  ebe <-
-    data.frame(
-      id = fit$ID,
-      Clint = fit$Clint,
-      KbBR = fit$KbBR,
-      KbMU = fit$KbMU,
-      KbAD = fit$KbAD,
-      KbBO = fit$KbBO,
-      KbRB = fit$KbRB,
-    ) %>% unique()
-  return(list(pop=pop_params, ebe=ebe))
 
-}
-
-out <- fit_nlmixr()
-write.csv(x=out$ebe,file="Mavoglurant_ebe_nlmixr_PDU",row.names = F,quote = F)
+write.csv(ebe,file="Mavoglurant_ebe_nlmixr_PDU",row.names = F,quote = F)
