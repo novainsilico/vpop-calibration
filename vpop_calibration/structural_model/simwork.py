@@ -23,7 +23,7 @@ class TimeseriesOutput(BaseModel):
 
 
 PatientOutput = tuple[list[float], list[TimeseriesOutput]]
-ModelOutput = dict[str, PatientOutput]
+ModelOutput = dict[str, Optional[PatientOutput]]
 model_output_adapter = TypeAdapter(ModelOutput)
 
 
@@ -112,7 +112,7 @@ class SimworkModelBinding:
             text=True,
         )
         model_output = model_output_adapter.validate_json(filt_result.stdout)
-        output_df = self.parse_output_to_pandas(model_output)
+        output_df = self.parse_output_to_pandas(model_output, time)
         return output_df
 
     def df_to_json_vpop(self, vpop_df: pd.DataFrame) -> dict:
@@ -130,19 +130,32 @@ class SimworkModelBinding:
         }
         return vpop
 
-    def parse_output_to_pandas(self, simwork_output: ModelOutput) -> pd.DataFrame:
+    def parse_output_to_pandas(self, simwork_output: ModelOutput, timepoints: list[float]) -> pd.DataFrame:
         df_list = []
         for patient_id, patient_data in simwork_output.items():
-            for timeseries in patient_data[1]:
-                temp_df = pd.DataFrame(
-                    {
-                        "id": patient_id,
-                        "time": patient_data[0],
-                        "output_name": timeseries.id,
-                        "value": timeseries.values,
-                    }
-                )
-                df_list.append(temp_df)
+            if patient_data is None:
+                # Solving failed for this patient so let's fill the output timeseries Inf values
+                for output_name in self.outputs:
+                    temp_df = pd.DataFrame(
+                        {
+                            "id": patient_id,
+                            "time": timepoints,
+                            "output_name": output_name,
+                            "value": [np.inf] * len(timepoints),
+                        }
+                    )
+                    df_list.append(temp_df)                
+            else:
+                for timeseries in patient_data[1]:
+                    temp_df = pd.DataFrame(
+                        {
+                            "id": patient_id,
+                            "time": patient_data[0],
+                            "output_name": timeseries.id,
+                            "value": timeseries.values,
+                        }
+                    )
+                    df_list.append(temp_df)
         full_df = pd.concat(df_list)
         full_df_wide = full_df.pivot(
             index=["id", "time"], columns="output_name", values="value"
