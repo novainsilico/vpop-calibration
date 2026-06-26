@@ -7,6 +7,15 @@ library(microbenchmark)
 library(dplyr)
 library(stringr)
 
+dat <- nlmixr2data::mavoglurant
+dat$occ = unlist(with(dat, tapply(EVID, ID, function(x) cumsum(x>0))))
+dat = subset(dat, occ==1)
+dat = subset(dat, EVID>0 | DV>0)
+dat$CMT[dat$CMT == 0]  <- 1;
+dat$CMT[dat$EVID == 1]  <- "Venous_Blood" ## Compartment dosed to is Venous Blood
+dat$DV <- log(dat$DV)
+dat$CMT[dat$EVID != 1]  <- "logC15"
+
 pbpk <- function(){
   ini({
     ##theta=exp(c(1.1, .3, 2, 7.6, .003, .3))
@@ -17,12 +26,12 @@ pbpk <- function(){
     lKbBO = 0.03
     lKbRB = 0.3
     eta.LClint ~ 4
-    eta.LKbBR ~ 2
-    eta.LKbMU ~ 2
-    eta.LKbAD ~ 2
-    eta.LKbBO ~ 2
-    eta.LKbRB ~ 2
-    prop.err <- 10
+    eta.LKbBR ~ 0.5
+    eta.LKbMU ~ 0.5
+    eta.LKbAD ~ 0.5
+    eta.LKbBO ~ 0.5
+    eta.LKbRB ~ 0.5
+    add.err <- 0.5
   })
   model({
     KbBR = exp(lKbBR + eta.LKbBR)
@@ -105,7 +114,8 @@ pbpk <- function(){
     d/dt(Venous_Blood) = QHT*Heart/KbHT/VHT + QBR*Brain/KbBR/VBR + QMU*Muscles/KbMU/VMU + QAD*Adipose/KbAD/VAD + QSK*Skin/KbSK/VSK + QLI*Liver/KbLI/VLI + QBO*Bones/KbBO/VBO + QKI*Kidneys/KbKI/VKI + QRB*Rest_of_Body/KbRB/VRB - QLU*Venous_Blood/VVB;
     d/dt(Rest_of_Body) = QRB*(Arterial_Blood/VAB - Rest_of_Body/KbRB/VRB);
 
-    C15 ~ prop(prop.err)
+    logC15 = log(C15)
+    logC15 ~ add(add.err)
   })
 }
 
@@ -129,6 +139,6 @@ ebe <- fit %>%
   as.data.frame() %>%
   select(ID, CLint, KbBR, KbMU, KbAD, KbBO, KbRB) %>%
   distinct()
+ebe
 
-
-write.csv(ebe,file="Mavoglurant_ebe_nlmixr_PDU",row.names = F,quote = F)
+write.csv(ebe,file="Mavoglurant_nlmixr_ebe_PDU.csv",row.names = F,quote = F)
