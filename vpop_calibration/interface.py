@@ -8,7 +8,7 @@ from vpop_calibration.structural_model import StructuralModel
 from vpop_calibration.pynlme.data import ObsData
 from vpop_calibration.pynlme.params import MixedEffectParameters
 from vpop_calibration.pynlme.diagnostics import ModelDiagnostics
-from vpop_calibration.saem import PySaem
+from vpop_calibration.saem_legacy import PySaem
 from vpop_calibration.pynlme.plot import PlottingUtility
 
 
