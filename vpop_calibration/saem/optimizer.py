@@ -2,7 +2,8 @@ import numpy as np
 import torch
 
 from vpop_calibration.pynlme.model import StatisticalModel
-from vpop_calibration.saem.scheduler import PopEstimates, SaemScheduler
+from vpop_calibration.saem.scheduler import SaemScheduler
+from vpop_calibration.saem.estimates import PopEstimates
 from vpop_calibration.saem.config import SaemConfigDict
 from vpop_calibration.config import smoke_test
 from vpop_calibration.metropolis_hastings import MetropolisHastingsState
@@ -66,6 +67,13 @@ class PySaem:
         else:
             self.consecutive_converged_iters = 0
 
+    def update_optimizer_state(
+        self, new_estimates: PopEstimates, new_mh_state: MetropolisHastingsState
+    ):
+        self.mh_state = new_mh_state
+        self.update_pop_estimates(new_estimates)
+        # todo: add sufficient statistics update
+
     def init_state(self):
         """Initiate the optimizer state with first estimates. Ensure this function is called before the optimization starts."""
         output = self.model.log_posterior_etas_all_patients(
@@ -73,7 +81,7 @@ class PySaem:
         )
         # Give an initial dummy estimate for the total likelihood
         init_likelihood = torch.tensor([0.0])
-        self.mh_state = MetropolisHastingsState(
+        init_mh_state = MetropolisHastingsState(
             etas=self.model.eta_samples_chains,
             gaussian_params=output.gaussian_params,
             prediction=output.predictions,
@@ -88,7 +96,9 @@ class PySaem:
             sigma=self.model.residual_var,
             complete_likelihood=init_likelihood,
         )
-        self.update_pop_estimates(init_estimates)
+        self.update_optimizer_state(
+            new_estimates=init_estimates, new_mh_state=init_mh_state
+        )
 
     def run(self):
         # Inititate the SAEM state with current estimates and Metropolis Hastings state
