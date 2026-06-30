@@ -130,7 +130,9 @@ class SimworkModelBinding:
         }
         return vpop
 
-    def parse_output_to_pandas(self, simwork_output: ModelOutput, timepoints: list[float]) -> pd.DataFrame:
+    def parse_output_to_pandas(
+        self, simwork_output: ModelOutput, timepoints: list[float]
+    ) -> pd.DataFrame:
         df_list = []
         for patient_id, patient_data in simwork_output.items():
             if patient_data is None:
@@ -144,7 +146,7 @@ class SimworkModelBinding:
                             "value": [np.inf] * len(timepoints),
                         }
                     )
-                    df_list.append(temp_df)                
+                    df_list.append(temp_df)
             else:
                 for timeseries in patient_data[1]:
                     temp_df = pd.DataFrame(
@@ -189,18 +191,6 @@ class StructuralSimwork(StructuralModel):
         )
         self.protocol_design = self.protocol_schema.validate(protocol_design)
         protocol_arms = protocol_design["protocol_arm"].drop_duplicates().tolist()
-        # Create the protocol overrides tensor
-        # Indexed by protocol index:
-        # protocol_overrides_tensor[protocol_index,:] = parameter overrides for this protocol
-        self.protocol_overrides_tensor = torch.as_tensor(
-            protocol_design.drop_duplicates()
-            .set_index("protocol_arm")
-            .loc[protocol_arms]
-            .reset_index()
-            .drop(columns="protocol_arm")
-            .values,
-            device=device,
-        )
         # the parameters of the simwork model which are NOT protocol overrides
         parameter_names_without_protocol_overrides = [
             p for p in model.inputs if p not in protocol_overrides
@@ -214,6 +204,19 @@ class StructuralSimwork(StructuralModel):
             parameter_names_without_protocol_overrides + self.protocol_parameters
         )
         self.nb_parameters = len(self.input_parameters)
+
+        # Create the protocol overrides tensor
+        # Indexed by protocol index:
+        # protocol_overrides_tensor[protocol_index,:] = parameter overrides for this protocol
+        self.protocol_overrides_tensor = torch.as_tensor(
+            protocol_design.drop_duplicates()
+            .set_index("protocol_arm")
+            .loc[protocol_arms, self.protocol_parameters]
+            .reset_index()
+            .drop(columns="protocol_arm")
+            .values,
+            device=device,
+        )
 
         self.task_names = [
             output + "_" + protocol
