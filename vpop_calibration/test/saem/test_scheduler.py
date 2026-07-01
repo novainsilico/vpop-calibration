@@ -8,7 +8,7 @@ def test_scheduler():
         nb_iter_burnin=2,
         nb_iter_learning=2,
         nb_iter_smoothing=2,
-        init_step_size_adaptation=0.5,
+        init_step_adaptation=0.5,
         learning_rate_power=0.8,
         patience=5,
     )

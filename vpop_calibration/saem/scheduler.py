@@ -1,5 +1,4 @@
-from typing import Literal, NamedTuple
-import torch
+from typing import Literal
 import numpy as np
 
 
