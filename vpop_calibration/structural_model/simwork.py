@@ -61,12 +61,14 @@ class SimworkModelBinding:
         path_to_solving_options: str,
         inputs: list[str],
         outputs: list[str],
+        categorical_attributes: Optional[pd.DataFrame] = None,
     ):
         self.model_path = path_to_model
         self.solving_options = path_to_solving_options
         self.inputs = inputs
         self.outputs = outputs
         self.nb_outputs = len(outputs)
+        self.categorical_attributes = categorical_attributes
 
         build_result = subprocess.run(
             [
@@ -120,7 +122,16 @@ class SimworkModelBinding:
             "patients": [
                 {
                     "patientIndex": row["id"],
-                    "patientCategoricalAttributes": [],
+                    "patientCategoricalAttributes": (
+                        [
+                            {"id": param, "val": param}
+                            for param in self.categorical_attributes.loc[
+                                self.categorical_attributes["id"] == row["id"]
+                            ]
+                        ]
+                        if self.categorical_attributes is not None
+                        else []
+                    ),
                     "patientAttributes": [
                         {"id": param, "val": row[param]} for param in self.inputs
                     ],
