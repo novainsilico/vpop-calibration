@@ -10,7 +10,8 @@ class SaemConfigDict(NamedTuple):
     ## E-step parameters
     nb_mcmc_transitions: int = 1
     # Metropolis-Hastings step size. Stick to the 0.1 - 1 range
-    init_step_size: float = 0.5
+    init_step_size_unscaled: float = 0.5  # to be divided by sqrt(nb_pdu)
+    init_step_adaptation: float = 0.5
 
     ## M-step parameters
     # Stochastic-approximation learning rate decay power

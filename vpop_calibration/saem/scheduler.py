@@ -9,7 +9,7 @@ class SaemScheduler:
         nb_iter_burnin: int,
         nb_iter_learning: int,
         nb_iter_smoothing: int,
-        init_step_size_adaptation: float,
+        init_step_adaptation: float,
         learning_rate_power: float,
         patience: int,
     ):
@@ -17,7 +17,7 @@ class SaemScheduler:
         self.nb_iter_burnin = nb_iter_burnin
         self.nb_iter_learning = nb_iter_learning
         self.nb_iter_smoothing = nb_iter_smoothing
-        self.init_step_size_adaptation = init_step_size_adaptation
+        self.init_step_adaptation = init_step_adaptation
         self.learning_rate_power = learning_rate_power
         self.patience = patience
 
@@ -44,9 +44,9 @@ class SaemScheduler:
     @property
     def mh_learning_rate(self) -> float:
         if self.phase == "burnin":
-            return self.init_step_size_adaptation
+            return self.init_step_adaptation
         elif self.phase == "learning":
-            return self.init_step_size_adaptation / (
+            return self.init_step_adaptation / (
                 np.maximum(1, self.iteration - self.nb_iter_burnin + 1) ** 0.5
             )
         elif self.phase == "smoothing":
