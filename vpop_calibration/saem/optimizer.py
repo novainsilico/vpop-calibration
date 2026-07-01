@@ -7,6 +7,7 @@ from vpop_calibration.saem.estimates import PopEstimates
 from vpop_calibration.saem.config import SaemConfigDict
 from vpop_calibration.config import smoke_test
 from vpop_calibration.metropolis_hastings import MetropolisHastingsState
+from vpop_calibration.saem.m_step import MStepState
 
 
 class PySaem:
@@ -69,11 +70,14 @@ class PySaem:
             self.consecutive_converged_iters = 0
 
     def update_optimizer_state(
-        self, new_estimates: PopEstimates, new_mh_state: MetropolisHastingsState
+        self,
+        new_estimates: PopEstimates,
+        new_mh_state: MetropolisHastingsState,
+        new_sufficient_statistics: MStepState,
     ):
         self.mh_state = new_mh_state
         self.update_pop_estimates_convergence_check(new_estimates)
-        # todo: add sufficient statistics update
+        self.sufficient_statistics = new_sufficient_statistics
 
     def init_state(self):
         """Initiate the optimizer state with first estimates. Ensure this function is called before the optimization starts."""
@@ -103,8 +107,17 @@ class PySaem:
             sigma=self.model.residual_var,
             complete_likelihood=init_likelihood,
         )
+        init_sufficient_stats = MStepState(
+            design_matrix=self.model.full_design_matrix,
+            init_gaussian_params=output.gaussian_params,
+            nb_chains=self.model.nb_chains,
+            nb_patients=self.model.nb_patients,
+            nb_pdu=self.model.nb_pdu,
+        )
         self.update_optimizer_state(
-            new_estimates=init_estimates, new_mh_state=init_mh_state
+            new_estimates=init_estimates,
+            new_mh_state=init_mh_state,
+            new_sufficient_statistics=init_sufficient_stats,
         )
 
     def run(self):

@@ -26,8 +26,3 @@ def check_convergence(
             all_converged = False
             break
     return all_converged
-
-
-class SufficientStatistics(NamedTuple):
-    outer_product: torch.Tensor
-    cross_product: torch.Tensor
