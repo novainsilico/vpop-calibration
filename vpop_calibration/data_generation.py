@@ -126,7 +126,7 @@ def generate_training_data(
 ) -> pd.DataFrame:
     """Given a structural model and parameter ranges, generate a training data set."""
     if smoke_test:
-        log_nb_ind = 2
+        log_nb_ind = 3
 
     param_ranges = paramRangesAdapter.validate_python(ranges)
     # Sample the patient descriptors using Sobol sequences
