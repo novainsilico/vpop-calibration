@@ -1,6 +1,7 @@
 import torch
 from typing import get_args, NamedTuple, Callable
 import pandas as pd
+from warnings import deprecated
 
 from vpop_calibration.structural_model.base import StructuralModel
 from vpop_calibration.pynlme.data import ObsData
@@ -251,6 +252,7 @@ class StatisticalModel:
 
         self.log_mi = log_mi
 
+    @deprecated("Unused")
     def update_eta_samples(self, eta: torch.Tensor) -> None:
         """Update the model current individual random effect samples."""
 
