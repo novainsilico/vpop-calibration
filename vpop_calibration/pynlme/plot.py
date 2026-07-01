@@ -399,6 +399,7 @@ class PlottingUtility:
             gof_df = obs_vs_simulated.loc[
                 (obs_vs_simulated["output_name"] == output_name)
             ]
+            # gof_df = gof_df.loc[gof_df["time"] >= 14400]
 
             # Compute R² and RMSE
             r2 = r2_score(gof_df["value"], gof_df["predicted_value"])
@@ -406,11 +407,13 @@ class PlottingUtility:
             metrics_text = f"$R^2 = {r2:.3f}$\n$RMSE= {rmse:.3f}$"
 
             # Plot (obs,pred) points
+            colors = ["red" if t < 14400 else "blue" for t in gof_df["time"]]
             ax.scatter(
                 x=gof_df["value"],
                 y=gof_df["predicted_value"],
                 alpha=0.7,
                 s=50,
+                c=colors,
                 edgecolors="w",
             )
 
