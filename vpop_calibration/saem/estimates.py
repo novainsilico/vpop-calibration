@@ -7,6 +7,7 @@ class PopEstimates(NamedTuple):
     omega: torch.Tensor
     psi: torch.Tensor
     sigma: torch.Tensor
+    model_intrinsic: torch.Tensor
     complete_likelihood: torch.Tensor
 
 
@@ -15,7 +16,7 @@ def check_convergence(
 ):
     """Checks for convergence based on the relative change in parameters."""
     all_converged = True
-    variables_to_check = ["beta", "omega", "psi", "sigma"]
+    variables_to_check = ["beta", "omega", "psi", "sigma", "model_intrinsic"]
     for name in variables_to_check:
         current_val = current_est._asdict()[name]
         prev_val = prev_est._asdict()[name]

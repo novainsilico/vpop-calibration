@@ -58,8 +58,16 @@ class MStepState:
         # Todo: make this tooltip part of the docstring
 
         # Ensure the cross_product was updated first
-        new_beta = torch.linalg.solve(self.gram_matrix, self.cross_product).to(device)
-        new_mu = torch.matmul(self.X, new_beta.unsqueeze(0)).squeeze(-1).to(device)
+        new_beta = (
+            torch.linalg.solve(self.gram_matrix, self.cross_product)
+            .squeeze(-1)
+            .to(device)
+        )
+        new_mu = (
+            torch.matmul(self.X, new_beta.unsqueeze(0).unsqueeze(-1))
+            .squeeze(-1)
+            .to(device)
+        )
         residuals = gaussian_params - new_mu.unsqueeze(0)
         residuals.unsqueeze_(-1)
         outer_prod_centered = (

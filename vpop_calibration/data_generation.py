@@ -188,7 +188,7 @@ def generate_synthetic_data(
         structural_model=struct_model, dataset=data, prior_params=params, nb_chains=1
     )
     # Prepare model inputs
-    eta = nlme_model.eta_samples_chains
+    eta = nlme_model.sample_etas(1)
     gaussian = nlme_model.convert_etas_to_gaussian_all_patients(eta)
     physical = nlme_model.convert_gaussian_to_physical(
         psi=gaussian, log_mi=nlme_model.log_mi

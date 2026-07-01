@@ -13,6 +13,7 @@ def test_check_convergence():
         psi=tensor_1,
         sigma=tensor_1,
         complete_likelihood=tensor_1,
+        model_intrinsic=tensor_1,
     )
     current_estimates = PopEstimates(
         beta=tensor_1,
@@ -20,6 +21,7 @@ def test_check_convergence():
         psi=tensor_2,
         sigma=tensor_1,
         complete_likelihood=tensor_1,
+        model_intrinsic=tensor_2,
     )
 
     assert check_convergence(
