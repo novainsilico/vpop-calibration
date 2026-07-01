@@ -1,13 +1,15 @@
 import numpy as np
 import torch
+from tqdm import tqdm
 
 from vpop_calibration.pynlme.model import StatisticalModel
 from vpop_calibration.saem.scheduler import SaemScheduler
 from vpop_calibration.saem.estimates import PopEstimates
 from vpop_calibration.saem.config import SaemConfigDict
-from vpop_calibration.config import smoke_test
-from vpop_calibration.metropolis_hastings import MetropolisHastingsState
+from vpop_calibration.metropolis_hastings import MetropolisHastingsState, mh_step
 from vpop_calibration.saem.m_step import MStepState
+from vpop_calibration.pynlme.residuals import sum_sq_residuals
+from vpop_calibration.saem.utils import simulated_annealing, stochastic_approximation
 
 
 class PySaem:
@@ -75,6 +77,7 @@ class PySaem:
         new_mh_state: MetropolisHastingsState,
         new_sufficient_statistics: MStepState,
     ):
+        """Utilitary function to update the optimizer state at the end of an iteration"""
         self.mh_state = new_mh_state
         self.update_pop_estimates_convergence_check(new_estimates)
         self.sufficient_statistics = new_sufficient_statistics
@@ -123,7 +126,53 @@ class PySaem:
     def run(self):
         # Inititate the SAEM state with current estimates and Metropolis Hastings state
         self.init_state()
-        pass
+        for k in tqdm(self.scheduler):
+            current_mh_state = self.mh_state
+            # E-step
+            current_mh_state = mh_step(
+                nlme_model=self.model,
+                previous_state=current_mh_state,
+                learning_rate=self.scheduler.mh_learning_rate,
+            )
+            # M-step
+            if self.scheduler.phase != "burnin":
+                self.model.update_eta_samples(current_mh_state.etas)
+
+                sum_sq_res_full = sum_sq_residuals(
+                    prediction=current_mh_state.prediction,
+                    observations=self.model.data.full_obs,
+                    error_model_selector=self.model.error_model_selector,
+                )
+                sum_sq_res = sum_sq_res_full.sum(dim=0)
+                assert sum_sq_res.shape == (
+                    self.model.nb_outputs,
+                ), f"Unexpected residual shape: {sum_sq_res.shape}"
+                target_res_var: torch.Tensor = (
+                    sum_sq_res / self.model.data.n_tot_observations_per_output
+                )
+                current_res_var: torch.Tensor = self.model.residual_var
+                if self.scheduler.phase == "learning":
+                    target_res_var = simulated_annealing(
+                        current=current_res_var,
+                        target=target_res_var,
+                        factor=self.config.annealing_factor,
+                    )
+
+                new_residual_error_var = stochastic_approximation(
+                    previous=current_res_var,
+                    new=target_res_var,
+                    learning_rate=self.scheduler.stochastic_approximation_rate,
+                )
+
+                self.model.update_res_var(new_residual_error_var)
+
+                mstep_proposal = self.sufficient_statistics.update(
+                    new_gaussian_params=current_mh_state.gaussian_params,
+                    learning_rate=self.scheduler.stochastic_approximation_rate,
+                )
+                self.model.update_betas(mstep_proposal.beta)
+                self.model.update_omega(mstep_proposal.omega)
+            # MI optimization
 
     def iterate(self):
         pass
