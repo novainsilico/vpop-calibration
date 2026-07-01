@@ -1,6 +1,8 @@
 from typing import Literal
 import numpy as np
 
+from vpop_calibration.config import smoke_test
+
 
 class SaemScheduler:
     def __init__(
@@ -16,6 +18,11 @@ class SaemScheduler:
         self.nb_iter_burnin = nb_iter_burnin
         self.nb_iter_learning = nb_iter_learning
         self.nb_iter_smoothing = nb_iter_smoothing
+        if smoke_test:
+            self.nb_iter_burnin = 1
+            self.nb_iter_learning = 1
+            self.nb_iter_smoothing = 1
+
         self.init_step_adaptation = init_step_adaptation
         self.learning_rate_power = learning_rate_power
         self.patience = patience
