@@ -22,12 +22,11 @@ class PySaem:
         else:
             nb_iter_smoothing = config.nb_iter_smoothing
         self.consecutive_converged_iters = 0
-        init_step_size_scaled = self.config.init_step_size / np.sqrt(self.model.nb_pdu)
         self.scheduler = SaemScheduler(
             nb_iter_burnin=config.nb_iter_burn_in,
             nb_iter_learning=config.nb_iter_learning,
             nb_iter_smoothing=nb_iter_smoothing,
-            init_step_size_adaptation=init_step_size_scaled,
+            init_step_adaptation=config.init_step_adaptation,
             learning_rate_power=config.learning_rate_power,
             patience=config.patience,
         )
@@ -47,7 +46,9 @@ class PySaem:
                 break
         return all_converged
 
-    def update_pop_estimates(self, new_estimates: PopEstimates) -> None:
+    def update_pop_estimates_convergence_check(
+        self, new_estimates: PopEstimates
+    ) -> None:
         """Update the optimizer state with new population estimates, also updating the number of converged iterations."""
 
         if not hasattr(self, "current_estimates"):
@@ -71,22 +72,28 @@ class PySaem:
         self, new_estimates: PopEstimates, new_mh_state: MetropolisHastingsState
     ):
         self.mh_state = new_mh_state
-        self.update_pop_estimates(new_estimates)
+        self.update_pop_estimates_convergence_check(new_estimates)
         # todo: add sufficient statistics update
 
     def init_state(self):
         """Initiate the optimizer state with first estimates. Ensure this function is called before the optimization starts."""
+        # Estimate the log-posterior on current eta samples
         output = self.model.log_posterior_etas_all_patients(
             self.model.eta_samples_chains
         )
         # Give an initial dummy estimate for the total likelihood
         init_likelihood = torch.tensor([0.0])
+        # Initialize the step size by incorporating problem dimension
+        init_step_size = self.config.init_step_size_unscaled / np.sqrt(
+            self.model.nb_pdu
+        )
+        # Initialize the Metropolis Hastings state variables
         init_mh_state = MetropolisHastingsState(
             etas=self.model.eta_samples_chains,
             gaussian_params=output.gaussian_params,
             prediction=output.predictions,
             log_prob=output.log_posterior,
-            step_size=self.scheduler.mh_learning_rate,
+            step_size=init_step_size,
             complete_likelihood=init_likelihood,
         )
         init_estimates = PopEstimates(
