@@ -61,14 +61,12 @@ class SimworkModelBinding:
         path_to_solving_options: str,
         inputs: list[str],
         outputs: list[str],
-        categorical_attributes: Optional[pd.DataFrame] = None,
     ):
         self.model_path = path_to_model
         self.solving_options = path_to_solving_options
         self.inputs = inputs
         self.outputs = outputs
         self.nb_outputs = len(outputs)
-        self.categorical_attributes = categorical_attributes
 
         build_result = subprocess.run(
             [
@@ -85,8 +83,15 @@ class SimworkModelBinding:
             build_result.stdout.decode().strip("\n") + "/bin/scripts.run-model-simple"
         )
 
-    def run(self, vpop: pd.DataFrame, time: list[float]) -> pd.DataFrame:
-        vpop_json = self.df_to_json_vpop(vpop)
+    def run(
+        self,
+        vpop: pd.DataFrame,
+        time: list[float],
+        categorical_attributes: pd.DataFrame | None = None,
+    ) -> pd.DataFrame:
+        vpop_json = self.df_to_json_vpop(
+            vpop_df=vpop, categorical_attributes=categorical_attributes
+        )
         with tempfile.NamedTemporaryFile(
             mode="w", suffix=".json", delete_on_close=False
         ) as tmp_file:
@@ -117,7 +122,9 @@ class SimworkModelBinding:
         output_df = self.parse_output_to_pandas(model_output, time)
         return output_df
 
-    def df_to_json_vpop(self, vpop_df: pd.DataFrame) -> dict:
+    def df_to_json_vpop(
+        self, vpop_df: pd.DataFrame, categorical_attributes: pd.DataFrame | None = None
+    ) -> dict:
         vpop = {
             "patients": [
                 {
@@ -125,11 +132,11 @@ class SimworkModelBinding:
                     "patientCategoricalAttributes": (
                         [
                             {"id": param, "val": param}
-                            for param in self.categorical_attributes.loc[
-                                self.categorical_attributes["id"] == row["id"]
+                            for param in categorical_attributes.loc[
+                                categorical_attributes["id"] == row["id"]
                             ]
                         ]
-                        if self.categorical_attributes is not None
+                        if categorical_attributes is not None
                         else []
                     ),
                     "patientAttributes": [
@@ -181,6 +188,7 @@ class StructuralSimwork(StructuralModel):
         self,
         model: SimworkModelBinding,
         protocol_design: Optional[pd.DataFrame] = None,
+        categorical_attributes: pd.DataFrame | None = None,
     ):
         self.model = model
 
@@ -234,6 +242,8 @@ class StructuralSimwork(StructuralModel):
             for output in self.model.outputs
             for protocol in protocol_arms
         ]
+
+        self.categorical_attributes = categorical_attributes
 
         super().__init__(
             parameter_names=parameter_names_without_protocol_overrides,
@@ -291,7 +301,9 @@ class StructuralSimwork(StructuralModel):
         # Assemble the time values
         time = prediction_index.time.ref_values
         # Run the model
-        outputs_df = self.model.run(vpop=vpop, time=time)
+        outputs_df = self.model.run(
+            vpop=vpop, time=time, categorical_attributes=self.categorical_attributes
+        )
         patient_id_ordered = pd.DataFrame({"id": temporary_ids})
         outputs_df_ordered = patient_id_ordered.merge(outputs_df, on="id", how="left")
         outputs_tensor = torch.as_tensor(
