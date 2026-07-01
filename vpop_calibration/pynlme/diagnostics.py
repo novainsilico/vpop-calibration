@@ -35,6 +35,7 @@ class ModelDiagnostics:
         self.iwres: ModelResiduals | None = None
         self.npde: ModelResiduals | None = None
         self.conditional_distribution_samples: ConditionalDistribSamples | None = None
+        self.shrinkage: torch.Tensor | None = None
 
     def compute_ebe(self, nb_samples: int = 50) -> None:
         if self.conditional_distribution_samples is None:
@@ -273,7 +274,7 @@ class ModelDiagnostics:
         pred_df = self.model.data.full_obs.to_pandas(prediction=pred)
         self.population_parameters_predictions_df = pred_df
 
-    def compute_shrinkage(self, nb_samples: int = 50) -> pd.DataFrame:
+    def compute_shrinkage(self, nb_samples: int = 50) -> None:
 
         if self.conditional_distribution_samples is None:
             self.sample_conditional_distribution(nb_samples=nb_samples)
@@ -293,11 +294,4 @@ class ModelDiagnostics:
 
         shrinkage = 1 - eta_sd / omega_sd
 
-        return pd.DataFrame(
-            {
-                "parameter": self.model.pdu_names,
-                "omega_sd": omega_sd,
-                "eta_sd": eta_sd,
-                "shrinkage": shrinkage,
-            }
-        )
+        self.shrinkage = shrinkage
