@@ -1,20 +1,20 @@
-# Modèle Mavoglurant:
+# Mavoglurant model:
 
-## Paramètres
+## Parameters
 
-6 paramètres à optimiser:
+6 parameters to optimise:
 
-Dans le modèle originale:
+In the original model:
 PDU: Clint
 MI: KbBR,KbMU,KbBO,KbRB,KbAD
 
-Il semblerait que le modèle originale rencontre des soucis d'identifiabilité avec plusieurs configurations de paramètres pouvant expliquer les données. Nous avons donc fait une analyse de l'importance des paramètres dans le but d'essayer de simplifier le modèle.
+The original model appears to suffer from identifiability issues, with multiple parameter configurations that can explain the data equally well. We therefore conducted a parameter importance analysis in order to simplify the model
 
-## Importance des paramètres
+## Parameter importance
 
-En considèrant tout les paramètres comme des PDU.
+Considering all parameters as PDUs,
 
-Sur nlmixr, on évalue la Log-likelihood en faisant varier un seul paramètre (tout les autres sont fixés à leur valeur initiale):
+With nlmixr, we evaluate the Log-likelihood by varying one parameter at a tim (all other parameters being fixed to their original values):
 
 KbMU: -937
 KbBO: -866
@@ -23,9 +23,9 @@ KbBR: -883
 KbAD: -1018
 CLint: -592
 
-Ceci laisse supposer que les paramètres par ordre d'importance décroissant sont CLint, KbRB, KbBO, KbBR, KbMU, KbAD.
+This leads to the hypothesis that the most important parameters are, by decreasing order, CLint, KbRB, KbBO, KbBR, KbMU, KbAD.
 
-Si on optimise tout les paramètres on obtient les résultats suivants:
+If we optimise all parameters we have the following results:
 
 Log-Lik: -158
 
@@ -40,9 +40,8 @@ lKbBO      2.2  0.106  4.81             9.05 (7.35, 11.1)     127.      18.6%
 lKbRB      1.1   1.36   123            3.01 (0.211, 43.2)     20.5      79.6%
 add.err   0.21                                       0.21
 
-La RSE particulièrement élevé de lKbRB (123%) et ainsi que la valeur de shrinkage (79.6%) laisse supposer que les données n'arrivent pas à identifier KbRB. On a donc peut être intérêt à le fixer à sa valeur d'initialisation.
-
-Si on fixe KbRB:
+The high standard error value of lKbRB (123%) as well as the shrinkage value (79.6%) leads to the belief that the data is not enough to identify KbRB correctly. Thus, there could be value in fixing KbBR to it's original value.
+If we fix KbRB:
 
 Log-Lik: -193
 
@@ -57,9 +56,8 @@ lCLint   7.37 0.0391 0.531 1.58e+03 (1.46e+03, 1.71e+03)     43.2      3.06%
 lKbBO    2.18  0.104  4.76             8.86 (7.23, 10.9)     122.      19.0%
 add.err 0.217                                      0.217
 
-La Log-Likelihood n'a pas baissé significativement et il n'y a plus de paramètres avec une RSE très élevé. Cependant KbBR présente un shrinkage toujours très élevé et on peut également songer à le fixer.
-
-Si on fixe KbMU:
+The Log-Likelihood has not decreased dramatically et no parameter has a high standard error. However KbBR has a high shrinkage value and we could envisage fixing it.
+If we fix KbMU:
 
 Log-Lik: -337
 
@@ -72,4 +70,4 @@ lCLint    7.35 0.0383 0.521 1.56e+03 (1.44e+03, 1.68e+03)     41.8      3.76%
 lKbBO     2.11 0.0973   4.6               8.29 (6.85, 10)     103.      21.9%
 add.err  0.247                                      0.247
 
-Plus aucun paramètre ne présente de RSE ou shrinkage élevé mais la Log-Likelihood a significativement baissé donc la qualité du modèle à expliquer les données n'est pas aussi bonne.
+Now no parameters present a high standard error value or shrinkage value. However the Log-Likelihood has decreased indicating a degradation of the model's ability to correctly explain the data.
