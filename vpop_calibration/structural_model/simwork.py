@@ -1,6 +1,7 @@
 from typing import Optional
 import pandas as pd
 import pandera.pandas as pa
+from pandera.typing import Series
 import numpy as np
 import torch
 from pydantic import BaseModel, TypeAdapter
@@ -83,8 +84,15 @@ class SimworkModelBinding:
             build_result.stdout.decode().strip("\n") + "/bin/scripts.run-model-simple"
         )
 
-    def run(self, vpop: pd.DataFrame, time: list[float]) -> pd.DataFrame:
-        vpop_json = self.df_to_json_vpop(vpop)
+    def run(
+        self,
+        vpop: pd.DataFrame,
+        time: list[float],
+        categorical_attributes: pd.DataFrame | None = None,
+    ) -> pd.DataFrame:
+        vpop_json = self.df_to_json_vpop(
+            vpop_df=vpop, categorical_attributes=categorical_attributes
+        )
         with tempfile.NamedTemporaryFile(
             mode="w", suffix=".json", delete_on_close=False
         ) as tmp_file:
@@ -115,12 +123,23 @@ class SimworkModelBinding:
         output_df = self.parse_output_to_pandas(model_output, time)
         return output_df
 
-    def df_to_json_vpop(self, vpop_df: pd.DataFrame) -> dict:
+    def df_to_json_vpop(
+        self, vpop_df: pd.DataFrame, categorical_attributes: pd.DataFrame | None = None
+    ) -> dict:
         vpop = {
             "patients": [
                 {
                     "patientIndex": row["id"],
-                    "patientCategoricalAttributes": [],
+                    "patientCategoricalAttributes": (
+                        [
+                            {"id": k, "val": v}
+                            for k, v in categorical_attributes.loc[
+                                categorical_attributes["id"] == row["id"]
+                            ].iloc[0].to_dict().items() if k != "id" 
+                        ]
+                        if categorical_attributes is not None
+                        else []
+                    ),
                     "patientAttributes": [
                         {"id": param, "val": row[param]} for param in self.inputs
                     ],
@@ -170,6 +189,7 @@ class StructuralSimwork(StructuralModel):
         self,
         model: SimworkModelBinding,
         protocol_design: Optional[pd.DataFrame] = None,
+        categorical_attributes: pd.DataFrame | None = None,
     ):
         self.model = model
 
@@ -224,6 +244,8 @@ class StructuralSimwork(StructuralModel):
             for protocol in protocol_arms
         ]
 
+        self.categorical_attributes = categorical_attributes
+
         super().__init__(
             parameter_names=parameter_names_without_protocol_overrides,
             output_names=self.model.outputs,
@@ -231,11 +253,11 @@ class StructuralSimwork(StructuralModel):
             task_names=self.task_names,
         )
 
-    def simulate(
+    def assemble_numeric_vpop(
         self,
         X: torch.Tensor,
         prediction_index: ObservationIndex,
-    ) -> tuple[torch.Tensor, torch.Tensor]:
+    ) -> pd.DataFrame:
         nb_chains, nb_patients, nb_timesteps, _ = X.shape
         # Create a mapping from patient index to protocol index
         map_patient_to_protocol = {
@@ -276,11 +298,58 @@ class StructuralSimwork(StructuralModel):
         )
         # Add a temp patient id, to cover the fact that a single patient is simulated on each chain
         temporary_ids = [str(uuid.uuid4()) for _ in range(vpop.shape[0])]
-        vpop["id"] = temporary_ids
+        vpop["id"] = temporary_ids  
+        return vpop      
+
+    def assemble_categorical_vpop(
+        self,
+        nb_patients: int,
+        nb_chains: int,
+        temporary_ids: Series[str],
+        prediction_index: ObservationIndex,
+    ) -> pd.DataFrame:
+
+        if self.categorical_attributes is not None:
+            # Create a numpy array indexing patients from 0 to nb_patients, looping over chains
+            patient_indexing = (
+                torch.arange(nb_patients)
+                .unsqueeze(0)
+                .expand(nb_chains, -1)
+                .reshape(-1)
+                .numpy()
+            )
+            # Map the `real` id and the temporary id
+            actual_patient_ids = pd.DataFrame(
+                {
+                    "id": np.array(prediction_index.id.ref_values)[patient_indexing],
+                    "tmp_id": temporary_ids,
+                }
+            )
+
+            cat_with_temp_id = (
+                self.categorical_attributes.merge(actual_patient_ids, on="id")
+                .drop(columns=["id"])
+                .rename(columns={"tmp_id": "id"})
+            )
+        else:
+            cat_with_temp_id = None
+        return cat_with_temp_id
+
+    def simulate(
+        self,
+        X: torch.Tensor,
+        prediction_index: ObservationIndex,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        nb_chains, nb_patients, nb_timesteps, _ = X.shape
+        vpop = self.assemble_numeric_vpop(X, prediction_index)
+        temporary_ids = vpop["id"]
+        cat_with_temp_id = self.assemble_categorical_vpop(nb_patients, nb_chains, temporary_ids, prediction_index)
         # Assemble the time values
         time = prediction_index.time.ref_values
         # Run the model
-        outputs_df = self.model.run(vpop=vpop, time=time)
+        outputs_df = self.model.run(
+            vpop=vpop, time=time, categorical_attributes=cat_with_temp_id
+        )
         patient_id_ordered = pd.DataFrame({"id": temporary_ids})
         outputs_df_ordered = patient_id_ordered.merge(outputs_df, on="id", how="left")
         outputs_tensor = torch.as_tensor(
