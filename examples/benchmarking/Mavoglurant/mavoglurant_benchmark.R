@@ -1,3 +1,4 @@
+# Original model copy-pasted directly from nlmixr
 library(nlmixr2)
 library(xpose)
 library(xpose.nlmixr2)
