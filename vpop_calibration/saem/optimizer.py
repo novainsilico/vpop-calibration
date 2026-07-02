@@ -6,7 +6,7 @@ from typing import Callable
 
 from vpop_calibration.pynlme.model import StatisticalModel
 from vpop_calibration.saem.scheduler import SaemScheduler
-from vpop_calibration.saem.estimates import PopEstimates
+from vpop_calibration.saem.estimates import PopEstimates, IterSummary
 from vpop_calibration.saem.config import SaemConfigDict
 from vpop_calibration.metropolis_hastings import MetropolisHastingsState, mh_step
 from vpop_calibration.saem.m_step import MStepState
@@ -119,13 +119,24 @@ class PySaem:
         # Inititate the SAEM state with current estimates and Metropolis Hastings state
         self.init_state()
 
-        # Iterate with the scheduler
-        for k in tqdm(self.scheduler):
-            self.step()
+        try:
+            for progress in self.optimization_loop():
+                pass
+                print(progress)
+        except KeyboardInterrupt:
+            print("Interrupted gracefully")
             # todo: add logs, history and live plotting
 
-    def step(self):
-        """One full iteration of SAEM."""
+    def optimization_loop(self):
+        for _ in tqdm(self.scheduler):
+            summary = self.step()
+            yield summary
+
+    def step(self) -> IterSummary:
+        """One full iteration of SAEM.
+
+        This function is implemented as a generator, yielding the iteration summary.
+        """
 
         # Temporarily store the mh state to iterate over it
         current_mh_state = self.mh_state
@@ -213,16 +224,26 @@ class PySaem:
 
                 self.model.update_log_mi(new_log_MI)
 
-            # Update population estimates and check for early convergence
-            new_estimates = PopEstimates(
-                beta=self.model.population_betas,
-                omega=self.model.omega_pop,
-                psi=self.mh_state.gaussian_params,
-                sigma=self.model.residual_var,
-                model_intrinsic=self.model.log_mi,
-                complete_likelihood=self.mh_state.complete_likelihood,
-            )
-            self.update_pop_estimates_convergence_check(new_estimates=new_estimates)
+        # Update population estimates and check for early convergence
+        new_estimates = PopEstimates(
+            beta=self.model.population_betas,
+            omega=self.model.omega_pop,
+            psi=self.mh_state.gaussian_params,
+            sigma=self.model.residual_var,
+            model_intrinsic=self.model.log_mi,
+            complete_likelihood=self.mh_state.complete_likelihood,
+        )
+        self.update_pop_estimates_convergence_check(new_estimates=new_estimates)
+        summary = IterSummary.from_pop_estimates(
+            iteration=self.scheduler.iteration,
+            estimates=new_estimates,
+            beta_names=self.model.beta_names,
+            pdu_names=self.model.pdu_names,
+            covariate_coeff_names=self.model.covariate_coeff_names,
+            mi_names=self.model.mi_names,
+            output_names=self.model.output_names,
+        )
+        return summary
 
     def build_mi_objective_function(self, gaussian_params: torch.Tensor) -> Callable:
         """Build the objective function to be optimized for model intrinsic parameters estimation."""

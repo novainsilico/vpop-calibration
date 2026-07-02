@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Literal, NamedTuple
 import numpy as np
 
 from vpop_calibration.config import smoke_test

@@ -22,9 +22,9 @@
 | vpop\_calibration/pynlme/utils.py                     |       18 |        0 |        0 |        0 |    100% |           |
 | vpop\_calibration/saem/\_\_init\_\_.py                |        0 |        0 |        0 |        0 |    100% |           |
 | vpop\_calibration/saem/config.py                      |       16 |        0 |        0 |        0 |    100% |           |
-| vpop\_calibration/saem/estimates.py                   |       22 |        0 |        4 |        0 |    100% |           |
+| vpop\_calibration/saem/estimates.py                   |       37 |        0 |        4 |        0 |    100% |           |
 | vpop\_calibration/saem/m\_step.py                     |       36 |        0 |        0 |        0 |    100% |           |
-| vpop\_calibration/saem/optimizer.py                   |       98 |        1 |       22 |        2 |     98% |34, 196->217 |
+| vpop\_calibration/saem/optimizer.py                   |      101 |        1 |       24 |        2 |     98% |34, 200->221 |
 | vpop\_calibration/saem/scheduler.py                   |       48 |        2 |       20 |        3 |     93% |21->26, 61, 76 |
 | vpop\_calibration/saem/utils.py                       |       27 |        0 |        0 |        0 |    100% |           |
 | vpop\_calibration/saem\_legacy.py                     |      413 |       52 |      158 |       23 |     81% |80-81, 113, 170, 176, 251->260, 252->251, 491->512, 612->608, 615->645, 629, 632-642, 654-696, 737->743, 739, 756->762, 758, 776->782, 778, 797-798, 817-818, 846-847, 878-882, 889-892, 896->902, 902->913 |
@@ -34,4 +34,4 @@
 | vpop\_calibration/structural\_model/gp.py             |       26 |        0 |        2 |        0 |    100% |           |
 | vpop\_calibration/structural\_model/simwork.py        |      122 |        2 |       16 |        2 |     97% |   82, 115 |
 | vpop\_calibration/utils.py                            |        6 |        0 |        2 |        0 |    100% |           |
-| **TOTAL**                                             | **2600** |  **210** |  **586** |  **122** | **88%** |           |
+| **TOTAL**                                             | **2633** |  **210** |  **590** |  **122** | **88%** |           |
