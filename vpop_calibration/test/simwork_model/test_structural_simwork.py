@@ -80,8 +80,13 @@ def test_analytical_simwork_one_protocol_override(dummy_simwork_model):
 
     protocol_design = pd.DataFrame({"protocol_arm": ["arm-A", "arm-B"], "k_21": [0, 1]})
 
+    categorical_attributes = pd.DataFrame(
+        {"id": ["p1", "p2"], "foo": ["truc", "muche"]}
+    )
     struct_model = StructuralSimwork(
-        model=dummy_simwork_model, protocol_design=protocol_design
+        model=dummy_simwork_model,
+        protocol_design=protocol_design,
+        categorical_attributes=categorical_attributes,
     )
     X = torch.tensor(
         # k_12 time

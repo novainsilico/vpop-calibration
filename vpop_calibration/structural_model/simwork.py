@@ -298,11 +298,37 @@ class StructuralSimwork(StructuralModel):
         # Add a temp patient id, to cover the fact that a single patient is simulated on each chain
         temporary_ids = [str(uuid.uuid4()) for _ in range(vpop.shape[0])]
         vpop["id"] = temporary_ids
+
+        if self.categorical_attributes is not None:
+            # Create a numpy array indexing patients from 0 to nb_patients, looping over chains
+            patient_indexing = (
+                torch.arange(nb_patients)
+                .unsqueeze(0)
+                .expand(nb_chains, -1)
+                .reshape(-1)
+                .numpy()
+            )
+            # Map the `real` id and the temporary id
+            actual_patient_ids = pd.DataFrame(
+                {
+                    "id": np.array(prediction_index.id.ref_values)[patient_indexing],
+                    "tmp_id": temporary_ids,
+                }
+            )
+
+            cat_with_temp_id = (
+                self.categorical_attributes.merge(actual_patient_ids, on="id")
+                .drop(columns=["id"])
+                .rename(columns={"tmp_id": "id"})
+            )
+        else:
+            cat_with_temp_id = None
+
         # Assemble the time values
         time = prediction_index.time.ref_values
         # Run the model
         outputs_df = self.model.run(
-            vpop=vpop, time=time, categorical_attributes=self.categorical_attributes
+            vpop=vpop, time=time, categorical_attributes=cat_with_temp_id
         )
         patient_id_ordered = pd.DataFrame({"id": temporary_ids})
         outputs_df_ordered = patient_id_ordered.merge(outputs_df, on="id", how="left")
