@@ -502,9 +502,26 @@
     "species": [],
     "events": [],
     "algebraicRules": [],
-    "modelName": "unnamedModel",
+    "modelName": "DummyPKModel",
     "baselineChecks": [],
-    "categoricalParams": [],
+    "categoricalParams": [
+        {
+            "allLevels": [
+                "Pikachu",
+                "Pikassiette",
+                "Totoro",
+                "Jean-Claude Dusse"
+            ],
+            "currentLevel": "Totoro",
+            "description": "The identifier of the patient",
+            "displayName": null,
+            "inputTag": null,
+            "name": "PatientId",
+            "reference": "",
+            "status": null,
+            "tags": []
+        }
+    ],
     "immutableIds": {
         "1718bb7c-0661-4cb9-a4f9-e6adaefb35e3": "time",
         "2cfd91b4-66a7-4ef3-adea-0336002f2ff5": "k_a",
@@ -517,7 +534,8 @@
         "da7ed118-069a-40b7-93db-522b2528a164": "k_el",
         "df6b6911-6914-4333-9787-16e39aa3542c": "dA_central_dt",
         "e96dcc9b-c66c-434e-bd85-033d20619d0c": "A2",
-        "fcc3b64f-97a3-4f71-8d96-1c8eb06f1458": "A0"
+        "fcc3b64f-97a3-4f71-8d96-1c8eb06f1458": "A0",
+        "fcc3b64f-97a3-4f71-8d96-1c8eb06f1451": "PatientId"
     },
     "customTags": [],
     "mergeConflicts": {
