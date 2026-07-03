@@ -162,7 +162,8 @@ class PySaem:
                 observations=self.model.data.full_obs,
                 error_model_selector=self.model.error_model_selector,
             )
-            sum_sq_res = sum_sq_res_full.sum(dim=0)
+            # Average the sum of squared residuals over samples (MCMC chains)
+            sum_sq_res = sum_sq_res_full.mean(dim=0)
             assert sum_sq_res.shape == (
                 self.model.nb_outputs,
             ), f"Unexpected residual shape: {sum_sq_res.shape}"
