@@ -733,3 +733,79 @@ class PlottingUtility:
 
             plt.tight_layout()
             plt.show()
+
+    def vpc_plot(
+        self,
+        facet_width: int = 10,
+        facet_height: int = 6,
+        show: bool = True,
+    ):
+        vpc = self.model_diag.vpc
+        assert vpc is not None, "VPC has not been computed. Run compute_vpc() first."
+
+        fig, ax = plt.subplots(1, 1, figsize=(facet_width, facet_height))
+
+        bins = vpc.bins
+        bin_centers = 0.5 * (bins[:-1] + bins[1:])
+
+        ax.grid(True, linestyle="--", alpha=0.6, which="both")
+        ax.set_facecolor("#fdfdfd")
+
+        ax.plot(
+            bin_centers,
+            vpc.obs_q5,
+            color="#033a0d",
+            linestyle="--",
+            linewidth=2,
+            label="Empirical mean",
+        )
+
+        ax.plot(
+            bin_centers,
+            vpc.obs_q50,
+            color="#033a0d",
+            linestyle="--",
+            linewidth=2,
+            label="Empirical mean",
+        )
+        ax.plot(
+            bin_centers,
+            vpc.obs_q95,
+            color="#033a0d",
+            linestyle="--",
+            linewidth=2,
+            label="Empirical mean",
+        )
+
+        ax.fill_between(
+            bin_centers,
+            vpc.pred_q95_ci[:, 0],
+            vpc.pred_q95_ci[:, 1],
+            color="#618386",
+            alpha=0.15,
+        )
+        ax.fill_between(
+            bin_centers,
+            vpc.pred_q5_ci[:, 0],
+            vpc.pred_q5_ci[:, 1],
+            color="#618386",
+            alpha=0.15,
+        )
+        ax.fill_between(
+            bin_centers,
+            vpc.pred_q50_ci[:, 0],
+            vpc.pred_q50_ci[:, 1],
+            color="#ED82DE",
+            alpha=0.15,
+        )
+
+        ax.set_xlabel("Time")
+        ax.set_ylabel("Observation")
+        ax.set_title("Visual Predictive Check")
+        ax.legend()
+        ax.grid(True, alpha=0.3)
+
+        if show:
+            plt.show()
+
+        return ax
