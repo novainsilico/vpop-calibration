@@ -42,43 +42,6 @@ class PySaem:
             patience=config.patience,
         )
 
-    def check_convergence(self, prev_est: PopEstimates, current_est: PopEstimates):
-        """Checks for convergence based on the relative change in parameters."""
-        all_converged = True
-        variables_to_check = ["beta", "omega", "psi", "sigma"]
-        for name in variables_to_check:
-            current_val = current_est._asdict()[name]
-            prev_val = prev_est._asdict()[name]
-            abs_diff = torch.abs(current_val - prev_val)
-            abs_sum = torch.abs(current_val) + torch.abs(prev_val) + 1e-9
-            relative_change = abs_diff / abs_sum
-            if torch.any(relative_change > self.config.convergence_threshold):
-                all_converged = False
-                break
-        return all_converged
-
-    def update_pop_estimates_convergence_check(
-        self, new_estimates: PopEstimates
-    ) -> None:
-        """Update the optimizer state with new population estimates, also updating the number of converged iterations."""
-
-        if not hasattr(self, "current_estimates"):
-            # This is the first iteration
-            self.current_estimates = new_estimates
-            converged = False
-        else:
-            self.previous_estimates = self.current_estimates
-            self.current_estimates = new_estimates
-            converged = self.check_convergence(
-                self.previous_estimates,
-                self.current_estimates,
-            )
-
-        if converged:
-            self.consecutive_converged_iters += 1
-        else:
-            self.consecutive_converged_iters = 0
-
     def init_state(self):
         """Initiate the optimizer state with first estimates. Ensure this function is called before the optimization starts."""
         # Estimate the log-posterior on current eta samples
@@ -116,19 +79,30 @@ class PySaem:
         )
 
     def run(self):
-        # Inititate the SAEM state with current estimates and Metropolis Hastings state
-        self.init_state()
-
+        if self.scheduler.iteration == 0:
+            # Inititate the SAEM state with current estimates and Metropolis Hastings state
+            self.init_state()
+        else:
+            print(f"Resuming at iteration {self.scheduler.iteration}:")
         try:
-            for progress in self.optimization_loop():
-                pass
-                print(progress)
+            for progress in self.optimization_stream():
+                # Logging
+                if self.config.logging:
+                    if (progress.iteration % self.config.logging_frequency == 0) or (
+                        progress.iteration == self.scheduler.nb_iter_tot - 1
+                    ):
+                        progress.print(width=self.config.column_width)
+                # Live plotting
         except KeyboardInterrupt:
-            print("Interrupted gracefully")
-            # todo: add logs, history and live plotting
+            print(f"Interrupted gracefully at iteration {self.scheduler.iteration}.")
 
-    def optimization_loop(self):
-        for _ in tqdm(self.scheduler):
+    def optimization_stream(self):
+        for _ in tqdm(
+            self.scheduler,
+            total=self.scheduler.nb_iter_tot,
+            initial=self.scheduler.iteration,
+            disable=not self.config.progress_bars,
+        ):
             summary = self.step()
             yield summary
 
@@ -203,7 +177,7 @@ class PySaem:
                 new_omega = mstep_proposal.omega
             self.model.update_omega(new_omega)
 
-            # MI optimization        # 3. Update fixed effects MIs
+            # 3. Update fixed effects MIs
             if self.model.nb_mi > 0:
                 # This step is notoriously under-optimized
                 objective_fun = self.build_mi_objective_function(
@@ -234,6 +208,7 @@ class PySaem:
             complete_likelihood=self.mh_state.complete_likelihood,
         )
         self.update_pop_estimates_convergence_check(new_estimates=new_estimates)
+        # Assemble the iteration summary
         summary = IterSummary.from_pop_estimates(
             iteration=self.scheduler.iteration,
             estimates=new_estimates,
@@ -276,3 +251,40 @@ class PySaem:
             return -total_log_lik
 
         return mi_objective_function
+
+    def check_convergence(self, prev_est: PopEstimates, current_est: PopEstimates):
+        """Checks for convergence based on the relative change in parameters."""
+        all_converged = True
+        variables_to_check = ["beta", "omega", "psi", "sigma"]
+        for name in variables_to_check:
+            current_val = current_est._asdict()[name]
+            prev_val = prev_est._asdict()[name]
+            abs_diff = torch.abs(current_val - prev_val)
+            abs_sum = torch.abs(current_val) + torch.abs(prev_val) + 1e-9
+            relative_change = abs_diff / abs_sum
+            if torch.any(relative_change > self.config.convergence_threshold):
+                all_converged = False
+                break
+        return all_converged
+
+    def update_pop_estimates_convergence_check(
+        self, new_estimates: PopEstimates
+    ) -> None:
+        """Update the optimizer state with new population estimates, also updating the number of converged iterations."""
+
+        if not hasattr(self, "current_estimates"):
+            # This is the first iteration
+            self.current_estimates = new_estimates
+            converged = False
+        else:
+            self.previous_estimates = self.current_estimates
+            self.current_estimates = new_estimates
+            converged = self.check_convergence(
+                self.previous_estimates,
+                self.current_estimates,
+            )
+
+        if converged:
+            self.consecutive_converged_iters += 1
+        else:
+            self.consecutive_converged_iters = 0

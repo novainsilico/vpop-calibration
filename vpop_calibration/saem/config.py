@@ -1,9 +1,11 @@
 from typing import NamedTuple, Literal
 
+from vpop_calibration.config import smoke_test
+
 
 class SaemConfigDict(NamedTuple):
     ## Schedule
-    nb_iter_burn_in: int = 5
+    nb_iter_burn_in: int = 0
     nb_iter_learning: int = 100
     nb_iter_smoothing: int | None = None
 
@@ -18,11 +20,24 @@ class SaemConfigDict(NamedTuple):
     learning_rate_power: float = 0.8
     # Simulated annealing factor
     annealing_factor: float = 0.95
+    optim_max_fun: int = 50  # for MI optimization
 
-    ## General parameters
+    # Convergence parameters
     convergence_threshold: float = 1e-4
     patience: int = 5
-    mode: Literal["test", "debug", "cli", "notebook"] = "notebook"
-    optim_max_fun: int = 50  # for MI optimization
+
+    # Output mode selector
+    mode: Literal["test", "debug", "cli", "notebook"] = (
+        "test" if smoke_test else "notebook"
+    )
+
+    # Mode dependent config options
+    live_plot: bool = mode in ["notebook", "debug"]
     plot_frames: int = 20
     plot_columns: int = 3
+
+    logging: bool = mode == "debug"
+    logging_frequency: int = 10
+    column_width: int = 12
+
+    progress_bars: bool = mode == "notebook"

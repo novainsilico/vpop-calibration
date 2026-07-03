@@ -73,3 +73,40 @@ class IterSummary(NamedTuple):
             cov=cov_dict,
             sigma=sigma_dict,
         )
+
+    def print(self, width: int):
+        if self.iteration == 0:
+            header = self._console_header(width)
+        else:
+            header = ""
+        out_str_list = [f"{self.iteration:<{width}}"]
+        for d in [self.mu, self.omega, self.model_intrinsic, self.cov, self.sigma]:
+            if d:
+                out_str_list.append(dict_values_to_str(d, width))
+        out_str = header + ", ".join(out_str_list)
+        print(out_str)
+
+    def _console_header(self, width: int) -> str:
+        out_str_list = [
+            f"{'iteration':<{width}}",
+        ]
+        headers = [
+            (self.mu, "mu_"),
+            (self.omega, "omega_"),
+            (self.model_intrinsic, ""),
+            (self.cov, ""),
+            (self.sigma, "sigma_"),
+        ]
+        for d, prefix in headers:
+            if d:
+                out_str_list.append(dict_keys_to_str(d, width, prefix))
+        out_str = ", ".join(out_str_list) + "\n"
+        return out_str
+
+
+def dict_values_to_str(d: dict[str, float], width: int) -> str:
+    return ", ".join(f"{v:<{width}.2f}" for v in d.values())
+
+
+def dict_keys_to_str(d: dict[str, float], width: int, prefix: str = "") -> str:
+    return ", ".join(f"{prefix+k:<{width}}" for k in d.keys())
