@@ -1,5 +1,6 @@
 from typing import NamedTuple
 import torch
+import pandas as pd
 
 
 class PopEstimates(NamedTuple):
@@ -36,6 +37,18 @@ class IterSummary(NamedTuple):
     model_intrinsic: dict[str, float]
     cov: dict[str, float]
     sigma: dict[str, float]
+    likelihood: float
+
+    @property
+    def headers(self) -> list[tuple[dict, str]]:
+        header_tuples = [
+            (self.mu, "mu_"),
+            (self.omega, "omega_"),
+            (self.model_intrinsic, ""),
+            (self.cov, ""),
+            (self.sigma, "sigma_"),
+        ]
+        return header_tuples
 
     @classmethod
     def from_pop_estimates(
@@ -72,6 +85,7 @@ class IterSummary(NamedTuple):
             model_intrinsic=mi_dict,
             cov=cov_dict,
             sigma=sigma_dict,
+            likelihood=estimates.complete_likelihood.item(),
         )
 
     def print(self, width: int):
@@ -90,18 +104,22 @@ class IterSummary(NamedTuple):
         out_str_list = [
             f"{'iteration':<{width}}",
         ]
-        headers = [
-            (self.mu, "mu_"),
-            (self.omega, "omega_"),
-            (self.model_intrinsic, ""),
-            (self.cov, ""),
-            (self.sigma, "sigma_"),
-        ]
-        for d, prefix in headers:
+        for d, prefix in self.headers:
             if d:
                 out_str_list.append(dict_keys_to_str(d, width, prefix))
         out_str = ", ".join(out_str_list) + "\n"
         return out_str
+
+    def to_pandas(self) -> pd.DataFrame:
+        combined_dicts = {}
+        for d, prefix in self.headers:
+            for k, v in d.items():
+                combined_dicts.update({prefix + k: v})
+        combined_dicts.update({"likelihood": self.likelihood})
+        df = pd.DataFrame([combined_dicts])
+        df.insert(0, "iteration", self.iteration)
+
+        return df
 
 
 def dict_values_to_str(d: dict[str, float], width: int) -> str:

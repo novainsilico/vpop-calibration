@@ -73,4 +73,5 @@ def sample_nlme_model(np_rng) -> StatisticalModel:
 
 def test_optimizer(sample_nlme_model):
     optim = PySaem(model=sample_nlme_model, config=SaemConfigDict())
+    assert optim.config.mode == "test"
     optim.run()

@@ -1,7 +1,6 @@
 import torch
 from typing import get_args, NamedTuple, Callable
 import pandas as pd
-from warnings import deprecated
 
 from vpop_calibration.structural_model.base import StructuralModel
 from vpop_calibration.pynlme.data import ObsData
@@ -128,10 +127,6 @@ class StatisticalModel:
             res_var=self.init_res_var,
         )
 
-        # Sample some etas to initialize the model state
-        etas = self.sample_etas(self.nb_chains)
-        self.update_eta_samples(etas)
-
         # Create design matrices
         self.init_all_design_matrices()
 
@@ -251,20 +246,6 @@ class StatisticalModel:
         ), f"Wrong shape in model intrinsic parameters update: {log_mi.shape}, expected: {expected_shape}"
 
         self.log_mi = log_mi
-
-    @deprecated("Unused")
-    def update_eta_samples(self, eta: torch.Tensor) -> None:
-        """Update the model current individual random effect samples."""
-
-        if hasattr(self, "eta_samples_chains"):
-            expected_shape = self.eta_samples_chains.shape
-        else:
-            expected_shape = (self.nb_chains, self.nb_patients, self.nb_pdu)
-        assert (
-            eta.shape == expected_shape
-        ), f"Wrong shape in eta samples update: {eta.shape}, expected: {expected_shape}"
-
-        self.eta_samples_chains = eta
 
     def set_current_parameters(
         self,

@@ -3,6 +3,7 @@ import torch
 from tqdm import tqdm
 from scipy.optimize import minimize
 from typing import Callable
+import pandas as pd
 
 from vpop_calibration.pynlme.model import StatisticalModel
 from vpop_calibration.saem.scheduler import SaemScheduler
@@ -18,6 +19,8 @@ from vpop_calibration.saem.utils import (
 )
 from vpop_calibration.config import device
 from vpop_calibration.pynlme.residuals import log_likelihood_observation
+from vpop_calibration.saem.plot import OptimizerPlot
+from vpop_calibration.config import smoke_test
 
 
 class PySaem:
@@ -28,19 +31,32 @@ class PySaem:
     ):
         self.model: StatisticalModel = model
         self.config = config
-        if config.nb_iter_smoothing is None:
-            nb_iter_smoothing = config.nb_iter_learning
-        else:
-            nb_iter_smoothing = config.nb_iter_smoothing
+        if self.config.nb_iter_smoothing is None:
+            self.config = self.config._replace(
+                nb_iter_smoothing=self.config.nb_iter_learning
+            )
+        assert self.config.nb_iter_smoothing is not None
+
+        if smoke_test:
+            # Override with test config
+            self.config = self.config._replace(
+                nb_iter_burnin=1,
+                nb_iter_learning=2,
+                nb_iter_smoothing=2,
+                optim_max_fun=1,
+                mode="test",
+            )
+
         self.consecutive_converged_iters = 0
         self.scheduler = SaemScheduler(
-            nb_iter_burnin=config.nb_iter_burn_in,
-            nb_iter_learning=config.nb_iter_learning,
-            nb_iter_smoothing=nb_iter_smoothing,
+            nb_iter_burnin=self.config.nb_iter_burnin,
+            nb_iter_learning=self.config.nb_iter_learning,
+            nb_iter_smoothing=self.config.nb_iter_smoothing,
             init_step_adaptation=config.init_step_adaptation,
             learning_rate_power=config.learning_rate_power,
             patience=config.patience,
         )
+        self.history = pd.DataFrame()
 
     def init_state(self):
         """Initiate the optimizer state with first estimates. Ensure this function is called before the optimization starts."""
@@ -86,6 +102,8 @@ class PySaem:
             print(f"Resuming at iteration {self.scheduler.iteration}:")
         try:
             for progress in self.optimization_stream():
+                # Push history
+                self.history = pd.concat([self.history, progress.to_pandas()])
                 # Logging
                 if self.config.logging:
                     if (progress.iteration % self.config.logging_frequency == 0) or (
@@ -93,8 +111,19 @@ class PySaem:
                     ):
                         progress.print(width=self.config.column_width)
                 # Live plotting
+                if self.config.live_plot:
+                    if (progress.iteration % self.config.plot_frames == 0) or (
+                        progress.iteration == self.scheduler.nb_iter_tot - 1
+                    ):
+                        self.plot_history()
+
+            if self.config.live_plot:
+                self.plot.close()
         except KeyboardInterrupt:
             print(f"Interrupted gracefully at iteration {self.scheduler.iteration}.")
+
+            if self.config.live_plot:
+                self.plot.close()
 
     def optimization_stream(self):
         for _ in tqdm(
@@ -288,3 +317,14 @@ class PySaem:
             self.consecutive_converged_iters += 1
         else:
             self.consecutive_converged_iters = 0
+
+    def plot_history(self):
+        if not hasattr(self, "plot"):
+            self.plot = OptimizerPlot(
+                self.history,
+                nb_tot_iter=self.scheduler.nb_iter_tot,
+                facet_size=self.config.facet_size,
+                nb_cols=self.config.plot_columns,
+            )
+        else:
+            self.plot.update(self.history)

@@ -1,7 +1,6 @@
 from typing import Optional
 import pandas as pd
 import pandera.pandas as pa
-from pandera.typing import Series
 import numpy as np
 import torch
 from pydantic import BaseModel, TypeAdapter
@@ -10,11 +9,12 @@ import subprocess
 import tempfile
 import uuid
 import json
+import os
 
 from vpop_calibration.structural_model.base import StructuralModel
 from vpop_calibration.pynlme.indexing import ObservationIndex
 from vpop_calibration.utils import extend_schema
-from vpop_calibration.config import device
+from vpop_calibration.config import device, smoke_test
 
 
 class TimeseriesOutput(BaseModel):
@@ -68,21 +68,24 @@ class SimworkModelBinding:
         self.inputs = inputs
         self.outputs = outputs
         self.nb_outputs = len(outputs)
-
-        build_result = subprocess.run(
-            [
-                "nix",
-                "build",
-                ".#simwork.legacyPackages.x86_64-linux.perf.scripts.run-model-simple",
-                "--print-out-paths",
-            ],
-            capture_output=True,
-        )
-        if build_result.returncode != 0:
-            raise RuntimeError(build_result.stderr)
-        self.executable = (
-            build_result.stdout.decode().strip("\n") + "/bin/scripts.run-model-simple"
-        )
+        if not smoke_test:
+            build_result = subprocess.run(
+                [
+                    "nix",
+                    "build",
+                    ".#simwork.legacyPackages.x86_64-linux.perf.scripts.run-model-simple",
+                    "--print-out-paths",
+                ],
+                capture_output=True,
+            )
+            if build_result.returncode != 0:
+                raise RuntimeError(build_result.stderr)
+            self.executable = (
+                build_result.stdout.decode().strip("\n")
+                + "/bin/scripts.run-model-simple"
+            )
+        else:
+            self.executable = os.environ["SIMWORK_EXE"]
 
     def run(
         self,
@@ -305,9 +308,9 @@ class StructuralSimwork(StructuralModel):
         self,
         nb_patients: int,
         nb_chains: int,
-        temporary_ids: Series[str],
+        temporary_ids: pd.Series,
         prediction_index: ObservationIndex,
-    ) -> pd.DataFrame:
+    ) -> pd.DataFrame | None:
 
         if self.categorical_attributes is not None:
             # Create a numpy array indexing patients from 0 to nb_patients, looping over chains

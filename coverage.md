@@ -14,7 +14,7 @@
 | vpop\_calibration/pynlme/data.py                      |       47 |        0 |        8 |        0 |    100% |           |
 | vpop\_calibration/pynlme/diagnostics.py               |      121 |        6 |       16 |        5 |     92% |43, 85-86, 147->150, 190-192, 205->209 |
 | vpop\_calibration/pynlme/indexing.py                  |       60 |        0 |        8 |        0 |    100% |           |
-| vpop\_calibration/pynlme/model.py                     |      228 |       21 |       26 |        2 |     91% |161->157, 260, 541-586 |
+| vpop\_calibration/pynlme/model.py                     |      218 |       20 |       24 |        1 |     91% |156->152, 522-567 |
 | vpop\_calibration/pynlme/params.py                    |      106 |        3 |       16 |        2 |     96% |54, 56, 129 |
 | vpop\_calibration/pynlme/plot.py                      |      349 |       34 |      108 |       33 |     85% |35->37, 70, 72-73, 119-120, 130, 154, 187-188, 199->203, 204, 215-216, 237, 272, 287, 292->298, 304, 309, 343, 372, 385, 427, 429, 442-443, 488, 502, 508, 514, 518-519, 527, 654, 663, 674->677, 683, 704->715 |
 | vpop\_calibration/pynlme/residuals.py                 |       61 |        2 |       12 |        2 |     95% |   49, 108 |
@@ -22,16 +22,16 @@
 | vpop\_calibration/pynlme/utils.py                     |       18 |        0 |        0 |        0 |    100% |           |
 | vpop\_calibration/saem/\_\_init\_\_.py                |        0 |        0 |        0 |        0 |    100% |           |
 | vpop\_calibration/saem/config.py                      |       22 |        0 |        0 |        0 |    100% |           |
-| vpop\_calibration/saem/estimates.py                   |       59 |       18 |       14 |        0 |     62% |78-87, 90-104, 108, 112 |
+| vpop\_calibration/saem/estimates.py                   |       73 |       17 |       18 |        0 |     70% |92-101, 104-111, 126, 130 |
 | vpop\_calibration/saem/m\_step.py                     |       36 |        0 |        0 |        0 |    100% |           |
-| vpop\_calibration/saem/optimizer.py                   |      111 |       32 |       30 |        7 |     61% |34, 86, 91-97, 100->exit, 106, 116-118, 125-128, 136, 145-147, 161, 168-170, 177, 181, 199, 210, 221, 226, 238, 251-253, 257, 259->268, 265->259, 275-277, 280, 287, 290 |
-| vpop\_calibration/saem/scheduler.py                   |       48 |        2 |       20 |        3 |     93% |21->26, 61, 76 |
+| vpop\_calibration/saem/optimizer.py                   |      129 |        8 |       42 |        7 |     89% |35, 40->50, 102, 109-112, 114->104, 120->exit, 122-126, 210->231 |
+| vpop\_calibration/saem/plot.py                        |       37 |        6 |       12 |        2 |     76% |43->exit, 45, 52-56 |
+| vpop\_calibration/saem/scheduler.py                   |       44 |        2 |       18 |        2 |     94% |    57, 72 |
 | vpop\_calibration/saem/utils.py                       |       27 |        0 |        0 |        0 |    100% |           |
-| vpop\_calibration/saem\_legacy.py                     |      413 |      413 |      158 |        0 |      0% |     1-924 |
 | vpop\_calibration/structural\_model/\_\_init\_\_.py   |        5 |        0 |        0 |        0 |    100% |           |
 | vpop\_calibration/structural\_model/analytical.py     |       41 |        0 |        2 |        0 |    100% |           |
 | vpop\_calibration/structural\_model/base.py           |       29 |        1 |        0 |        0 |     97% |        37 |
 | vpop\_calibration/structural\_model/gp.py             |       26 |        0 |        2 |        0 |    100% |           |
-| vpop\_calibration/structural\_model/simwork.py        |      122 |        2 |       16 |        2 |     97% |   82, 115 |
+| vpop\_calibration/structural\_model/simwork.py        |      124 |        5 |       18 |        2 |     94% |72-83, 118 |
 | vpop\_calibration/utils.py                            |        6 |        0 |        2 |        0 |    100% |           |
-| **TOTAL**                                             | **2656** |  **622** |  **606** |  **106** | **72%** |           |
+| **TOTAL**                                             | **2300** |  **192** |  **474** |  **106** | **88%** |           |
