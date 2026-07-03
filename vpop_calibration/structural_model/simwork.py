@@ -126,6 +126,10 @@ class SimworkModelBinding:
     def df_to_json_vpop(
         self, vpop_df: pd.DataFrame, categorical_attributes: pd.DataFrame | None = None
     ) -> dict:
+        cat_map = {}
+        if categorical_attributes is not None:
+            cat_map = categorical_attributes.set_index("id").to_dict(orient="index")
+
         vpop = {
             "patients": [
                 {
@@ -133,12 +137,8 @@ class SimworkModelBinding:
                     "patientCategoricalAttributes": (
                         [
                             {"id": k, "val": v}
-                            for k, v in categorical_attributes.loc[
-                                categorical_attributes["id"] == row["id"]
-                            ].iloc[0].to_dict().items() if k != "id" 
+                            for k, v in cat_map.get(row["id"], {}).items()
                         ]
-                        if categorical_attributes is not None
-                        else []
                     ),
                     "patientAttributes": [
                         {"id": param, "val": row[param]} for param in self.inputs
@@ -298,8 +298,8 @@ class StructuralSimwork(StructuralModel):
         )
         # Add a temp patient id, to cover the fact that a single patient is simulated on each chain
         temporary_ids = [str(uuid.uuid4()) for _ in range(vpop.shape[0])]
-        vpop["id"] = temporary_ids  
-        return vpop      
+        vpop["id"] = temporary_ids
+        return vpop
 
     def assemble_categorical_vpop(
         self,
@@ -343,7 +343,9 @@ class StructuralSimwork(StructuralModel):
         nb_chains, nb_patients, nb_timesteps, _ = X.shape
         vpop = self.assemble_numeric_vpop(X, prediction_index)
         temporary_ids = vpop["id"]
-        cat_with_temp_id = self.assemble_categorical_vpop(nb_patients, nb_chains, temporary_ids, prediction_index)
+        cat_with_temp_id = self.assemble_categorical_vpop(
+            nb_patients, nb_chains, temporary_ids, prediction_index
+        )
         # Assemble the time values
         time = prediction_index.time.ref_values
         # Run the model
