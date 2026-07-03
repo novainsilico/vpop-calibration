@@ -1,15 +1,19 @@
+from vpop_calibration.saem.optimizer import PySaem
+from vpop_calibration.saem.config import SaemConfigDict
+from vpop_calibration.pynlme.model import StatisticalModel
+from vpop_calibration.pynlme.params import MixedEffectParameters
+from vpop_calibration.pynlme.data import ObsData
+from vpop_calibration.structural_model import StructuralAnalytical
+
 import pytest
 import pandas as pd
 import numpy as np
 import torch
-
-from vpop_calibration.structural_model.base import StructuralModel
-from vpop_calibration.structural_model.analytical import StructuralAnalytical
-from vpop_calibration.interface import NlmeModel
+from pandera.typing import DataFrame
 
 
 @pytest.fixture
-def sample_nlme_params() -> dict:
+def sample_nlme_model(np_rng) -> StatisticalModel:
     input = {
         "model_intrinsic": {"mi_1": {"prior": 10.0}},
         "pdu": {
@@ -31,11 +35,7 @@ def sample_nlme_params() -> dict:
         },
         "pdk": ["pdk_1"],
     }
-    return input
-
-
-@pytest.fixture
-def obs_data(np_rng) -> pd.DataFrame:
+    params = MixedEffectParameters.model_validate(input)
     protocol_arms = ["arm-A", "arm-B"]
     patients = {
         "id": ["p1", "p2"],
@@ -49,13 +49,8 @@ def obs_data(np_rng) -> pd.DataFrame:
     df = df.merge(pd.DataFrame(outputs, columns=["output_name"]), how="cross")
     df = df.merge(pd.DataFrame(time_steps, columns=["time"]), how="cross")
     df["value"] = np.abs(np_rng.normal(0, 1, df.shape[0]))
-    df["task"] = df.apply(lambda r: r["output_name"] + "_" + r["protocol_arm"], axis=1)
-    df = df.sample(frac=0.9, random_state=np_rng)
-    return df
+    obs_data = ObsData(DataFrame(df))
 
-
-@pytest.fixture
-def struct_model() -> StructuralModel:
     def equations(mi_1, pdu_1, pdu_2, pdk_1, t, protocol_ovr_1):
         out = torch.zeros_like(t)
         return torch.cat((out, out), dim=-1)
@@ -68,15 +63,15 @@ def struct_model() -> StructuralModel:
         variable_names=["out_1", "out_2"],
         protocol_design=protocol_design,
     )
-    return struct_model
 
-
-def test_analytical_saem(sample_nlme_params, obs_data, struct_model):
-    nlme_model = NlmeModel(
-        structural_model=struct_model,
-        df=obs_data,
-        prior_params=sample_nlme_params,
+    nlme_model = StatisticalModel(
+        structural_model=struct_model, dataset=obs_data, prior_params=params
     )
-    nlme_model.optimizer.run()
-    nlme_model.diagnostics.compute_ebe()
-    nlme_model.diagnostics.sample_conditional_distribution()
+
+    return nlme_model
+
+
+def test_optimizer(sample_nlme_model):
+    optim = PySaem(model=sample_nlme_model, config=SaemConfigDict())
+    assert optim.config.mode == "test"
+    optim.run()

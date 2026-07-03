@@ -3,7 +3,6 @@ from numpy import inf
 from vpop_calibration.structural_model.simwork import (
     SimworkModelBinding,
     model_output_adapter,
-    TimeseriesOutput,
 )
 
 import pytest
@@ -48,11 +47,13 @@ def test_handle_payload(dummy_simwork_model):
                 {"id": "A2", "unit": "mg", "values": [0, 1, 2]},
             ],
         ),
-        "p3": None, # simwork returns None when it cannot simulate, for instance if the ODE solver fails
+        "p3": None,  # simwork returns None when it cannot simulate, for instance if the ODE solver fails
     }
     validated_output = model_output_adapter.validate_python(model_output_json)
-    
-    parsed_output = dummy_simwork_model.parse_output_to_pandas(validated_output, timepoints)
+
+    parsed_output = dummy_simwork_model.parse_output_to_pandas(
+        validated_output, timepoints
+    )
     expected_output = pd.DataFrame(
         {
             "id": ["p1", "p1", "p1", "p2", "p2", "p2", "p3", "p3", "p3"],

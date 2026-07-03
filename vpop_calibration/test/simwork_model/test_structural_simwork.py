@@ -8,7 +8,7 @@ from vpop_calibration.pynlme.schemas import ObsDataSchema
 import torch
 import pytest
 import pandas as pd
-import numpy as np
+import pandera.pandas as pa
 
 
 @pytest.fixture
@@ -94,6 +94,7 @@ def test_analytical_simwork_one_protocol_override(dummy_simwork_model):
     )
     out = struct_model.simulate(X=X, prediction_index=obs_index)
 
+
 def test_categorical_override(dummy_simwork_model):
     df = (
         pd.DataFrame({"id": ["p1", "p2"], "protocol_arm": ["arm-B", "arm-A"]})
@@ -124,16 +125,13 @@ def test_categorical_override(dummy_simwork_model):
     assert nb_params == 2
     vpop = struct_model.assemble_numeric_vpop(X=X, prediction_index=obs_index)
     temporary_ids = vpop["id"]
-    expected_vpop = pd.DataFrame(
-        {"id": temporary_ids, "k_12": [0, 1], "k_21": [1, 0]}
+    expected_vpop = pd.DataFrame({"id": temporary_ids, "k_12": [0, 1], "k_21": [1, 0]})
+    pd.testing.assert_frame_equal(vpop, expected_vpop, check_like=True)
+    cat_df = struct_model.assemble_categorical_vpop(
+        nb_patients, nb_chains, temporary_ids, prediction_index=obs_index
     )
-    pd.testing.assert_frame_equal(
-        vpop, expected_vpop, check_like=True
-    )
-    cat_df = struct_model.assemble_categorical_vpop(nb_patients, nb_chains, temporary_ids, prediction_index=obs_index)
+    assert cat_df is not None
     expected_cat_df = pd.DataFrame(
         {"id": temporary_ids, "PatientId": ["Totoro", "Pikachu"]}
     )
-    pd.testing.assert_frame_equal(
-        cat_df, expected_cat_df, check_like=True
-    )
+    pd.testing.assert_frame_equal(cat_df, expected_cat_df, check_like=True)

@@ -1,7 +1,6 @@
 import pytest
 import pandas as pd
 import numpy as np
-import torch
 
 from vpop_calibration.structural_model.simwork import (
     SimworkModelBinding,
@@ -71,7 +70,7 @@ def sample_nlme_params() -> dict:
 
 
 def test_simwork_saem(sample_nlme_params, obs_data, simwork_model):
-    config = Config(saem=SaemConfigDict(verbose=True), nlme=NlmeConfigDict(nb_chains=1))
+    config = Config(saem=SaemConfigDict(), nlme=NlmeConfigDict(nb_chains=1))
     nlme_model = NlmeModel(
         structural_model=simwork_model,
         df=obs_data,

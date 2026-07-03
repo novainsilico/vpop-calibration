@@ -127,12 +127,8 @@ class StatisticalModel:
             res_var=self.init_res_var,
         )
 
-        # Sample some etas to initialize the model state
-        etas = self.sample_etas(self.nb_chains)
-        self.update_eta_samples(etas)
-
         # Create design matrices
-        self.design_matrices, self.full_design_matrix = self.init_all_design_matrices()
+        self.init_all_design_matrices()
 
         # Assemble patients pdk tensors
         self.data.init_pdk_values(self.pdk_names)
@@ -165,9 +161,10 @@ class StatisticalModel:
 
     def init_all_design_matrices(
         self,
-    ) -> tuple[dict[str | int, torch.Tensor], torch.Tensor]:
+    ) -> None:
         """Creates a design matrix for each unique individual based on their covariates."""
-        design_matrices = {}
+        # Initiate the individual patients' design matrices
+        self.design_matrices = {}
         if self.nb_covariates == 0:
             # No covariates: all design matrices are the identity matrix
             assert (
@@ -175,7 +172,7 @@ class StatisticalModel:
             ), "No covariates are identified, yet the number of PDUs and the number of betas differ."
             ind_design_matrix = torch.diag(torch.ones((self.nb_pdu), device=device))
             for ind_id in self.patients:
-                design_matrices[ind_id] = ind_design_matrix
+                self.design_matrices[ind_id] = ind_design_matrix
         else:
             # The NLME model contains covariates
             for ind_id in self.patients:
@@ -187,12 +184,11 @@ class StatisticalModel:
                     .iloc[0]
                 )
                 covariates_dict = individual_covariates.to_dict()
-                design_matrices[ind_id] = self.init_design_matrix(covariates_dict)
-
-        full_design_matrix = torch.stack(
-            [design_matrices[p] for p in self.patients]
+                self.design_matrices[ind_id] = self.init_design_matrix(covariates_dict)
+        # Assemble the full design matrix
+        self.full_design_matrix = torch.stack(
+            [self.design_matrices[p] for p in self.patients]
         ).to(device)
-        return design_matrices, full_design_matrix
 
     def update_omega(self, omega: torch.Tensor) -> None:
         """Update the covariance matrix of the NLME model and the distribution of random effects."""
@@ -250,19 +246,6 @@ class StatisticalModel:
         ), f"Wrong shape in model intrinsic parameters update: {log_mi.shape}, expected: {expected_shape}"
 
         self.log_mi = log_mi
-
-    def update_eta_samples(self, eta: torch.Tensor) -> None:
-        """Update the model current individual random effect samples."""
-
-        if hasattr(self, "eta_samples_chains"):
-            expected_shape = self.eta_samples_chains.shape
-        else:
-            expected_shape = (self.nb_chains, self.nb_patients, self.nb_pdu)
-        assert (
-            eta.shape == expected_shape
-        ), f"Wrong shape in eta samples update: {eta.shape}, expected: {expected_shape}"
-
-        self.eta_samples_chains = eta
 
     def set_current_parameters(
         self,

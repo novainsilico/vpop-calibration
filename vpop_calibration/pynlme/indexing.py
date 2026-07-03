@@ -55,7 +55,7 @@ class ObservationIndex(NamedTuple):
     time: IndexedValues
 
     @classmethod
-    def from_dataframe(cls, df: DataFrame[ObsDataSchema]):
+    def from_dataframe(cls, df: DataFrame[ObsDataSchema]) -> "ObservationIndex":
         """Instantiate an ObservationIndex from an observed dataframe."""
         indexes = []
         for field in cls._fields:
