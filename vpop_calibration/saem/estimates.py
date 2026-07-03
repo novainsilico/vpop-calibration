@@ -37,7 +37,7 @@ class IterSummary(NamedTuple):
     model_intrinsic: dict[str, float]
     cov: dict[str, float]
     sigma: dict[str, float]
-    likelihood: float
+    convergence_indicator: float
 
     @property
     def headers(self) -> list[tuple[dict, str]]:
@@ -85,7 +85,7 @@ class IterSummary(NamedTuple):
             model_intrinsic=mi_dict,
             cov=cov_dict,
             sigma=sigma_dict,
-            likelihood=estimates.complete_likelihood.item(),
+            convergence_indicator=estimates.complete_likelihood.item(),
         )
 
     def print(self, width: int):
@@ -115,7 +115,7 @@ class IterSummary(NamedTuple):
         for d, prefix in self.headers:
             for k, v in d.items():
                 combined_dicts.update({prefix + k: v})
-        combined_dicts.update({"likelihood": self.likelihood})
+        combined_dicts.update({"convergence_indicator": self.convergence_indicator})
         df = pd.DataFrame([combined_dicts])
         df.insert(0, "iteration", self.iteration)
 
