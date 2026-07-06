@@ -1,6 +1,9 @@
 from tqdm import tqdm
 import torch
 from typing import NamedTuple
+import numpy as np
+import matplotlib.pyplot as plt
+from IPython.display import display
 
 
 from vpop_calibration.pynlme.model import StatisticalModel
@@ -17,6 +20,7 @@ def sample_conditional_distribution_nlme(
     nlme_model: StatisticalModel,
     nb_samples: int = 100,
     nb_burn_in: int = 0,
+    plot_frequency: int = 5,
 ) -> ConditionalDistribSamples:
     """
     Sample random effects from the conditional distribution
@@ -38,6 +42,10 @@ def sample_conditional_distribution_nlme(
     )
     sample_list = []
     log_prob_list = []
+    best_log_prob = current_state.log_prob.clone()
+    num_improved_history = []
+    mean_gain_history = []
+    handle, fig, axes, ebe_traces = _build_ebe_convergence_plot()
     print(f"Sampling conditional distribution on {nb_samples} samples:")
     for i in tqdm(range(nb_burn_in + nb_samples)):
         current_state = mh_step(
@@ -50,6 +58,29 @@ def sample_conditional_distribution_nlme(
             sample_list.append(current_state.etas)
             log_prob_list.append(current_state.log_prob)
 
+            delta = current_state.log_prob - best_log_prob
+            num_improved = (delta > 0).sum().item()
+            mean_gain = delta.clamp(min=0).mean().item()
+
+            num_improved_history.append(num_improved)
+            mean_gain_history.append(mean_gain)
+            best_log_prob = torch.maximum(
+                best_log_prob,
+                current_state.log_prob,
+            )
+            if i % plot_frequency == 0:
+                _update_ebe_convergence_plot(
+                    handle,
+                    fig,
+                    axes,
+                    ebe_traces,
+                    num_improved_history,
+                    mean_gain_history,
+                )
+
+    _update_ebe_convergence_plot(
+        handle, fig, axes, ebe_traces, num_improved_history, mean_gain_history
+    )
     samples = torch.stack(sample_list).squeeze(1)
     log_probs = torch.stack(log_prob_list).squeeze(1)
     assert samples.shape == (
@@ -62,3 +93,73 @@ def sample_conditional_distribution_nlme(
         nlme_model.nb_patients,
     ), f"{log_probs.shape},({nb_samples, nlme_model.nb_patients})"
     return ConditionalDistribSamples(samples=samples, log_prob=log_probs)
+
+
+def _build_ebe_convergence_plot(plot_indiv_figsize=(5.0, 3.0)):
+    fig, axes = plt.subplots(2, 1, figsize=plot_indiv_figsize, sharex=True)
+
+    for ax in axes:
+        ax.grid(True)
+
+    axes[0].set_title("EBE convergence")
+
+    axes[0].set_ylabel("Patients improved")
+    axes[1].set_ylabel("Mean LL gain")
+    axes[1].set_xlabel("Iteration")
+
+    (line1_raw,) = axes[0].plot([], color="lightgray", linewidth=1)
+    (line1_ma,) = axes[0].plot([], linewidth=2)
+    (line2_raw,) = axes[1].plot([], color="lightgray", linewidth=1)
+    (line2_ma,) = axes[1].plot([], linewidth=2)
+
+    ebe_traces = {
+        "num_improved": line1_raw,
+        "num_improved_ma": line1_ma,
+        "mean_gain": line2_raw,
+        "mean_gain_ma": line2_ma,
+    }
+
+    handle = display(fig, display_id=True)
+
+    return handle, fig, axes, ebe_traces
+
+
+def _update_ebe_convergence_plot(
+    handle, fig, axes, ebe_traces, num_improved_history: list, mean_gain_history: list
+):
+
+    x = np.arange(len(num_improved_history))
+
+    mean_gain_ma = moving_average(mean_gain_history, window=20)
+    num_improved_ma = moving_average(num_improved_history, window=20)
+
+    ebe_traces["num_improved"].set_data(
+        x,
+        num_improved_history,
+    )
+    ebe_traces["num_improved_ma"].set_data(
+        x,
+        num_improved_ma,
+    )
+    ebe_traces["mean_gain"].set_data(
+        x,
+        mean_gain_history,
+    )
+    ebe_traces["mean_gain_ma"].set_data(
+        x,
+        mean_gain_ma,
+    )
+
+    for ax in axes:
+        ax.relim()
+        ax.autoscale_view()
+
+    if handle is not None:
+        handle.update(fig)
+
+
+def moving_average(x: list[float], window: int = 20) -> np.ndarray:
+    x = np.asarray(x, dtype=float)
+    if len(x) < window:
+        return x
+    return np.convolve(x, np.ones(window) / window, mode="same")
