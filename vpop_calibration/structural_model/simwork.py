@@ -96,6 +96,8 @@ class SimworkModelBinding:
         vpop_json = self.df_to_json_vpop(
             vpop_df=vpop, categorical_attributes=categorical_attributes
         )
+        # with open("vpop.json", "w") as file:
+        #     json.dump(vpop_json, file)
         with tempfile.NamedTemporaryFile(
             mode="w", suffix=".json", delete_on_close=False
         ) as tmp_file:
@@ -122,6 +124,8 @@ class SimworkModelBinding:
             capture_output=True,
             text=True,
         )
+        # with open("result.stdout", "w") as file:
+        #     file.write(result.stdout)
         model_output = model_output_adapter.validate_json(filt_result.stdout)
         output_df = self.parse_output_to_pandas(model_output, time)
         return output_df

@@ -307,7 +307,7 @@ class PlottingUtility:
             ind_to_plot = list(range(n_patients_to_plot))
 
         cmap = plt.get_cmap("brg")
-        colors = cmap(np.linspace(0, 1, self.model_diag.model.nb_outputs))
+        colors = cmap([0] * self.model_diag.model.nb_outputs)
 
         # One plot for each output, containing all individual patients subplots for this output
         for output_index, output_name in enumerate(self.model_diag.model.output_names):
@@ -317,7 +317,7 @@ class PlottingUtility:
                 figsize=(facet_width * n_cols, facet_height * n_rows),
                 squeeze=False,
             )
-            fig.suptitle(f"Output: {output_name}")
+            # fig.suptitle(f"Output: {output_name}")
 
             data_output = obs_vs_simulated.loc[
                 obs_vs_simulated["output_name"] == output_name
@@ -328,7 +328,8 @@ class PlottingUtility:
                 i = k // n_cols
                 j = k % n_cols
                 ax = axes[i, j]
-                ax.set_xlabel("Time")
+                ax.set_xlabel("Time (days)")
+                ax.set_ylabel(f"{output_name}")
 
                 # Filter dataset for current patient
                 patient_ind = self.model_diag.model.patients[ind_to_plot[k]]
@@ -339,6 +340,7 @@ class PlottingUtility:
                 time_vec = patient_data["time"].to_numpy()
                 sorted_indices = np.argsort(time_vec)
                 sorted_times = time_vec[sorted_indices]
+                sorted_times = sorted_times / 86400
 
                 obs_vec = patient_data["value"].values[sorted_indices]
                 ax.plot(
@@ -359,7 +361,7 @@ class PlottingUtility:
                     alpha=0.5,
                 )
 
-                title = f"patient {ind_to_plot[k]}"
+                title = f"Patient {patient_ind}"
                 ax.set_title(title)
                 plt.tight_layout()
             if not smoke_test:
@@ -392,6 +394,7 @@ class PlottingUtility:
             gof_df = obs_vs_simulated.loc[
                 (obs_vs_simulated["output_name"] == output_name)
             ]
+            # gof_df = gof_df.loc[gof_df["time"] >= 14400]
 
             # Compute R² and RMSE
             r2 = r2_score(gof_df["value"], gof_df["predicted_value"])
@@ -399,11 +402,13 @@ class PlottingUtility:
             metrics_text = f"$R^2 = {r2:.3f}$\n$RMSE= {rmse:.3f}$"
 
             # Plot (obs,pred) points
+            # colors = ["red" if t < 14400 else "blue" for t in gof_df["time"]]
             ax.scatter(
                 x=gof_df["value"],
                 y=gof_df["predicted_value"],
                 alpha=0.7,
                 s=50,
+                # c=colors,
                 edgecolors="w",
             )
 
