@@ -4,11 +4,12 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import r2_score
 import random as rand
 import scipy.stats as stats
+import pandera.pandas as pa
 
 
 from vpop_calibration.pynlme.diagnostics import (
     ModelDiagnostics,
-    ModelResiduals,
+    WeightedResidualsSchema,
     ResidualType,
 )
 from vpop_calibration.model.gp import GP
@@ -523,7 +524,7 @@ class PlottingUtility:
                 self.model_diag.sample_conditional_distribution()
             comparison_df = self.model_diag.sampler.ebe_predictions_df
         self.residual_values(
-            res=wres_results,
+            res_df=wres_results,
             comparison=comparison_df,
             res_type=res_type,
             facet_height=facet_height,
@@ -532,20 +533,18 @@ class PlottingUtility:
 
     def residual_values(
         self,
-        res: ModelResiduals,
+        res_df: pa.typing.DataFrame[WeightedResidualsSchema],
         comparison: pd.DataFrame,
         res_type: str,
         facet_width: int = 10,
         facet_height: int = 10,
     ) -> None:
-        all_wres = np.concatenate([p.res for p in res.values()]).flatten()
-        all_times = np.concatenate([p.time for p in res.values()]).flatten()
 
         fig, ax = plt.subplots(2, 2, figsize=(facet_width, facet_height))
 
         ## Histogram plot
         ax[0, 0].hist(
-            all_wres,
+            res_df["residual_value"],
             bins=30,
             density=True,
             alpha=0.6,
@@ -553,7 +552,9 @@ class PlottingUtility:
             edgecolor="black",
         )
         mu, std = 0, 1
-        x = np.linspace(min(all_wres), max(all_wres), 100)
+        x = np.linspace(
+            min(res_df["residual_value"]), max(res_df["residual_value"]), 100
+        )
         p = stats.norm.pdf(x, mu, std)
         ax[0, 0].plot(x, p, "r", linewidth=2, label=r"$\mathcal{N}(0,1)$")
         ax[0, 0].set_title(f"{res_type.upper()} distribution")
@@ -562,15 +563,15 @@ class PlottingUtility:
         ax[0, 0].legend()
 
         ## Q-Q plot
-        stats.probplot(all_wres, dist="norm", plot=ax[1, 0])
+        stats.probplot(res_df["residual_value"], dist="norm", plot=ax[1, 0])
         ax[1, 0].set_title(f"{res_type.upper()} Q-Q Plot")
 
         ## Plot vs. time
         ax[0, 1].grid(True, linestyle="--", alpha=0.6, which="both")
         ax[0, 1].set_facecolor("#fdfdfd")
         ax[0, 1].scatter(
-            all_times,
-            all_wres,
+            res_df["time"],
+            res_df["residual_value"],
             alpha=0.5,
             color="#2c3e50",
             edgecolors="white",
@@ -588,7 +589,10 @@ class PlottingUtility:
         ax[0, 1].axhline(y=-1.96, color="#e74c3c", linestyle="--", linewidth=1.3)
         ax[0, 1].set_xlabel("Time", fontsize=12)
         ax[0, 1].set_ylabel("Weighted Residual (Standard Deviations)", fontsize=12)
-        ax[0, 1].set_ylim(-1.1 * max(abs(all_wres)), 1.1 * max(abs(all_wres)))
+        ax[0, 1].set_ylim(
+            -1.1 * max(abs(res_df["residual_value"])),
+            1.1 * max(abs(res_df["residual_value"])),
+        )
         ax[0, 1].legend(
             loc="upper right", frameon=True, facecolor="white", framealpha=0.9
         )
@@ -596,23 +600,12 @@ class PlottingUtility:
 
         ## Plot vs. predictions
 
-        # Transform WRES dict into a dataframe
-        rows = []
-        for patient_id, content in res.items():
-            rows.append(
-                pd.DataFrame(
-                    {"id": patient_id, res_type: content.res, "time": content.time}
-                )
-            )
-
-        wres_df = pd.concat(rows)
-
         # Merge WRES with predictions, matching patientID and time
         vs_pred_plot_df = pd.merge(
-            wres_df, comparison[["id", "time", "predicted_value"]], on=["id", "time"]
+            res_df, comparison[["id", "time", "predicted_value"]], on=["id", "time"]
         )
 
-        wres_to_plot = vs_pred_plot_df[res_type]
+        wres_to_plot = vs_pred_plot_df["residual_value"]
         pred_to_plot = vs_pred_plot_df["predicted_value"]
         ax[1, 1].set_facecolor("#fdfdfd")
         ax[1, 1].scatter(

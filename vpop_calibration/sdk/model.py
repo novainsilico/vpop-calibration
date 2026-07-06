@@ -19,6 +19,7 @@ def create_nlme_model(
     categorical_attributes: pd.DataFrame | None,
 ) -> NlmeModel:
 
+    # Override the output mode to ensure no plots or progress bars are shown
     config = config._replace(saem=config.saem._replace(mode="cli"))
     simwork_model_binding = SimworkModelBinding(
         path_to_model=model_path,
