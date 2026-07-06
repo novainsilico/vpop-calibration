@@ -27,6 +27,7 @@ class VPCResult:
     def __init__(
         self,
         bins,
+        bin_centers,
         obs_q5,
         obs_q50,
         obs_q95,
@@ -41,6 +42,7 @@ class VPCResult:
         self.pred_q5_ci = pred_q5_ci
         self.pred_q50_ci = pred_q50_ci
         self.pred_q95_ci = pred_q95_ci
+        self.bin_centers = bin_centers
 
 
 class ModelDiagnostics:
@@ -309,36 +311,44 @@ class ModelDiagnostics:
 
         # Observations
         obs_df = df[df["output_name"] == output_name]
-
-        times = obs_df["time"].values
-        bins = np.linspace(times.min(), times.max(), nb_bins + 1)
-
-        obs_times = times
+        obs_times = obs_df["time"].values
         obs_values = obs_df["value"].values
 
+        bins = np.unique(np.quantile(obs_times, np.linspace(0, 1, nb_bins + 1)))
+        actual_nb_bins = len(bins) - 1
+
         obs_bin = np.digitize(obs_times, bins) - 1
+        obs_bin = np.clip(obs_bin, 0, actual_nb_bins - 1)
+
         obs_q5 = []
         obs_q50 = []
         obs_q95 = []
-        for b in range(nb_bins):
+        bin_centers = []
+
+        for b in range(actual_nb_bins):
             vals = obs_values[obs_bin == b]
+            b_times = obs_times[obs_bin == b]
+
             if len(vals) > 0:
                 obs_q5.append(np.quantile(vals, 0.05))
                 obs_q50.append(np.quantile(vals, 0.5))
                 obs_q95.append(np.quantile(vals, 0.95))
+                bin_centers.append(np.median(b_times))
             else:
                 obs_q5.append(np.nan)
                 obs_q50.append(np.nan)
                 obs_q95.append(np.nan)
+                bin_centers.append(0.5 * (bins[b] + bins[b + 1]))
 
         sim_times = df.loc[selected_idx, "time"].values
-        sim_bin = np.clip(np.digitize(sim_times, bins) - 1, 0, nb_bins - 1)
+        sim_bin = np.digitize(sim_times, bins) - 1
+        sim_bin = np.clip(sim_bin, 0, actual_nb_bins - 1)
 
         pred_q5_ci = []
         pred_q50_ci = []
         pred_q95_ci = []
 
-        for b in range(nb_bins):
+        for b in range(actual_nb_bins):
             idx = np.where(sim_bin == b)[0]
 
             if len(idx) == 0:
@@ -347,20 +357,11 @@ class ModelDiagnostics:
                 pred_q95_ci.append((np.nan, np.nan))
                 continue
 
-            q5_per_sim = []
-            q50_per_sim = []
-            q95_per_sim = []
+            sim_vals_in_bin = pred[:, idx]
 
-            for s in range(pred.shape[0]):
-                sim_vals = pred[s, idx]
-
-                q5_per_sim.append(np.quantile(sim_vals, 0.05))
-                q50_per_sim.append(np.quantile(sim_vals, 0.5))
-                q95_per_sim.append(np.quantile(sim_vals, 0.95))
-
-            q5_per_sim = np.array(q5_per_sim)
-            q50_per_sim = np.array(q50_per_sim)
-            q95_per_sim = np.array(q95_per_sim)
+            q5_per_sim = np.quantile(sim_vals_in_bin, 0.05, axis=1)
+            q50_per_sim = np.quantile(sim_vals_in_bin, 0.5, axis=1)
+            q95_per_sim = np.quantile(sim_vals_in_bin, 0.95, axis=1)
 
             pred_q5_ci.append(np.percentile(q5_per_sim, [2.5, 97.5]))
             pred_q50_ci.append(np.percentile(q50_per_sim, [2.5, 97.5]))
@@ -368,6 +369,7 @@ class ModelDiagnostics:
 
         self.vpc = VPCResult(
             bins=bins,
+            bin_centers=np.array(bin_centers),
             obs_q5=np.array(obs_q5),
             obs_q50=np.array(obs_q50),
             obs_q95=np.array(obs_q95),

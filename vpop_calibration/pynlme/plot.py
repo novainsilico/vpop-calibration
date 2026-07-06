@@ -745,8 +745,7 @@ class PlottingUtility:
 
         fig, ax = plt.subplots(1, 1, figsize=(facet_width, facet_height))
 
-        bins = vpc.bins
-        bin_centers = 0.5 * (bins[:-1] + bins[1:])
+        bin_centers = vpc.bin_centers
 
         ax.grid(True, linestyle="--", alpha=0.6, which="both")
         ax.set_facecolor("#fdfdfd")
@@ -757,7 +756,7 @@ class PlottingUtility:
             color="#033a0d",
             linestyle="--",
             linewidth=2,
-            label="Empirical mean",
+            label="Empirical q5",
         )
 
         ax.plot(
@@ -774,7 +773,7 @@ class PlottingUtility:
             color="#033a0d",
             linestyle="--",
             linewidth=2,
-            label="Empirical mean",
+            label="Empirical q95",
         )
 
         ax.fill_between(
