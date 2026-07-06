@@ -32,13 +32,13 @@ class PlottingUtility:
             gp_model_struct, StructuralGp
         ), "Posterior surrogate validity check only implemented for GP structural model."
 
-        if self.model_diag.individual_ebe_estimates_df is None:
-            self.model_diag.compute_ebe()
-        assert self.model_diag.individual_ebe_estimates_df is not None
+        if self.model_diag.EbeEstimates.individual_ebe_estimates_df is None:
+            self.model_diag.sample_conditional_distribution()
+        assert self.model_diag.EbeEstimates.individual_ebe_estimates_df is not None
         gp_model: GP = gp_model_struct.gp_model
         train_data = gp_model.data.full_df_raw[pdus].drop_duplicates()
 
-        map_data = self.model_diag.individual_ebe_estimates_df
+        map_data = self.model_diag.EbeEstimates.individual_ebe_estimates_df
         patients = self.model_diag.model.patients
 
         n_plots = len(pdus)
@@ -126,10 +126,10 @@ class PlottingUtility:
         facet_height: float = 4.0,
         max_iter: int = 100,
     ) -> None:
-        if self.model_diag.individual_ebe_predictions_df is None:
-            self.model_diag.compute_ebe(max_iter)
-        assert self.model_diag.individual_ebe_predictions_df is not None
-        obs_vs_simulated = self.model_diag.individual_ebe_predictions_df
+        if self.model_diag.EbeEstimates.individual_ebe_predictions_df is None:
+            self.model_diag.sample_conditional_distribution(max_iter)
+        assert self.model_diag.EbeEstimates.individual_ebe_predictions_df is not None
+        obs_vs_simulated = self.model_diag.EbeEstimates.individual_ebe_predictions_df
 
         n_cols = self.model_diag.model.nb_outputs
         n_rows = self.model_diag.model.nb_protocols
@@ -200,19 +200,19 @@ class PlottingUtility:
             total_patient_num = self.model_diag.model.nb_patients
             patient_num = rand.randrange(total_patient_num)
 
-        if self.model_diag.individual_ebe_predictions_df is None:
-            self.model_diag.compute_ebe()
-        assert self.model_diag.individual_ebe_predictions_df is not None
-        assert self.model_diag.individual_ebe_estimates_df is not None
+        if self.model_diag.EbeEstimates.individual_ebe_predictions_df is None:
+            self.model_diag.sample_conditional_distribution()
+        assert self.model_diag.EbeEstimates.individual_ebe_predictions_df is not None
+        assert self.model_diag.EbeEstimates.individual_ebe_estimates_df is not None
         # Filter datasets for the selected patient
-        obs_vs_simulated = self.model_diag.individual_ebe_predictions_df
+        obs_vs_simulated = self.model_diag.EbeEstimates.individual_ebe_predictions_df
 
         patient_ind = self.model_diag.model.patients[patient_num]
         patient_data = obs_vs_simulated.loc[obs_vs_simulated["id"] == patient_ind]
 
         # Print patient parameters if verbose selected
         if verbose:
-            patient_params = self.model_diag.individual_ebe_estimates_df
+            patient_params = self.model_diag.EbeEstimates.individual_ebe_estimates_df
             print(patient_params.loc[patient_params["id"] == patient_ind])
 
         # Initialize subplots
@@ -283,10 +283,10 @@ class PlottingUtility:
         randomize: bool = False,
     ) -> None:
 
-        if self.model_diag.individual_ebe_predictions_df is None:
-            self.model_diag.compute_ebe()
-        assert self.model_diag.individual_ebe_predictions_df is not None
-        obs_vs_simulated = self.model_diag.individual_ebe_predictions_df
+        if self.model_diag.EbeEstimates.individual_ebe_predictions_df is None:
+            self.model_diag.sample_conditional_distribution()
+        assert self.model_diag.EbeEstimates.individual_ebe_predictions_df is not None
+        obs_vs_simulated = self.model_diag.EbeEstimates.individual_ebe_predictions_df
 
         # Plot all patients by default
         if (
@@ -381,10 +381,10 @@ class PlottingUtility:
         tolerance_pct: int = 50,
     ) -> None:
 
-        if self.model_diag.individual_ebe_predictions_df is None:
-            self.model_diag.compute_ebe()
-        assert self.model_diag.individual_ebe_predictions_df is not None
-        obs_vs_simulated = self.model_diag.individual_ebe_predictions_df
+        if self.model_diag.EbeEstimates.individual_ebe_predictions_df is None:
+            self.model_diag.sample_conditional_distribution()
+        assert self.model_diag.EbeEstimates.individual_ebe_predictions_df is not None
+        obs_vs_simulated = self.model_diag.EbeEstimates.individual_ebe_predictions_df
 
         num_plots = self.model_diag.model.nb_outputs
         fig, axes = plt.subplots(
@@ -523,10 +523,12 @@ class PlottingUtility:
             assert self.model_diag.population_parameters_predictions_df is not None
             comparison_df = self.model_diag.population_parameters_predictions_df
         else:
-            if self.model_diag.individual_ebe_predictions_df is None:
-                self.model_diag.compute_ebe()
-            assert self.model_diag.individual_ebe_predictions_df is not None
-            comparison_df = self.model_diag.individual_ebe_predictions_df
+            if self.model_diag.EbeEstimates.individual_ebe_predictions_df is None:
+                self.model_diag.sample_conditional_distribution()
+            assert (
+                self.model_diag.EbeEstimates.individual_ebe_predictions_df is not None
+            )
+            comparison_df = self.model_diag.EbeEstimates.individual_ebe_predictions_df
         self.residual_values(
             res=wres_results,
             comparison=comparison_df,
@@ -679,9 +681,9 @@ class PlottingUtility:
         )
 
         # Get EBE estimates for descriptors
-        if self.model_diag.individual_ebe_estimates_tensor is None:
-            self.model_diag.compute_ebe()
-        ebe_theta = self.model_diag.individual_ebe_estimates_tensor
+        if self.model_diag.EbeEstimates.individual_ebe_estimates_tensor is None:
+            self.model_diag.sample_conditional_distribution()
+        ebe_theta = self.model_diag.EbeEstimates.individual_ebe_estimates_tensor
         assert ebe_theta is not None
 
         for k in range(n_patients_to_plot):

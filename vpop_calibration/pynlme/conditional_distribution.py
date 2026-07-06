@@ -1,5 +1,6 @@
 from tqdm import tqdm
 import torch
+import pandas as pd
 from typing import NamedTuple
 import numpy as np
 import matplotlib.pyplot as plt
@@ -14,6 +15,12 @@ from vpop_calibration.metropolis_hastings import MetropolisHastingsState, mh_ste
 class ConditionalDistribSamples(NamedTuple):
     samples: torch.Tensor
     log_prob: torch.Tensor
+
+
+class EbeEstimates(NamedTuple):
+    individual_ebe_estimates_tensor: torch.Tensor | None = None
+    individual_ebe_estimates_df: pd.DataFrame | None = None
+    individual_ebe_predictions_df: pd.DataFrame | None = None
 
 
 def sample_conditional_distribution_nlme(
@@ -92,7 +99,39 @@ def sample_conditional_distribution_nlme(
         nb_samples,
         nlme_model.nb_patients,
     ), f"{log_probs.shape},({nb_samples, nlme_model.nb_patients})"
-    return ConditionalDistribSamples(samples=samples, log_prob=log_probs)
+
+    _, best_sample_id = log_probs.max(
+        dim=0,
+    )
+    range_indexing = torch.arange(nlme_model.nb_patients)
+    ebe_etas = samples[best_sample_id, range_indexing, :].unsqueeze(0)
+    ebe_pdus = nlme_model.convert_etas_to_gaussian_all_patients(ebe_etas)
+    assert ebe_pdus.shape == (
+        1,
+        nlme_model.nb_patients,
+        nlme_model.nb_pdu,
+    ), ebe_pdus.shape
+    individual_ebe_estimates_tensor = nlme_model.convert_gaussian_to_physical(
+        ebe_pdus, nlme_model.log_mi
+    )
+    # Compute predictions for these estimates, and store in a data frame
+    theta = nlme_model.convert_physical_to_thetas_all_patients(
+        individual_ebe_estimates_tensor
+    )
+    individual_ebe_estimates_df = nlme_model.convert_theta_to_dataframe(theta)
+    model_inputs = nlme_model.convert_thetas_to_model_parameters_all_patients(theta)
+    individual_ebe_pred, _ = nlme_model.predict_all_patients(model_inputs)
+    individual_ebe_predictions_df = nlme_model.data.full_obs.to_pandas(
+        prediction=individual_ebe_pred
+    )
+    return (
+        ConditionalDistribSamples(samples=samples, log_prob=log_probs),
+        EbeEstimates(
+            individual_ebe_estimates_df=individual_ebe_estimates_df,
+            individual_ebe_estimates_tensor=individual_ebe_estimates_tensor,
+            individual_ebe_predictions_df=individual_ebe_predictions_df,
+        ),
+    )
 
 
 def _build_ebe_convergence_plot(plot_indiv_figsize=(5.0, 3.0)):
