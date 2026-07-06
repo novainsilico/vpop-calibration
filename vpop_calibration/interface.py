@@ -1,13 +1,14 @@
 import pandas as pd
 from pandera.typing import DataFrame
 from typing import Literal, NamedTuple
-from functools import wraps
 
-from vpop_calibration.pynlme.model import StatisticalModel
 from vpop_calibration.structural_model import StructuralModel
+from vpop_calibration.pynlme.model import StatisticalModel
 from vpop_calibration.pynlme.data import ObsData
 from vpop_calibration.pynlme.params import MixedEffectParameters
 from vpop_calibration.pynlme.diagnostics import ModelDiagnostics
+from vpop_calibration.pynlme.plot import PlottingUtility
+from vpop_calibration.pynlme.config import NlmeConfigDict
 from vpop_calibration.saem.optimizer import PySaem
 from vpop_calibration.saem.config import SaemConfigDict
 from vpop_calibration.pynlme.plot import PlottingUtility
