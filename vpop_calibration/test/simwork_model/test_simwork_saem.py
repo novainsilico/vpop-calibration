@@ -78,5 +78,4 @@ def test_simwork_saem(sample_nlme_params, obs_data, simwork_model):
         config=config,
     )
     nlme_model.optimizer.run()
-    nlme_model.diagnostics.compute_ebe()
     nlme_model.diagnostics.sample_conditional_distribution()

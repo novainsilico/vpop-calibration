@@ -78,5 +78,4 @@ def test_analytical_saem(sample_nlme_params, obs_data, struct_model):
         prior_params=sample_nlme_params,
     )
     nlme_model.optimizer.run()
-    nlme_model.diagnostics.compute_ebe()
     nlme_model.diagnostics.sample_conditional_distribution()

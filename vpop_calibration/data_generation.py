@@ -11,6 +11,7 @@ from vpop_calibration.pynlme.params import MixedEffectParameters
 from vpop_calibration.pynlme.model import StatisticalModel
 from vpop_calibration.pynlme.data import ObsData
 from vpop_calibration.pynlme.residuals import add_predictive_error
+from vpop_calibration.pynlme.config import NlmeConfigDict
 from vpop_calibration.config import smoke_test
 
 
@@ -184,8 +185,9 @@ def generate_synthetic_data(
     assert params.pdk == [], "PDK are not yet supported in data generation."
     assert params.covariate_names == [], "Covariates are not yet supported."
     # Create the nlme model
+    config = NlmeConfigDict(nb_chains=1)
     nlme_model = StatisticalModel(
-        structural_model=struct_model, dataset=data, prior_params=params, nb_chains=1
+        structural_model=struct_model, dataset=data, prior_params=params, config=config
     )
     # Prepare model inputs
     eta = nlme_model.sample_etas(1)

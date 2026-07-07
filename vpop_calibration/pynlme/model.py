@@ -8,6 +8,7 @@ from vpop_calibration.pynlme.indexing import ObservationIndex
 from vpop_calibration.pynlme.params import MixedEffectParameters, ErrorType
 from vpop_calibration.pynlme.utils import init_transform_function
 from vpop_calibration.pynlme.residuals import log_likelihood_observation
+from vpop_calibration.pynlme.config import NlmeConfigDict
 from vpop_calibration.config import device
 
 
@@ -23,7 +24,7 @@ class StatisticalModel:
         structural_model: StructuralModel,
         dataset: ObsData,
         prior_params: MixedEffectParameters,
-        nb_chains: int = 1,
+        config: NlmeConfigDict = NlmeConfigDict(),
     ):
         """Non-linear mixed effects model
 
@@ -39,6 +40,7 @@ class StatisticalModel:
         self.structural_model = structural_model
         self.data = dataset
         self.prior_params = prior_params
+        self.config = config
 
         # -- Attributes initialization
         self.mi_names = self.prior_params.mi_names
@@ -56,7 +58,7 @@ class StatisticalModel:
         self.covariate_coeff_names = self.prior_params.covariate_coeff_names
         self.patients = self.data.patients
         self.nb_patients = len(self.patients)
-        self.nb_chains = nb_chains
+        self.nb_chains = self.config.nb_chains
 
         # -- Validation
         # Validate observed data against the user-specified parameters

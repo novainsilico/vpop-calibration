@@ -5,6 +5,7 @@ from typing import NamedTuple
 import numpy as np
 import matplotlib.pyplot as plt
 from IPython.display import display
+import numpy as np
 
 
 from vpop_calibration.pynlme.model import StatisticalModel
@@ -13,192 +14,164 @@ from vpop_calibration.metropolis_hastings import MetropolisHastingsState, mh_ste
 
 
 class ConditionalDistribSamples(NamedTuple):
-    samples: torch.Tensor
+    eta_samples: torch.Tensor
+    physical_params_samples: torch.Tensor
+    predictions: torch.Tensor
     log_prob: torch.Tensor
 
 
-class EbeEstimates(NamedTuple):
-    individual_ebe_estimates_tensor: torch.Tensor | None = None
-    individual_ebe_estimates_df: pd.DataFrame | None = None
-    individual_ebe_predictions_df: pd.DataFrame | None = None
+class ConditionalDistributionSampler:
+    def __init__(
+        self,
+        nlme_model: StatisticalModel,
+    ):
+        self.model = nlme_model
+        self.live_plot = self.model.config.live_plot
+        self.progress_bar = self.model.config.progress_bar
+        self.plot_frequency = self.model.config.plot_frequency
 
+    def init_samples(self):
+        if smoke_test:
+            nb_samples = 2
 
-def sample_conditional_distribution_nlme(
-    nlme_model: StatisticalModel,
-    nb_samples: int = 100,
-    nb_burn_in: int = 0,
-    plot_frequency: int = 5,
-) -> ConditionalDistribSamples:
-    """
-    Sample random effects from the conditional distribution
-    """
+        if self.live_plot:
+            self.build_convergence_plot()
 
-    if smoke_test:
-        nb_samples = 2
-        nb_burn_in = 1
+        # Initiate samples
+        init_etas = self.model.sample_etas(1)
+        init_predictions = self.model.log_posterior_etas_all_patients(init_etas)
+        self.current_state = MetropolisHastingsState(
+            etas=init_etas,
+            gaussian_params=init_predictions.gaussian_params,
+            prediction=init_predictions.predictions,
+            log_prob=init_predictions.log_posterior,
+            step_size=0.1,
+            complete_likelihood=init_predictions.predictions.sum(dim=0),
+        )
+        init_samples = ConditionalDistribSamples(
+            eta_samples=init_etas,
+            physical_params_samples=self.current_state.gaussian_params,
+            predictions=self.current_state.prediction,
+            log_prob=self.current_state.log_prob,
+        )
+        self.samples: list[ConditionalDistribSamples] = [init_samples]
+        self.ebe: ConditionalDistribSamples = init_samples
+        self.nb_improved_history: list[float] = [0]
+        self.mean_improved_history: list[float] = [0]
 
-    init_etas = nlme_model.sample_etas(1)
-    init_predictions = nlme_model.log_posterior_etas_all_patients(init_etas)
-    current_state = MetropolisHastingsState(
-        etas=init_etas,
-        gaussian_params=init_predictions.gaussian_params,
-        prediction=init_predictions.predictions,
-        log_prob=init_predictions.log_posterior,
-        step_size=0.1,
-        complete_likelihood=init_predictions.predictions.sum(dim=0),
-    )
-    sample_list = []
-    log_prob_list = []
-    best_log_prob = current_state.log_prob.clone()
-    num_improved_history = []
-    mean_gain_history = []
-    handle, fig, axes, ebe_traces = _build_ebe_convergence_plot()
-    print(f"Sampling conditional distribution on {nb_samples} samples:")
-    for i in tqdm(range(nb_burn_in + nb_samples)):
-        current_state = mh_step(
-            nlme_model=nlme_model,
-            previous_state=current_state,
-            learning_rate=0.0,
+    def run_sampler(self, nb_samples: int = 100):
+        self.init_samples()
+
+        for _ in tqdm(range(nb_samples), disable=not self.progress_bar):
+            self.current_state = mh_step(
+                self.model, previous_state=self.current_state, learning_rate=0.0
+            )
+            new_samples = ConditionalDistribSamples(
+                eta_samples=self.current_state.etas,
+                physical_params_samples=self.current_state.gaussian_params,
+                predictions=self.current_state.prediction,
+                log_prob=self.current_state.log_prob,
+            )
+            self.samples.append(new_samples)
+            self.update_ebe(new_samples)
+            if self.live_plot:
+                self.update_convergence_plot()
+
+    def update_ebe(self, new_samples: ConditionalDistribSamples):
+        # Assemble as mask to accept or reject new EBEs
+        accept_mask = self.ebe.log_prob < new_samples.log_prob
+        # size (nb_patients)
+        new_eta = torch.where(
+            accept_mask.view(-1, 1), new_samples.eta_samples, self.ebe.eta_samples
+        )
+        new_physical = torch.where(
+            accept_mask.view(-1, 1),
+            new_samples.physical_params_samples,
+            self.ebe.physical_params_samples,
+        )
+        accept_mask_predictions = accept_mask.index_select(
+            1, self.model.data.full_obs.obs_index.id.index_values
+        )
+        new_pred = torch.where(
+            accept_mask_predictions, new_samples.predictions, self.ebe.predictions
+        )
+        new_log_prob = torch.where(accept_mask, new_samples.log_prob, self.ebe.log_prob)
+        self.ebe = ConditionalDistribSamples(
+            eta_samples=new_eta,
+            physical_params_samples=new_physical,
+            predictions=new_pred,
+            log_prob=new_log_prob,
         )
 
-        if i >= nb_burn_in:
-            sample_list.append(current_state.etas)
-            log_prob_list.append(current_state.log_prob)
+        nb_improved = accept_mask.float().sum().item()
+        self.nb_improved_history.append(nb_improved)
+        mean_improved = accept_mask.float().mean().item()
+        self.mean_improved_history.append(mean_improved)
 
-            delta = current_state.log_prob - best_log_prob
-            num_improved = (delta > 0).sum().item()
-            mean_gain = delta.clamp(min=0).mean().item()
+    def build_convergence_plot(self, plot_indiv_figsize=(5.0, 3.0)):
+        self.fig, self.axes = plt.subplots(
+            2, 1, figsize=plot_indiv_figsize, sharex=True
+        )
 
-            num_improved_history.append(num_improved)
-            mean_gain_history.append(mean_gain)
-            best_log_prob = torch.maximum(
-                best_log_prob,
-                current_state.log_prob,
-            )
-            if i % plot_frequency == 0:
-                _update_ebe_convergence_plot(
-                    handle,
-                    fig,
-                    axes,
-                    ebe_traces,
-                    num_improved_history,
-                    mean_gain_history,
-                )
+        for ax in self.axes:
+            ax.grid(True)
 
-    _update_ebe_convergence_plot(
-        handle, fig, axes, ebe_traces, num_improved_history, mean_gain_history
-    )
-    samples = torch.stack(sample_list).squeeze(1)
-    log_probs = torch.stack(log_prob_list).squeeze(1)
-    assert samples.shape == (
-        nb_samples,
-        nlme_model.nb_patients,
-        nlme_model.nb_pdu,
-    )
-    assert log_probs.shape == (
-        nb_samples,
-        nlme_model.nb_patients,
-    ), f"{log_probs.shape},({nb_samples, nlme_model.nb_patients})"
+        self.axes[0].set_title("EBE convergence")
 
-    _, best_sample_id = log_probs.max(
-        dim=0,
-    )
-    range_indexing = torch.arange(nlme_model.nb_patients)
-    ebe_etas = samples[best_sample_id, range_indexing, :].unsqueeze(0)
-    ebe_pdus = nlme_model.convert_etas_to_gaussian_all_patients(ebe_etas)
-    assert ebe_pdus.shape == (
-        1,
-        nlme_model.nb_patients,
-        nlme_model.nb_pdu,
-    ), ebe_pdus.shape
-    individual_ebe_estimates_tensor = nlme_model.convert_gaussian_to_physical(
-        ebe_pdus, nlme_model.log_mi
-    )
-    # Compute predictions for these estimates, and store in a data frame
-    theta = nlme_model.convert_physical_to_thetas_all_patients(
-        individual_ebe_estimates_tensor
-    )
-    individual_ebe_estimates_df = nlme_model.convert_theta_to_dataframe(theta)
-    model_inputs = nlme_model.convert_thetas_to_model_parameters_all_patients(theta)
-    individual_ebe_pred, _ = nlme_model.predict_all_patients(model_inputs)
-    individual_ebe_predictions_df = nlme_model.data.full_obs.to_pandas(
-        prediction=individual_ebe_pred
-    )
-    return (
-        ConditionalDistribSamples(samples=samples, log_prob=log_probs),
-        EbeEstimates(
-            individual_ebe_estimates_df=individual_ebe_estimates_df,
-            individual_ebe_estimates_tensor=individual_ebe_estimates_tensor,
-            individual_ebe_predictions_df=individual_ebe_predictions_df,
-        ),
-    )
+        self.axes[0].set_ylabel("Patients improved")
+        self.axes[1].set_ylabel("Mean LL gain")
+        self.axes[1].set_xlabel("Iteration")
 
+        (line1_raw,) = self.axes[0].plot([], color="lightgray", linewidth=1)
+        (line1_ma,) = self.axes[0].plot([], linewidth=2)
+        (line2_raw,) = self.axes[1].plot([], color="lightgray", linewidth=1)
+        (line2_ma,) = self.axes[1].plot([], linewidth=2)
 
-def _build_ebe_convergence_plot(plot_indiv_figsize=(5.0, 3.0)):
-    fig, axes = plt.subplots(2, 1, figsize=plot_indiv_figsize, sharex=True)
+        self.traces = {
+            "num_improved": line1_raw,
+            "num_improved_ma": line1_ma,
+            "mean_gain": line2_raw,
+            "mean_gain_ma": line2_ma,
+        }
+        if not smoke_test:
+            self.handle = display(self.fig, display_id=True)
 
-    for ax in axes:
-        ax.grid(True)
+    def update_convergence_plot(self):
 
-    axes[0].set_title("EBE convergence")
+        x = np.arange(len(self.nb_improved_history))
 
-    axes[0].set_ylabel("Patients improved")
-    axes[1].set_ylabel("Mean LL gain")
-    axes[1].set_xlabel("Iteration")
+        mean_gain_ma = moving_average(self.mean_improved_history, window=20)
+        num_improved_ma = moving_average(self.nb_improved_history, window=20)
 
-    (line1_raw,) = axes[0].plot([], color="lightgray", linewidth=1)
-    (line1_ma,) = axes[0].plot([], linewidth=2)
-    (line2_raw,) = axes[1].plot([], color="lightgray", linewidth=1)
-    (line2_ma,) = axes[1].plot([], linewidth=2)
+        self.traces["num_improved"].set_data(
+            x,
+            self.nb_improved_history,
+        )
+        self.traces["num_improved_ma"].set_data(
+            x,
+            num_improved_ma,
+        )
+        self.traces["mean_gain"].set_data(
+            x,
+            self.mean_improved_history,
+        )
+        self.traces["mean_gain_ma"].set_data(
+            x,
+            mean_gain_ma,
+        )
 
-    ebe_traces = {
-        "num_improved": line1_raw,
-        "num_improved_ma": line1_ma,
-        "mean_gain": line2_raw,
-        "mean_gain_ma": line2_ma,
-    }
+        if not smoke_test:
+            for ax in self.axes:
+                ax.relim()
+                ax.autoscale_view()
 
-    handle = display(fig, display_id=True)
-
-    return handle, fig, axes, ebe_traces
-
-
-def _update_ebe_convergence_plot(
-    handle, fig, axes, ebe_traces, num_improved_history: list, mean_gain_history: list
-):
-
-    x = np.arange(len(num_improved_history))
-
-    mean_gain_ma = moving_average(mean_gain_history, window=20)
-    num_improved_ma = moving_average(num_improved_history, window=20)
-
-    ebe_traces["num_improved"].set_data(
-        x,
-        num_improved_history,
-    )
-    ebe_traces["num_improved_ma"].set_data(
-        x,
-        num_improved_ma,
-    )
-    ebe_traces["mean_gain"].set_data(
-        x,
-        mean_gain_history,
-    )
-    ebe_traces["mean_gain_ma"].set_data(
-        x,
-        mean_gain_ma,
-    )
-
-    for ax in axes:
-        ax.relim()
-        ax.autoscale_view()
-
-    if handle is not None:
-        handle.update(fig)
+        if hasattr(self, "handle"):
+            if self.handle is not None:
+                self.handle.update(self.fig)
 
 
 def moving_average(x: list[float], window: int = 20) -> np.ndarray:
-    x = np.asarray(x, dtype=float)
+    x_arr = np.asarray(x, dtype=float)
     if len(x) < window:
-        return x
-    return np.convolve(x, np.ones(window) / window, mode="same")
+        return x_arr
+    return np.convolve(x_arr, np.ones(window) / window, mode="same")

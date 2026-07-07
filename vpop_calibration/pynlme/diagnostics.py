@@ -10,9 +10,7 @@ from vpop_calibration.pynlme.residuals import (
 )
 from vpop_calibration.config import smoke_test
 from vpop_calibration.pynlme.conditional_distribution import (
-    sample_conditional_distribution_nlme,
-    ConditionalDistribSamples,
-    EbeEstimates,
+    ConditionalDistributionSampler,
 )
 
 
@@ -26,14 +24,22 @@ ModelResiduals = dict[str, PatientResiduals]
 
 
 class ModelDiagnostics:
-    def __init__(self, nlme_model: StatisticalModel):
+    def __init__(
+        self,
+        nlme_model: StatisticalModel,
+    ):
         self.model = nlme_model
         self.population_parameters_predictions_df: pd.DataFrame | None = None
         self.pwres: ModelResiduals | None = None
         self.iwres: ModelResiduals | None = None
         self.npde: ModelResiduals | None = None
-        self.conditional_distribution_samples: ConditionalDistribSamples | None = None
-        self.EbeEstimates: EbeEstimates | None = None
+        self.sampler = ConditionalDistributionSampler(nlme_model=self.model)
+
+    def sample_conditional_distribution(
+        self,
+        nb_samples: int = 100,
+    ) -> None:
+        self.sampler.run_sampler(nb_samples=nb_samples)
 
     def compute_iwres(self) -> None:
         """Compute Individual Weighted Residuals (IWRES), following the formula :
@@ -44,20 +50,21 @@ class ModelDiagnostics:
         Returns:
             dict: IWRES with patientId as key, with IWRES and timesteps for each patient
         """
-        if self.EbeEstimates.individual_ebe_estimates_tensor is None:
+        if not hasattr(self.sampler, "ebe"):
             print("No EBEs available, computing them...")
             self.sample_conditional_distribution()
-        assert self.EbeEstimates.individual_ebe_estimates_tensor is not None
+        assert hasattr(self.sampler, "ebe")
 
-        assert self.EbeEstimates.individual_ebe_estimates_tensor.shape == (
+        ebe_physical_params = self.sampler.ebe.physical_params_samples
+        assert ebe_physical_params.shape == (
             1,
             self.model.nb_patients,
             self.model.nb_pdu + self.model.nb_mi,
-        )
+        ), f"{ebe_physical_params.shape}"
 
         # Assemble the thetas by adding the PDKs
         theta = self.model.convert_physical_to_thetas_all_patients(
-            physical_params=self.EbeEstimates.individual_ebe_estimates_tensor
+            physical_params=ebe_physical_params
         )
         model_inputs = self.model.convert_thetas_to_model_parameters_all_patients(
             theta=theta
@@ -212,17 +219,6 @@ class ModelDiagnostics:
                 time=this_patient_time,
             )
             self.npde.update({patient_id: this_patient_npde})
-
-    def sample_conditional_distribution(
-        self,
-        nb_samples: int = 100,
-        nb_burn_in: int = 0,
-    ) -> None:
-        self.conditional_distribution_samples, self.EbeEstimates = (
-            sample_conditional_distribution_nlme(
-                nlme_model=self.model, nb_samples=nb_samples, nb_burn_in=nb_burn_in
-            )
-        )
 
     def zero_random_effect_predictions(self) -> None:
         eta = torch.zeros((1, self.model.nb_patients, self.model.nb_pdu))

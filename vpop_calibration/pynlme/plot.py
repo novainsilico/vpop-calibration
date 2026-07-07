@@ -32,7 +32,7 @@ class PlottingUtility:
             gp_model_struct, StructuralGp
         ), "Posterior surrogate validity check only implemented for GP structural model."
 
-        if self.model_diag.EbeEstimates.individual_ebe_estimates_df is None:
+        if not hasattr(self.model_diag.sampler, "ebe"):
             self.model_diag.sample_conditional_distribution()
         assert self.model_diag.EbeEstimates.individual_ebe_estimates_df is not None
         gp_model: GP = gp_model_struct.gp_model
@@ -124,10 +124,9 @@ class PlottingUtility:
         self,
         facet_width: float = 5.0,
         facet_height: float = 4.0,
-        max_iter: int = 100,
     ) -> None:
-        if self.model_diag.EbeEstimates.individual_ebe_predictions_df is None:
-            self.model_diag.sample_conditional_distribution(max_iter)
+        if not hasattr(self.model_diag.sampler, "ebe"):
+            self.model_diag.sample_conditional_distribution()
         assert self.model_diag.EbeEstimates.individual_ebe_predictions_df is not None
         obs_vs_simulated = self.model_diag.EbeEstimates.individual_ebe_predictions_df
 
@@ -200,7 +199,7 @@ class PlottingUtility:
             total_patient_num = self.model_diag.model.nb_patients
             patient_num = rand.randrange(total_patient_num)
 
-        if self.model_diag.EbeEstimates.individual_ebe_predictions_df is None:
+        if not hasattr(self.model_diag.sampler, "ebe"):
             self.model_diag.sample_conditional_distribution()
         assert self.model_diag.EbeEstimates.individual_ebe_predictions_df is not None
         assert self.model_diag.EbeEstimates.individual_ebe_estimates_df is not None
@@ -283,7 +282,7 @@ class PlottingUtility:
         randomize: bool = False,
     ) -> None:
 
-        if self.model_diag.EbeEstimates.individual_ebe_predictions_df is None:
+        if not hasattr(self.model_diag.sampler, "ebe"):
             self.model_diag.sample_conditional_distribution()
         assert self.model_diag.EbeEstimates.individual_ebe_predictions_df is not None
         obs_vs_simulated = self.model_diag.EbeEstimates.individual_ebe_predictions_df
@@ -381,7 +380,7 @@ class PlottingUtility:
         tolerance_pct: int = 50,
     ) -> None:
 
-        if self.model_diag.EbeEstimates.individual_ebe_predictions_df is None:
+        if not hasattr(self.model_diag.sampler, "ebe"):
             self.model_diag.sample_conditional_distribution()
         assert self.model_diag.EbeEstimates.individual_ebe_predictions_df is not None
         obs_vs_simulated = self.model_diag.EbeEstimates.individual_ebe_predictions_df
@@ -523,7 +522,7 @@ class PlottingUtility:
             assert self.model_diag.population_parameters_predictions_df is not None
             comparison_df = self.model_diag.population_parameters_predictions_df
         else:
-            if self.model_diag.EbeEstimates.individual_ebe_predictions_df is None:
+            if not hasattr(self.model_diag.sampler, "ebe"):
                 self.model_diag.sample_conditional_distribution()
             assert (
                 self.model_diag.EbeEstimates.individual_ebe_predictions_df is not None
@@ -661,7 +660,7 @@ class PlottingUtility:
         self,
         n_patients_to_plot: int = 3,
     ):
-        if self.model_diag.conditional_distribution_samples is None:
+        if not hasattr(self.model_diag.sampler, "ebe"):
             self.model_diag.sample_conditional_distribution()
         assert self.model_diag.conditional_distribution_samples is not None
         sample_etas = self.model_diag.conditional_distribution_samples.samples
