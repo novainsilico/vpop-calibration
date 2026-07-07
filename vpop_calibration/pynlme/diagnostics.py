@@ -23,26 +23,11 @@ ResidualType = Literal["pwres", "iwres", "npde"]
 ModelResiduals = dict[str, PatientResiduals]
 
 
-class VPCResult:
-    def __init__(
-        self,
-        bins,
-        bin_centers,
-        obs_q5,
-        obs_q50,
-        obs_q95,
-        pred_q5_ci,
-        pred_q50_ci,
-        pred_q95_ci,
-    ):
-        self.bins = bins
-        self.obs_q5 = obs_q5
-        self.obs_q50 = obs_q50
-        self.obs_q95 = obs_q95
-        self.pred_q5_ci = pred_q5_ci
-        self.pred_q50_ci = pred_q50_ci
-        self.pred_q95_ci = pred_q95_ci
-        self.bin_centers = bin_centers
+class VPCResult(NamedTuple):
+    bins: np.ndarray
+    bin_centers: np.ndarray
+    obs_quantiles: Dict[float, np.ndarray]
+    pred_quantiles_ci: Dict[float, np.ndarray]
 
 
 class ModelDiagnostics:
@@ -285,8 +270,8 @@ class ModelDiagnostics:
         self,
         output_name: str,
         nb_samples: int = 100,
-        nb_bins: int = 5,
-        quantiles=(0.05, 0.5, 0.95),
+        nb_bins: int = 30,
+        quantiles: list[float] = [0.05, 0.5, 0.95],
     ) -> None:
 
         if self.conditional_distribution_samples is None:
@@ -304,15 +289,13 @@ class ModelDiagnostics:
         all_pred, _ = self.model.predict_all_patients(model_inputs)
 
         # only keep output_name predicted values
-        df = self.model.data.input_df
-        mask = df["output_name"] == output_name
-        selected_idx = np.where(mask)[0]
-        pred = all_pred[:, selected_idx]
+        df = self.model.data.full_obs.to_pandas(prediction=all_pred)
+        df_output = df[df["output_name"] == output_name]
 
-        # Observations
-        obs_df = df[df["output_name"] == output_name]
-        obs_times = obs_df["time"].values
-        obs_values = obs_df["value"].values
+        obs_times = df_output["time"].values
+        obs_values = df_output["value"].values
+
+        pred = np.vstack(df_output["predicted_value"].values).T
 
         bins = np.unique(np.quantile(obs_times, np.linspace(0, 1, nb_bins + 1)))
         actual_nb_bins = len(bins) - 1
@@ -320,60 +303,44 @@ class ModelDiagnostics:
         obs_bin = np.digitize(obs_times, bins) - 1
         obs_bin = np.clip(obs_bin, 0, actual_nb_bins - 1)
 
-        obs_q5 = []
-        obs_q50 = []
-        obs_q95 = []
         bin_centers = []
+        obs_quantiles_lists = {q: [] for q in quantiles}
+        pred_quantiles_ci_lists = {q: [] for q in quantiles}
 
         for b in range(actual_nb_bins):
-            vals = obs_values[obs_bin == b]
-            b_times = obs_times[obs_bin == b]
+            in_bin = obs_bin == b
+
+            vals = obs_values[in_bin]
+            b_times = obs_times[in_bin]
 
             if len(vals) > 0:
-                obs_q5.append(np.quantile(vals, 0.05))
-                obs_q50.append(np.quantile(vals, 0.5))
-                obs_q95.append(np.quantile(vals, 0.95))
                 bin_centers.append(np.median(b_times))
+                sim_vals_in_bin = pred[:, in_bin]
+
+                for q in quantiles:
+                    obs_quantiles_lists[q].append(np.quantile(vals, q))
+
+                    q_per_sim = np.quantile(sim_vals_in_bin, q, axis=1)
+                    pred_quantiles_ci_lists[q].append(
+                        np.percentile(q_per_sim, [2.5, 97.5])
+                    )
+
             else:
-                obs_q5.append(np.nan)
-                obs_q50.append(np.nan)
-                obs_q95.append(np.nan)
                 bin_centers.append(0.5 * (bins[b] + bins[b + 1]))
+                for q in quantiles:
+                    obs_quantiles_lists[q].append(np.nan)
+                    pred_quantiles_ci_lists[q].append((np.nan, np.nan))
 
-        sim_times = df.loc[selected_idx, "time"].values
-        sim_bin = np.digitize(sim_times, bins) - 1
-        sim_bin = np.clip(sim_bin, 0, actual_nb_bins - 1)
-
-        pred_q5_ci = []
-        pred_q50_ci = []
-        pred_q95_ci = []
-
-        for b in range(actual_nb_bins):
-            idx = np.where(sim_bin == b)[0]
-
-            if len(idx) == 0:
-                pred_q5_ci.append((np.nan, np.nan))
-                pred_q50_ci.append((np.nan, np.nan))
-                pred_q95_ci.append((np.nan, np.nan))
-                continue
-
-            sim_vals_in_bin = pred[:, idx]
-
-            q5_per_sim = np.quantile(sim_vals_in_bin, 0.05, axis=1)
-            q50_per_sim = np.quantile(sim_vals_in_bin, 0.5, axis=1)
-            q95_per_sim = np.quantile(sim_vals_in_bin, 0.95, axis=1)
-
-            pred_q5_ci.append(np.percentile(q5_per_sim, [2.5, 97.5]))
-            pred_q50_ci.append(np.percentile(q50_per_sim, [2.5, 97.5]))
-            pred_q95_ci.append(np.percentile(q95_per_sim, [2.5, 97.5]))
+        final_obs_quantiles = {
+            q: np.array(lst) for q, lst in obs_quantiles_lists.items()
+        }
+        final_pred_quantiles_ci = {
+            q: np.array(lst) for q, lst in pred_quantiles_ci_lists.items()
+        }
 
         self.vpc = VPCResult(
             bins=bins,
             bin_centers=np.array(bin_centers),
-            obs_q5=np.array(obs_q5),
-            obs_q50=np.array(obs_q50),
-            obs_q95=np.array(obs_q95),
-            pred_q5_ci=np.array(pred_q5_ci),
-            pred_q50_ci=np.array(pred_q50_ci),
-            pred_q95_ci=np.array(pred_q95_ci),
+            obs_quantiles=final_obs_quantiles,
+            pred_quantiles_ci=final_pred_quantiles_ci,
         )

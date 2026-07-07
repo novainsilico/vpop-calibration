@@ -736,75 +736,62 @@ class PlottingUtility:
 
     def vpc_plot(
         self,
+        quantiles: list[float] = [0.05, 0.5, 0.95],
+        nb_samples: int = 100,
+        nb_bins: int = 30,
         facet_width: int = 10,
         facet_height: int = 6,
-        show: bool = True,
     ):
-        vpc = self.model_diag.vpc
-        assert vpc is not None, "VPC has not been computed. Run compute_vpc() first."
+        axes_dict = {}
 
-        fig, ax = plt.subplots(1, 1, figsize=(facet_width, facet_height))
+        for output_name in self.model.output_names:
 
-        bin_centers = vpc.bin_centers
+            print(f"Calcul du VPC pour l'output : {output_name}...")
+            self.model_diag.compute_vpc(
+                output_name=output_name,
+                nb_samples=nb_samples,
+                nb_bins=nb_bins,
+                quantiles=quantiles,
+            )
 
-        ax.grid(True, linestyle="--", alpha=0.6, which="both")
-        ax.set_facecolor("#fdfdfd")
+            vpc = self.model_diag.vpc
+            assert vpc is not None
 
-        ax.plot(
-            bin_centers,
-            vpc.obs_q5,
-            color="#033a0d",
-            linestyle="--",
-            linewidth=2,
-            label="Empirical q5",
-        )
+            fig, ax = plt.subplots(1, 1, figsize=(facet_width, facet_height))
+            bin_centers = vpc.bin_centers
 
-        ax.plot(
-            bin_centers,
-            vpc.obs_q50,
-            color="#033a0d",
-            linestyle="--",
-            linewidth=2,
-            label="Empirical mean",
-        )
-        ax.plot(
-            bin_centers,
-            vpc.obs_q95,
-            color="#033a0d",
-            linestyle="--",
-            linewidth=2,
-            label="Empirical q95",
-        )
+            ax.grid(True, linestyle="--", alpha=0.3, which="both")
+            ax.set_facecolor("#fdfdfd")
 
-        ax.fill_between(
-            bin_centers,
-            vpc.pred_q95_ci[:, 0],
-            vpc.pred_q95_ci[:, 1],
-            color="#618386",
-            alpha=0.15,
-        )
-        ax.fill_between(
-            bin_centers,
-            vpc.pred_q5_ci[:, 0],
-            vpc.pred_q5_ci[:, 1],
-            color="#618386",
-            alpha=0.15,
-        )
-        ax.fill_between(
-            bin_centers,
-            vpc.pred_q50_ci[:, 0],
-            vpc.pred_q50_ci[:, 1],
-            color="#ED82DE",
-            alpha=0.15,
-        )
+            for i, (q, obs_q_values) in enumerate(vpc.obs_quantiles.items()):
+                label = "Empirical quantiles" if i == 0 else None
+                ax.plot(
+                    bin_centers,
+                    obs_q_values,
+                    color="#033a0d",
+                    linestyle="--",
+                    linewidth=2,
+                    label=label,
+                )
 
-        ax.set_xlabel("Time")
-        ax.set_ylabel("Observation")
-        ax.set_title("Visual Predictive Check")
-        ax.legend()
-        ax.grid(True, alpha=0.3)
+            for i, (q, ci) in enumerate(vpc.pred_quantiles_ci.items()):
+                label = "95% Prediction CI" if i == 0 else None
+                ax.fill_between(
+                    bin_centers,
+                    ci[:, 0],
+                    ci[:, 1],
+                    color="#ED82DE",
+                    alpha=0.15,
+                    label=label,
+                )
 
-        if show:
-            plt.show()
+            ax.set_xlabel("Time")
+            ax.set_ylabel("Observation")
+            ax.set_title(f"Visual Predictive Check : {output_name}")
+            ax.legend()
 
-        return ax
+            plt.tight_layout()
+
+            axes_dict[output_name] = ax
+
+        plt.show()
