@@ -32,9 +32,9 @@ class ModelDiagnostics:
     ):
         self.model = nlme_model
         self.population_parameters_predictions_df: pd.DataFrame | None = None
-        self.pwres: ModelResiduals | None = None
-        self.iwres: ModelResiduals | None = None
-        self.npde: ModelResiduals | None = None
+        self.pwres: pa.typing.DataFrame[WeightedResidualsSchema] | None = None
+        self.iwres: pa.typing.DataFrame[WeightedResidualsSchema] | None = None
+        self.npde: pa.typing.DataFrame[WeightedResidualsSchema] | None = None
         self.sampler = ConditionalDistributionSampler(nlme_model=self.model)
         self.shrinkage: torch.Tensor | None = None
         self.vpc: pd.DataFrame | None = None

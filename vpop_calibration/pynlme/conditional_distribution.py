@@ -198,7 +198,7 @@ class ConditionalDistributionSampler:
         theta = self.model.convert_physical_to_thetas_all_patients(
             self.ebe.physical_params_samples
         )
-        df = self.model.convert_theta_to_dataframe(theta)
+        df = self.add_unique_id(self.model.convert_theta_to_dataframe(theta))
         return df
 
     @property
@@ -221,18 +221,37 @@ class ConditionalDistributionSampler:
         return out
 
     @property
+    def total_samples_parameters_df(self) -> pd.DataFrame:
+        all_df = []
+        for sample in self.samples:
+            this_sample_theta = self.model.convert_physical_to_thetas_all_patients(
+                sample.physical_params_samples
+            )
+            this_sample_df = self.add_unique_id(
+                self.model.convert_theta_to_dataframe(this_sample_theta)
+            )
+            all_df.append(this_sample_df)
+        total_df = pd.concat(all_df)
+        return total_df
+
+    @property
     def total_samples_predictions_df(self) -> pd.DataFrame:
         all_df = []
         for i, sample in enumerate(self.samples):
-            this_sample_df = self.model.data.full_obs.to_pandas(
-                prediction=sample.predictions
-            ).rename(columns={"id": "ref_id"})
-            new_ids = {patient: str(uuid.uuid4()) for patient in self.model.patients}
-            this_sample_df["id"] = this_sample_df["ref_id"].map(new_ids)
+            this_sample_df = self.add_unique_id(
+                self.model.data.full_obs.to_pandas(prediction=sample.predictions)
+            )
             this_sample_df["batch_id"] = i
             all_df.append(this_sample_df)
         total_df = pd.concat(all_df)
         return total_df
+
+    def add_unique_id(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Create  a new `id` column with unique values, store the patient id in `id_ref`."""
+        out_df = df.rename(columns={"id": "id_ref"})
+        new_ids = {patient: str(uuid.uuid4()) for patient in self.model.patients}
+        out_df["id"] = out_df["id_ref"].map(new_ids)
+        return out_df
 
 
 def moving_average(x: list[float], window: int = 20) -> np.ndarray:
