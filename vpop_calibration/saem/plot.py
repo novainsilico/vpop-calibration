@@ -40,6 +40,11 @@ class OptimizerPlot:
             ax.set_title(header)
             ax.grid(True)
             self.traces.update({header: tr})
+        for plot_idx in range(self.nb_plots, self.nb_rows * self.nb_cols):
+            row, col = plot_idx // self.nb_cols, plot_idx % self.nb_cols
+            ax = self.axes[row, col]
+            ax.axis("off")
+
         if not smoke_test:
             plt.tight_layout()
             self.handle = display(self.fig, display_id=True)

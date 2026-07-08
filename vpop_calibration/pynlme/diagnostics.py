@@ -10,8 +10,7 @@ from vpop_calibration.pynlme.residuals import (
 )
 from vpop_calibration.config import smoke_test
 from vpop_calibration.pynlme.conditional_distribution import (
-    sample_conditional_distribution_nlme,
-    ConditionalDistribSamples,
+    ConditionalDistributionSampler,
 )
 
 
@@ -25,52 +24,22 @@ ModelResiduals = dict[str, PatientResiduals]
 
 
 class ModelDiagnostics:
-    def __init__(self, nlme_model: StatisticalModel):
+    def __init__(
+        self,
+        nlme_model: StatisticalModel,
+    ):
         self.model = nlme_model
-        self.individual_ebe_estimates_tensor: torch.Tensor | None = None
-        self.individual_ebe_estimates_df: pd.DataFrame | None = None
-        self.individual_ebe_predictions_df: pd.DataFrame | None = None
         self.population_parameters_predictions_df: pd.DataFrame | None = None
         self.pwres: ModelResiduals | None = None
         self.iwres: ModelResiduals | None = None
         self.npde: ModelResiduals | None = None
-        self.conditional_distribution_samples: ConditionalDistribSamples | None = None
+        self.sampler = ConditionalDistributionSampler(nlme_model=self.model)
 
-    def compute_ebe(self, nb_samples: int = 50) -> None:
-        if self.conditional_distribution_samples is None:
-            self.sample_conditional_distribution(nb_samples=nb_samples)
-        else:
-            print(
-                "Conditional distribution samples are already stored. Rerun `self.sample_conditional_distribution` if you wish to override them."
-            )
-        assert self.conditional_distribution_samples is not None
-
-        _, best_sample_id = self.conditional_distribution_samples.log_prob.max(
-            dim=0,
-        )
-        range_indexing = torch.arange(self.model.nb_patients)
-        ebe_etas = self.conditional_distribution_samples.samples[
-            best_sample_id, range_indexing, :
-        ].unsqueeze(0)
-        ebe_pdus = self.model.convert_etas_to_gaussian_all_patients(ebe_etas)
-        assert ebe_pdus.shape == (
-            1,
-            self.model.nb_patients,
-            self.model.nb_pdu,
-        ), ebe_pdus.shape
-        self.individual_ebe_estimates_tensor = self.model.convert_gaussian_to_physical(
-            ebe_pdus, self.model.log_mi
-        )
-        # Compute predictions for these estimates, and store in a data frame
-        theta = self.model.convert_physical_to_thetas_all_patients(
-            self.individual_ebe_estimates_tensor
-        )
-        self.individual_ebe_estimates_df = self.model.convert_theta_to_dataframe(theta)
-        model_inputs = self.model.convert_thetas_to_model_parameters_all_patients(theta)
-        individual_ebe_pred, _ = self.model.predict_all_patients(model_inputs)
-        self.individual_ebe_predictions_df = self.model.data.full_obs.to_pandas(
-            prediction=individual_ebe_pred
-        )
+    def sample_conditional_distribution(
+        self,
+        nb_samples: int = 100,
+    ) -> None:
+        self.sampler.run_sampler(nb_samples=nb_samples)
 
     def compute_iwres(self) -> None:
         """Compute Individual Weighted Residuals (IWRES), following the formula :
@@ -81,20 +50,21 @@ class ModelDiagnostics:
         Returns:
             dict: IWRES with patientId as key, with IWRES and timesteps for each patient
         """
-        if self.individual_ebe_estimates_tensor is None:
+        if not hasattr(self.sampler, "ebe"):
             print("No EBEs available, computing them...")
-            self.compute_ebe()
-        assert self.individual_ebe_estimates_tensor is not None
+            self.sample_conditional_distribution()
+        assert hasattr(self.sampler, "ebe")
 
-        assert self.individual_ebe_estimates_tensor.shape == (
+        ebe_physical_params = self.sampler.ebe.physical_params_samples
+        assert ebe_physical_params.shape == (
             1,
             self.model.nb_patients,
             self.model.nb_pdu + self.model.nb_mi,
-        )
+        ), f"{ebe_physical_params.shape}"
 
         # Assemble the thetas by adding the PDKs
         theta = self.model.convert_physical_to_thetas_all_patients(
-            physical_params=self.individual_ebe_estimates_tensor
+            physical_params=ebe_physical_params
         )
         model_inputs = self.model.convert_thetas_to_model_parameters_all_patients(
             theta=theta
@@ -249,15 +219,6 @@ class ModelDiagnostics:
                 time=this_patient_time,
             )
             self.npde.update({patient_id: this_patient_npde})
-
-    def sample_conditional_distribution(
-        self,
-        nb_samples: int = 100,
-        nb_burn_in: int = 0,
-    ) -> None:
-        self.conditional_distribution_samples = sample_conditional_distribution_nlme(
-            nlme_model=self.model, nb_samples=nb_samples, nb_burn_in=nb_burn_in
-        )
 
     def zero_random_effect_predictions(self) -> None:
         eta = torch.zeros((1, self.model.nb_patients, self.model.nb_pdu))

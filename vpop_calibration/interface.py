@@ -11,10 +11,7 @@ from vpop_calibration.pynlme.diagnostics import ModelDiagnostics
 from vpop_calibration.saem.optimizer import PySaem
 from vpop_calibration.saem.config import SaemConfigDict
 from vpop_calibration.pynlme.plot import PlottingUtility
-
-
-class NlmeConfigDict(NamedTuple):
-    nb_chains: int = 1
+from vpop_calibration.pynlme.config import NlmeConfigDict
 
 
 class Config(NamedTuple):
@@ -37,7 +34,7 @@ class NlmeModel:
             structural_model=structural_model,
             dataset=obs_data,
             prior_params=nlme_params,
-            **config.nlme._asdict(),
+            config=config.nlme,
         )
         if optim == "saem":
             self.optimizer = PySaem(model=self.statistical_model, config=config.saem)

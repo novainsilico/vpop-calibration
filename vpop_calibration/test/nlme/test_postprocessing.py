@@ -10,7 +10,7 @@ from vpop_calibration.pynlme.model import StatisticalModel
 from vpop_calibration.structural_model.base import StructuralModel
 from vpop_calibration.structural_model.analytical import StructuralAnalytical
 from vpop_calibration.pynlme.conditional_distribution import (
-    sample_conditional_distribution_nlme,
+    ConditionalDistributionSampler,
 )
 
 
@@ -81,6 +81,6 @@ def test_conditional_sampling(sample_nlme_params, obs_data, struct_model):
         structural_model=struct_model,
         dataset=obs_data,
         prior_params=sample_nlme_params,
-        nb_chains=2,
     )
-    samples = sample_conditional_distribution_nlme(nlme_model=nlme_model)
+    sampler = ConditionalDistributionSampler(nlme_model)
+    sampler.run_sampler()

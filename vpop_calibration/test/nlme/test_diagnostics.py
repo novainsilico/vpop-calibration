@@ -80,7 +80,6 @@ def test_diagnostics(sample_nlme_params, obs_data, struct_model):
         structural_model=struct_model, dataset=obs_data, prior_params=sample_nlme_params
     )
     diagnostics = ModelDiagnostics(nlme_model)
-    diagnostics.compute_ebe()
     diagnostics.sample_conditional_distribution()
     diagnostics.compute_iwres()
     diagnostics.compute_pwres()
