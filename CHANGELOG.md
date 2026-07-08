@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.4.0] - 2026-07-08
+
+### Modified
+
+- New EBE estimation logic: empirical bayesian estimators are now computed during the sampling of the conditional distribution. Convergence plots are featured to show the improvement of the likelihood for each individual patient and on average.
+- The `compute_ebe()` method is now deprecated. One should call `sample_conditional_distribution` in order to obtain samples and EBEs
+
 ## [4.3.0] - 2026-07-03
 
 ### Modified

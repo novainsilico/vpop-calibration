@@ -34,11 +34,10 @@ class PlottingUtility:
 
         if not hasattr(self.model_diag.sampler, "ebe"):
             self.model_diag.sample_conditional_distribution()
-        assert self.model_diag.EbeEstimates.individual_ebe_estimates_df is not None
         gp_model: GP = gp_model_struct.gp_model
         train_data = gp_model.data.full_df_raw[pdus].drop_duplicates()
 
-        map_data = self.model_diag.EbeEstimates.individual_ebe_estimates_df
+        map_data = self.model_diag.sampler.ebe_parameters_df
         patients = self.model_diag.model.patients
 
         n_plots = len(pdus)
@@ -127,8 +126,7 @@ class PlottingUtility:
     ) -> None:
         if not hasattr(self.model_diag.sampler, "ebe"):
             self.model_diag.sample_conditional_distribution()
-        assert self.model_diag.EbeEstimates.individual_ebe_predictions_df is not None
-        obs_vs_simulated = self.model_diag.EbeEstimates.individual_ebe_predictions_df
+        obs_vs_simulated = self.model_diag.sampler.ebe_predictions_df
 
         n_cols = self.model_diag.model.nb_outputs
         n_rows = self.model_diag.model.nb_protocols
@@ -201,17 +199,15 @@ class PlottingUtility:
 
         if not hasattr(self.model_diag.sampler, "ebe"):
             self.model_diag.sample_conditional_distribution()
-        assert self.model_diag.EbeEstimates.individual_ebe_predictions_df is not None
-        assert self.model_diag.EbeEstimates.individual_ebe_estimates_df is not None
         # Filter datasets for the selected patient
-        obs_vs_simulated = self.model_diag.EbeEstimates.individual_ebe_predictions_df
+        obs_vs_simulated = self.model_diag.sampler.ebe_predictions_df
 
         patient_ind = self.model_diag.model.patients[patient_num]
         patient_data = obs_vs_simulated.loc[obs_vs_simulated["id"] == patient_ind]
 
         # Print patient parameters if verbose selected
         if verbose:
-            patient_params = self.model_diag.EbeEstimates.individual_ebe_estimates_df
+            patient_params = self.model_diag.sampler.ebe_parameters_df
             print(patient_params.loc[patient_params["id"] == patient_ind])
 
         # Initialize subplots
@@ -284,8 +280,7 @@ class PlottingUtility:
 
         if not hasattr(self.model_diag.sampler, "ebe"):
             self.model_diag.sample_conditional_distribution()
-        assert self.model_diag.EbeEstimates.individual_ebe_predictions_df is not None
-        obs_vs_simulated = self.model_diag.EbeEstimates.individual_ebe_predictions_df
+        obs_vs_simulated = self.model_diag.sampler.ebe_predictions_df
 
         # Plot all patients by default
         if (
@@ -382,8 +377,7 @@ class PlottingUtility:
 
         if not hasattr(self.model_diag.sampler, "ebe"):
             self.model_diag.sample_conditional_distribution()
-        assert self.model_diag.EbeEstimates.individual_ebe_predictions_df is not None
-        obs_vs_simulated = self.model_diag.EbeEstimates.individual_ebe_predictions_df
+        obs_vs_simulated = self.model_diag.sampler.ebe_predictions_df
 
         num_plots = self.model_diag.model.nb_outputs
         fig, axes = plt.subplots(
@@ -524,10 +518,7 @@ class PlottingUtility:
         else:
             if not hasattr(self.model_diag.sampler, "ebe"):
                 self.model_diag.sample_conditional_distribution()
-            assert (
-                self.model_diag.EbeEstimates.individual_ebe_predictions_df is not None
-            )
-            comparison_df = self.model_diag.EbeEstimates.individual_ebe_predictions_df
+            comparison_df = self.model_diag.sampler.ebe_predictions_df
         self.residual_values(
             res=wres_results,
             comparison=comparison_df,
@@ -662,16 +653,7 @@ class PlottingUtility:
     ):
         if not hasattr(self.model_diag.sampler, "ebe"):
             self.model_diag.sample_conditional_distribution()
-        assert self.model_diag.conditional_distribution_samples is not None
-        sample_etas = self.model_diag.conditional_distribution_samples.samples
-
-        sample_gaussian = self.model_diag.model.convert_etas_to_gaussian_all_patients(
-            sample_etas
-        )
-        sample_physical = self.model_diag.model.convert_gaussian_to_physical(
-            psi=sample_gaussian, log_mi=self.model_diag.model.log_mi
-        )
-
+        sample_physical = self.model_diag.sampler.total_samples.physical_params_samples
         if n_patients_to_plot > self.model_diag.model.nb_patients:
             n_patients_to_plot = self.model_diag.model.nb_patients
 
@@ -680,9 +662,9 @@ class PlottingUtility:
         )
 
         # Get EBE estimates for descriptors
-        if self.model_diag.EbeEstimates.individual_ebe_estimates_tensor is None:
-            self.model_diag.sample_conditional_distribution()
-        ebe_theta = self.model_diag.EbeEstimates.individual_ebe_estimates_tensor
+        ebe_theta = self.model_diag.model.convert_physical_to_thetas_all_patients(
+            self.model_diag.sampler.ebe.physical_params_samples
+        )
         assert ebe_theta is not None
 
         for k in range(n_patients_to_plot):
