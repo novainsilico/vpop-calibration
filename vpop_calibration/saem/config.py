@@ -25,7 +25,7 @@ class SaemConfigDict(NamedTuple):
     patience: int = 5
 
     # Output mode selector
-    mode: Literal["test", "debug", "cli", "notebook"] = "notebook"
+    mode: Literal["debug", "cli", "notebook"] = "notebook"
 
     # Mode dependent config options
     live_plot: bool = mode in ["notebook", "debug"]

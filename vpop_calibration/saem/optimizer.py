@@ -44,7 +44,9 @@ class PySaem:
                 nb_iter_learning=2,
                 nb_iter_smoothing=2,
                 optim_max_fun=1,
-                mode="test",
+                progress_bars=False,
+                live_plot=False,
+                logging=False,
             )
 
         self.consecutive_converged_iters = 0

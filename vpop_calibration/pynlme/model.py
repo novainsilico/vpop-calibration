@@ -9,7 +9,7 @@ from vpop_calibration.pynlme.params import MixedEffectParameters, ErrorType
 from vpop_calibration.pynlme.utils import init_transform_function
 from vpop_calibration.pynlme.residuals import log_likelihood_observation
 from vpop_calibration.pynlme.config import NlmeConfigDict
-from vpop_calibration.config import device
+from vpop_calibration.config import device, smoke_test
 
 
 class LogPosteriorPrediction(NamedTuple):
@@ -41,6 +41,11 @@ class StatisticalModel:
         self.data = dataset
         self.prior_params = prior_params
         self.config = config
+        if smoke_test:
+            # Override with test config
+            self.config = self.config._replace(
+                progress_bar=False, live_plot=False, max_samples=10
+            )
 
         # -- Attributes initialization
         self.mi_names = self.prior_params.mi_names

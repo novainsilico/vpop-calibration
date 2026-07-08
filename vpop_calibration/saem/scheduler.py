@@ -1,7 +1,5 @@
-from typing import Literal, NamedTuple
+from typing import Literal
 import numpy as np
-
-from vpop_calibration.config import smoke_test
 
 
 class SaemScheduler:
