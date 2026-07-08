@@ -44,7 +44,6 @@ class ModelDiagnostics:
         self.shrinkage: torch.Tensor | None = None
         self.vpc: VPCResult | None = None
 
-
     def sample_conditional_distribution(
         self,
         nb_samples: int = 100,
@@ -246,18 +245,11 @@ class ModelDiagnostics:
 
     def compute_shrinkage(self, nb_samples: int = 50) -> None:
 
-        if self.conditional_distribution_samples is None:
-            self.sample_conditional_distribution(nb_samples=nb_samples)
+        if not hasattr(self.sampler, "ebe"):
+            self.sampler.run_sampler(nb_samples=nb_samples)
+        assert self.sampler.ebe is not None
 
-        assert self.conditional_distribution_samples is not None
-
-        _, best_sample_id = self.conditional_distribution_samples.log_prob.max(
-            dim=0,
-        )
-        range_indexing = torch.arange(self.model.nb_patients)
-        ebe_etas = self.conditional_distribution_samples.samples[
-            best_sample_id, range_indexing, :
-        ]
+        ebe_etas = self.sampler.ebe.eta_samples
 
         eta_sd = torch.std(ebe_etas, dim=0, unbiased=True)
         omega_sd = torch.sqrt(torch.diag(self.model.omega_pop))
