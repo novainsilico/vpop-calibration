@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-from tqdm import tqdm
+from tqdm.notebook import tqdm
 from scipy.optimize import minimize
 from typing import Callable
 import pandas as pd

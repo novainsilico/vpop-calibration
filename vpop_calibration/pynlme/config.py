@@ -6,3 +6,4 @@ class NlmeConfigDict(NamedTuple):
     live_plot: bool = True
     plot_frequency: int = 5
     progress_bar: bool = True
+    max_samples: int = 1000

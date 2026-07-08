@@ -10,7 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Modified
 
 - New EBE estimation logic: empirical bayesian estimators are now computed during the sampling of the conditional distribution. Convergence plots are featured to show the improvement of the likelihood for each individual patient and on average.
-- The `compute_ebe()` method is now deprecated. One should call `sample_conditional_distribution` in order to obtain samples and EBEs
+- The `compute_ebe()` method is now deprecated. One should call `sample_conditional_distribution` in order to obtain samples and EBEs.
+- `sample_conditional_distribution` method is interruptable, and a maximum cache size is defined to stored samples.
 
 ## [4.3.0] - 2026-07-03
 

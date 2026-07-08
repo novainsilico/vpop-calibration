@@ -1,4 +1,4 @@
-from tqdm import tqdm
+from tqdm.notebook import tqdm
 import torch
 import pandas as pd
 from typing import NamedTuple
@@ -30,11 +30,11 @@ class ConditionalDistributionSampler:
         self.live_plot = self.model.config.live_plot
         self.progress_bar = self.model.config.progress_bar
         self.plot_frequency = self.model.config.plot_frequency
+        self.max_samples = self.model.config.max_samples
+        if smoke_test:
+            self.max_samples = 2
 
     def init_samples(self):
-
-        if self.live_plot:
-            self.build_convergence_plot()
 
         # Initiate samples
         init_etas = self.model.sample_etas(1)
@@ -63,7 +63,13 @@ class ConditionalDistributionSampler:
         self.indiv_log_prob: np.ndarray = init_samples.log_prob.cpu().numpy()
 
     def run_sampler(self, nb_samples: int = 100):
-        self.init_samples()
+        if not hasattr(self, "ebe"):
+            self.init_samples()
+        else:
+            print(f"Sampling already started, adding {nb_samples} new samples.")
+
+        if self.live_plot:
+            self.build_convergence_plot()
 
         if smoke_test:
             nb_samples = 2
@@ -91,7 +97,9 @@ class ConditionalDistributionSampler:
                 log_prob=self.current_state.log_prob,
             )
             self.samples.append(new_samples)
+            # Clip the list of samples to keep only the last max_samples values
             self.update_ebe(new_samples)
+            self.clip_samples()
             yield i
 
     def update_ebe(self, new_samples: ConditionalDistribSamples):
@@ -122,13 +130,16 @@ class ConditionalDistributionSampler:
 
         nb_improved = accept_mask.float().sum().item()
         self.nb_improved_history.append(nb_improved)
-        mean_improved = accept_mask.float().mean().item()
-        self.mean_improved_history.append(mean_improved)
         self.indiv_log_prob = np.concat((self.indiv_log_prob, new_log_prob), axis=0)
+
+    def clip_samples(self):
+        self.nb_improved_history = self.nb_improved_history[-self.max_samples :]
+        self.indiv_log_prob = self.indiv_log_prob[-self.max_samples :, :]
+        self.samples = self.samples[-self.max_samples :]
 
     def build_convergence_plot(self, plot_indiv_figsize=(5.0, 5.0)):
         self.fig, self.axes = plt.subplots(
-            3, 1, figsize=plot_indiv_figsize, sharex=True
+            2, 1, figsize=plot_indiv_figsize, sharex=True
         )
 
         for ax in self.axes:
@@ -137,25 +148,19 @@ class ConditionalDistributionSampler:
         self.axes[0].set_title("EBE convergence")
         self.axes[0].set_ylabel("Patients improved")
 
-        self.axes[1].set_ylabel("Mean LL gain")
-
-        self.axes[2].set_ylabel("Individual LL")
-        self.axes[2].set_xlabel("Iteration")
+        self.axes[1].set_ylabel("Individual LL")
+        self.axes[1].set_xlabel("Iteration")
 
         (line1_raw,) = self.axes[0].plot([], color="lightgray", linewidth=1)
         (line1_ma,) = self.axes[0].plot([], linewidth=2)
-        (line2_raw,) = self.axes[1].plot([], color="lightgray", linewidth=1)
-        (line2_ma,) = self.axes[1].plot([], linewidth=2)
         patient_lines = []
         for _ in range(self.model.nb_patients):
-            (line,) = self.axes[2].plot([], linewidth=1)
+            (line,) = self.axes[1].plot([], linewidth=1)
             patient_lines.append(line)
 
         self.traces = {
             "num_improved": line1_raw,
             "num_improved_ma": line1_ma,
-            "mean_gain": line2_raw,
-            "mean_gain_ma": line2_ma,
             "individual": patient_lines,
         }
         if not smoke_test:
@@ -166,7 +171,6 @@ class ConditionalDistributionSampler:
         nb_iters_so_far = len(self.nb_improved_history)
         x = np.arange(nb_iters_so_far)
 
-        mean_gain_ma = moving_average(self.mean_improved_history, window=20)
         num_improved_ma = moving_average(self.nb_improved_history, window=20)
 
         self.traces["num_improved"].set_data(
@@ -176,14 +180,6 @@ class ConditionalDistributionSampler:
         self.traces["num_improved_ma"].set_data(
             x,
             num_improved_ma,
-        )
-        self.traces["mean_gain"].set_data(
-            x,
-            self.mean_improved_history,
-        )
-        self.traces["mean_gain_ma"].set_data(
-            x,
-            mean_gain_ma,
         )
         for i in range(self.model.nb_patients):
             self.traces["individual"][i].set_data(x, self.indiv_log_prob[:, i])
