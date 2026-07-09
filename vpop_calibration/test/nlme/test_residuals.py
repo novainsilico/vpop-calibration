@@ -16,6 +16,7 @@ import torch
 import pandas as pd
 from math import log, pi, inf
 
+
 def test_residuals():
     patient_id: list = ["p1", "p2"]
     protocols: list = ["arm-1", "arm-2", "arm-3"]
@@ -112,12 +113,18 @@ def test_residuals():
         predictions=pred,
         error_model_selector=error_model_selector,
         sigma=sigma,
-    )   
+    )
     expected_log_lik = torch.tensor(
-        [[ -0.5 * ( log(2 * pi * 1) + ((-1)**2 / 1) ) - 0.5 * (log(2 * pi * 4) + ((-1/2)**2 / 4)),
-            -0.5 * ( log(2 * pi * 1) + ((-1)**2 / 1) ) - 0.5 * (log(2 * pi * 4) + ((-1/2)**2 / 4))
-        ]]
-        , dtype=torch.float32)
+        [
+            [
+                -0.5 * (log(2 * pi * 1) + ((-1) ** 2 / 1))
+                - 0.5 * (log(2 * pi * 4) + ((-1 / 2) ** 2 / 4)),
+                -0.5 * (log(2 * pi * 1) + ((-1) ** 2 / 1))
+                - 0.5 * (log(2 * pi * 4) + ((-1 / 2) ** 2 / 4)),
+            ]
+        ],
+        dtype=torch.float32,
+    )
     torch.testing.assert_close(log_lik, expected_log_lik)
 
     noisy_prediction = add_predictive_error(
@@ -126,6 +133,8 @@ def test_residuals():
         error_model_selector=error_model_selector,
         sigma=sigma,
     )
+
+
 def test_residuals_with_inf():
     patient_id: list = ["p1", "p2"]
     protocols: list = ["arm-1", "arm-2", "arm-3"]
@@ -222,12 +231,17 @@ def test_residuals_with_inf():
         predictions=pred,
         error_model_selector=error_model_selector,
         sigma=sigma,
-    )   
+    )
     expected_log_lik = torch.tensor(
-        [[ -0.5 * ( log(2 * pi * 1) + ((-1)**2 / 1) ) - 0.5 * (log(2 * pi * 4) + ((-1/2)**2 / 4)),
-           -inf
-        ]]
-        , dtype=torch.float32)
+        [
+            [
+                -0.5 * (log(2 * pi * 1) + ((-1) ** 2 / 1))
+                - 0.5 * (log(2 * pi * 4) + ((-1 / 2) ** 2 / 4)),
+                -inf,
+            ]
+        ],
+        dtype=torch.float32,
+    )
     torch.testing.assert_close(log_lik, expected_log_lik)
 
     noisy_prediction = add_predictive_error(

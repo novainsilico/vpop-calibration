@@ -813,3 +813,69 @@ class PlottingUtility:
         if not smoke_test:
             plt.show()
         plt.close(fig)
+
+    def conditional_codistributions(
+        self,
+        scaling_indiv_plot: float = 3.0,
+        scaling_2by2_plot: float = 2.0,
+        n_columns: int = 3,
+    ) -> None:
+
+        pdus = self.model_diag.model.pdu_names
+        sampler = self.model_diag.sampler
+
+        if not hasattr(sampler, "ebe"):
+            self.model_diag.sample_conditional_distribution()
+
+        map_data = self.model_diag.sampler.ebe_parameters_df
+        cond_data = self.model_diag.sampler.total_samples_parameters_df
+
+        n_plots = len(pdus)
+        n_cols = n_columns
+        n_rows = int(np.ceil(n_plots / n_cols))
+
+        _, axes1 = plt.subplots(
+            n_rows,
+            n_cols,
+            squeeze=False,
+            figsize=[scaling_indiv_plot * n_cols, scaling_indiv_plot * n_rows],
+        )
+
+        for k, param in enumerate(pdus):
+            i, j = k // n_cols, k % n_cols
+            map_samples = np.log(map_data[param])
+            cond_samples = np.log(cond_data[param])
+
+            ax = axes1[i, j]
+            ax.hist([cond_samples, map_samples], density=True)
+            ax.set_title(f"{param}")
+
+        _, axes2 = plt.subplots(
+            n_plots,
+            n_plots,
+            squeeze=False,
+            figsize=[scaling_2by2_plot * n_plots, scaling_2by2_plot * n_plots],
+            sharex="col",
+            sharey="row",
+        )
+
+        for k1, param1 in enumerate(pdus):
+            cond_samples_1 = np.log(cond_data[param1])
+            map_samples_1 = np.log(map_data[param1])
+            for k2, param2 in enumerate(pdus):
+                cond_samples_2 = np.log(cond_data[param2])
+                map_samples_2 = np.log(map_data[param2])
+                ax = axes2[k1, k2]
+                if k1 != k2:
+                    # param 1 is the row -> y axis
+                    # param 2 is the column -> x axis
+                    ax.scatter(cond_samples_2, cond_samples_1, alpha=0.5, s=1.0)
+                    ax.scatter(map_samples_2, map_samples_1, s=5)
+                if k2 == 0:
+                    ax.set_ylabel(param1)
+                if k1 == len(pdus) - 1:
+                    ax.set_xlabel(param2)
+
+        if not smoke_test:
+            plt.tight_layout()
+            plt.show()
