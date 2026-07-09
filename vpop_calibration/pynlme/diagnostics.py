@@ -262,18 +262,19 @@ class ModelDiagnostics:
 
         df = self.sampler.total_samples_predictions_df
         all_vpc_records = []
+        quantiles_arr = np.asarray(quantiles)
 
         for output_name in self.model.output_names:
 
             df_output = df[df["output_name"] == output_name]
             bin_labels, bin_edges = pd.cut(
-                df_output["time"],
+                df_output["time"].astype("float"),
                 bins=nb_bins,
                 include_lowest=True,
                 labels=False,
                 retbins=True,
             )
-            df_output["bin"] = bin_labels
+            df_output.insert(1, "bin", bin_labels)
 
             default_centers = pd.Series(
                 0.5 * (bin_edges[:-1] + bin_edges[1:]), index=range(nb_bins)
@@ -289,16 +290,20 @@ class ModelDiagnostics:
             q_obs = (
                 df_output.loc[df_output["batch_id"] == 0]
                 .groupby("bin")["value"]
-                .quantile(quantiles)
+                .quantile(quantiles_arr)
                 .rename("q_obs")
             )
             q_obs.index.names = ["bin", "quantile"]
 
             pred_q_batch = df_output.groupby(["bin", "batch_id"])[
                 "predicted_value"
-            ].quantile(quantiles)
+            ].quantile(quantiles_arr)
             pred_q_batch.index.names = ["bin", "batch_id", "quantile"]
-
+            pred_median = (
+                pred_q_batch.groupby(["bin", "quantile"])
+                .quantile(0.5)
+                .rename("pred_median")
+            )
             pred_lower = (
                 pred_q_batch.groupby(["bin", "quantile"])
                 .quantile(0.025)
@@ -310,7 +315,9 @@ class ModelDiagnostics:
                 .rename("pred_upper")
             )
 
-            df_q = pd.concat([q_obs, pred_lower, pred_upper], axis=1).reset_index()
+            df_q = pd.concat(
+                [q_obs, pred_median, pred_lower, pred_upper], axis=1
+            ).reset_index()
             df_q["bin_center"] = df_q["bin"].map(bin_centers)
             df_q["output_name"] = output_name
 

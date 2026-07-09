@@ -44,7 +44,7 @@ class PlottingUtility:
         n_cols = n_columns
         n_rows = int(np.ceil(n_plots / n_cols))
 
-        _, axes1 = plt.subplots(
+        fig1, axes1 = plt.subplots(
             n_rows,
             n_cols,
             squeeze=False,
@@ -89,7 +89,7 @@ class PlottingUtility:
             ax.axvline(train_max, linestyle="dashed", color="black")
             ax.set_title(f"{param}")
 
-        _, axes2 = plt.subplots(
+        fig2, axes2 = plt.subplots(
             n_plots,
             n_plots,
             squeeze=False,
@@ -117,6 +117,8 @@ class PlottingUtility:
         if not smoke_test:
             plt.tight_layout()
             plt.show()
+        plt.close(fig1)
+        plt.close(fig2)
         return diagnostics, recommended_ranges
 
     def map_estimates(
@@ -130,7 +132,7 @@ class PlottingUtility:
 
         n_cols = self.model_diag.model.nb_outputs
         n_rows = self.model_diag.model.nb_protocols
-        _, axes = plt.subplots(
+        fig, axes = plt.subplots(
             n_rows,
             n_cols,
             figsize=(facet_width * n_cols, facet_height * n_rows),
@@ -183,6 +185,7 @@ class PlottingUtility:
         if not smoke_test:
             plt.tight_layout()
             plt.show()
+        plt.close(fig)
 
     def individual_map_estimates(
         self,
@@ -675,7 +678,7 @@ class PlottingUtility:
             # Adapt rows to columns
             n_cols = 3
             n_rows = (self.model_diag.model.nb_pdu + n_cols - 1) // n_cols
-            _, axes = plt.subplots(n_rows, n_cols, figsize=(15, 4 * n_rows))
+            fig, axes = plt.subplots(n_rows, n_cols, figsize=(15, 4 * n_rows))
             axes = np.atleast_1d(axes).flatten()
 
             # Plot distribution and MAP for each PDU
@@ -731,8 +734,10 @@ class PlottingUtility:
                     # Hide plot if empty
                     ax.set_visible(False)
 
-            plt.tight_layout()
-            plt.show()
+            if not smoke_test:
+                plt.tight_layout()
+                plt.show()
+            plt.close(fig)
 
     def vpc(
         self,
@@ -742,61 +747,76 @@ class PlottingUtility:
         facet_height: int = 6,
     ):
 
-        print(f"Calculating VPC for all outputs")
-        self.model_diag.compute_vpc(
-            nb_bins=nb_bins,
-            quantiles=quantiles,
-        )
+        if self.model_diag.vpc is None:
+            print(f"Calculating VPC for all outputs")
+            self.model_diag.compute_vpc(
+                nb_bins=nb_bins,
+                quantiles=quantiles,
+            )
 
         vpc_df = self.model_diag.vpc
         assert vpc_df is not None
 
         output_names = vpc_df["output_name"].unique()
+        nb_outputs = len(output_names)
+        fig, axes = plt.subplots(
+            1, nb_outputs, figsize=(facet_width, facet_height), squeeze=False
+        )
 
-        for output_name in output_names:
-
+        for i, output_name in enumerate(output_names):
+            ax = axes[0, i]
             df_output = vpc_df[vpc_df["output_name"] == output_name]
-
-            fig, ax = plt.subplots(1, 1, figsize=(facet_width, facet_height))
 
             ax.grid(True, linestyle="--", alpha=0.3, which="both")
             ax.set_facecolor("#fdfdfd")
 
-            for i, q in enumerate(quantiles):
+            for j, q in enumerate(quantiles):
 
                 df_q = df_output[df_output["quantile"] == q]
 
                 bin_centers = df_q["bin_center"]
                 q_obs = df_q["q_obs"]
+                pred_median = df_q["pred_median"]
                 pred_lower = df_q["pred_lower"]
                 pred_upper = df_q["pred_upper"]
 
-                label_obs = "Empirical quantiles" if i == 0 else None
-                label_ci = "95% Prediction CI" if i == 0 else None
+                label_obs = "Empirical quantiles" if j == 0 else None
+                label_ci = "95% CI for Prediction quantile" if j == 0 else None
+                label_median = "Prediction quantile" if j == 0 else None
 
                 ax.plot(
                     bin_centers,
                     q_obs,
                     color="#033a0d",
                     linestyle="--",
-                    linewidth=2,
+                    linewidth=1,
                     label=label_obs,
+                )
+                ax.plot(
+                    bin_centers,
+                    pred_median,
+                    color="#FF1639",
+                    linestyle="-",
+                    linewidth=1,
+                    label=label_median,
                 )
 
                 ax.fill_between(
                     bin_centers,
                     pred_lower,
                     pred_upper,
-                    color="#ED82DE",
+                    color="#FF1639",
                     alpha=0.15,
                     label=label_ci,
                 )
 
             ax.set_xlabel("Time")
             ax.set_ylabel("Observation")
-            ax.set_title(f"Visual Predictive Check : {output_name}")
-            ax.legend()
-            if not smoke_test:
-                plt.tight_layout()
+            ax.set_title(f"VPC: {output_name}")
+            if i == 0:
+                ax.legend(loc="upper right")
+        if not smoke_test:
+            plt.tight_layout()
         if not smoke_test:
             plt.show()
+        plt.close(fig)
