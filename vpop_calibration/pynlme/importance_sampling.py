@@ -16,10 +16,8 @@ class ImportanceSampler:
     def fit_sudent_t_proposal(self, df: float = 5.0, jitter: float = 1e-5) -> None:
         # samples shape: (N,P,D) - N samples, P patients, D parameters
 
-        if self.model_diag.sampler is None:
+        if not hasattr(self.model_diag.sampler, "ebe"):
             self.model_diag.sample_conditional_distribution()
-        assert self.model_diag.sampler is not None
-
         samples = self.model_diag.sampler.ebe.eta_samples
 
         N, P, D = samples.shape
