@@ -85,7 +85,7 @@ def test_diagnostics(sample_nlme_params, obs_data, struct_model):
     diagnostics.compute_pwres()
     diagnostics.compute_npde()
     diagnostics.compute_shrinkage()
-    diagnostics.compute_vpc("out_1", quantiles=[0.35, 0.75])
+    diagnostics.compute_vpc()
     plotter = PlottingUtility(diagnostics=diagnostics)
     plotter.map_estimates()
     plotter.individual_map_estimates()

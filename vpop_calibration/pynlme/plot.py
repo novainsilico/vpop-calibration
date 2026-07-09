@@ -734,25 +734,28 @@ class PlottingUtility:
             plt.tight_layout()
             plt.show()
 
-    def vpc_plot(
+    def vpc(
         self,
         quantiles: list[float] = [0.05, 0.5, 0.95],
-        nb_bins: int = 30,
+        nb_bins: int = 10,
         facet_width: int = 10,
         facet_height: int = 6,
     ):
 
-        for output_name in self.model_diag.model.output_names:
+        print(f"Calculating VPC for all outputs")
+        self.model_diag.compute_vpc(
+            nb_bins=nb_bins,
+            quantiles=quantiles,
+        )
 
-            print(f"Calcul du VPC pour l'output : {output_name}...")
-            self.model_diag.compute_vpc(
-                output_name=output_name,
-                nb_bins=nb_bins,
-                quantiles=quantiles,
-            )
+        vpc_df = self.model_diag.vpc
+        assert vpc_df is not None
 
-            vpc_df = self.model_diag.vpc
-            assert vpc_df is not None
+        output_names = vpc_df["output_name"].unique()
+
+        for output_name in output_names:
+
+            df_output = vpc_df[vpc_df["output_name"] == output_name]
 
             fig, ax = plt.subplots(1, 1, figsize=(facet_width, facet_height))
 
@@ -761,10 +764,10 @@ class PlottingUtility:
 
             for i, q in enumerate(quantiles):
 
-                df_q = vpc_df[vpc_df["quantile"] == q].sort_values("bin_center")
+                df_q = df_output[df_output["quantile"] == q]
 
                 bin_centers = df_q["bin_center"]
-                obs_values = df_q["obs_value"]
+                q_obs = df_q["q_obs"]
                 pred_lower = df_q["pred_lower"]
                 pred_upper = df_q["pred_upper"]
 
@@ -773,7 +776,7 @@ class PlottingUtility:
 
                 ax.plot(
                     bin_centers,
-                    obs_values,
+                    q_obs,
                     color="#033a0d",
                     linestyle="--",
                     linewidth=2,
@@ -793,7 +796,7 @@ class PlottingUtility:
             ax.set_ylabel("Observation")
             ax.set_title(f"Visual Predictive Check : {output_name}")
             ax.legend()
-
-            plt.tight_layout()
-
-        plt.show()
+            if not smoke_test:
+                plt.tight_layout()
+        if not smoke_test:
+            plt.show()
