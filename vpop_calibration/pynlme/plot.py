@@ -737,52 +737,56 @@ class PlottingUtility:
     def vpc_plot(
         self,
         quantiles: list[float] = [0.05, 0.5, 0.95],
-        nb_samples: int = 100,
         nb_bins: int = 30,
         facet_width: int = 10,
         facet_height: int = 6,
     ):
-        axes_dict = {}
 
-        for output_name in self.model.output_names:
+        for output_name in self.model_diag.model.output_names:
 
             print(f"Calcul du VPC pour l'output : {output_name}...")
             self.model_diag.compute_vpc(
                 output_name=output_name,
-                nb_samples=nb_samples,
                 nb_bins=nb_bins,
                 quantiles=quantiles,
             )
 
-            vpc = self.model_diag.vpc
-            assert vpc is not None
+            vpc_df = self.model_diag.vpc
+            assert vpc_df is not None
 
             fig, ax = plt.subplots(1, 1, figsize=(facet_width, facet_height))
-            bin_centers = vpc.bin_centers
 
             ax.grid(True, linestyle="--", alpha=0.3, which="both")
             ax.set_facecolor("#fdfdfd")
 
-            for i, (q, obs_q_values) in enumerate(vpc.obs_quantiles.items()):
-                label = "Empirical quantiles" if i == 0 else None
+            for i, q in enumerate(quantiles):
+
+                df_q = vpc_df[vpc_df["quantile"] == q].sort_values("bin_center")
+
+                bin_centers = df_q["bin_center"]
+                obs_values = df_q["obs_value"]
+                pred_lower = df_q["pred_lower"]
+                pred_upper = df_q["pred_upper"]
+
+                label_obs = "Empirical quantiles" if i == 0 else None
+                label_ci = "95% Prediction CI" if i == 0 else None
+
                 ax.plot(
                     bin_centers,
-                    obs_q_values,
+                    obs_values,
                     color="#033a0d",
                     linestyle="--",
                     linewidth=2,
-                    label=label,
+                    label=label_obs,
                 )
 
-            for i, (q, ci) in enumerate(vpc.pred_quantiles_ci.items()):
-                label = "95% Prediction CI" if i == 0 else None
                 ax.fill_between(
                     bin_centers,
-                    ci[:, 0],
-                    ci[:, 1],
+                    pred_lower,
+                    pred_upper,
                     color="#ED82DE",
                     alpha=0.15,
-                    label=label,
+                    label=label_ci,
                 )
 
             ax.set_xlabel("Time")
@@ -791,7 +795,5 @@ class PlottingUtility:
             ax.legend()
 
             plt.tight_layout()
-
-            axes_dict[output_name] = ax
 
         plt.show()

@@ -223,12 +223,13 @@ class ConditionalDistributionSampler:
     @property
     def total_samples_predictions_df(self) -> pd.DataFrame:
         all_df = []
-        for sample in self.samples:
+        for i, sample in enumerate(self.samples):
             this_sample_df = self.model.data.full_obs.to_pandas(
                 prediction=sample.predictions
             ).rename(columns={"id": "ref_id"})
             new_ids = {patient: str(uuid.uuid4()) for patient in self.model.patients}
             this_sample_df["id"] = this_sample_df["ref_id"].map(new_ids)
+            this_sample_df["batch_id"] = i
             all_df.append(this_sample_df)
         total_df = pd.concat(all_df)
         return total_df

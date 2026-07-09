@@ -23,13 +23,6 @@ ResidualType = Literal["pwres", "iwres", "npde"]
 ModelResiduals = dict[str, PatientResiduals]
 
 
-class VPCResult(NamedTuple):
-    bins: np.ndarray
-    bin_centers: np.ndarray
-    obs_quantiles: Dict[float, np.ndarray]
-    pred_quantiles_ci: Dict[float, np.ndarray]
-
-
 class ModelDiagnostics:
     def __init__(
         self,
@@ -42,7 +35,7 @@ class ModelDiagnostics:
         self.npde: ModelResiduals | None = None
         self.sampler = ConditionalDistributionSampler(nlme_model=self.model)
         self.shrinkage: torch.Tensor | None = None
-        self.vpc: VPCResult | None = None
+        self.vpc: pd.DataFrame | None = None
 
     def sample_conditional_distribution(
         self,
@@ -261,78 +254,62 @@ class ModelDiagnostics:
     def compute_vpc(
         self,
         output_name: str,
-        nb_samples: int = 100,
-        nb_bins: int = 30,
+        nb_bins: int = 10,
         quantiles: list[float] = [0.05, 0.5, 0.95],
     ) -> None:
 
-        if self.conditional_distribution_samples is None:
-            self.sample_conditional_distribution(nb_samples=nb_samples)
+        if not hasattr(self.sampler, "ebe"):
+            self.sampler.total_samples_predictions_df
 
-        assert self.conditional_distribution_samples is not None
+        df = self.sampler.total_samples_predictions_df
+        df_output = df[df["output_name"] == output_name].copy()
 
-        etas_samples = self.conditional_distribution_samples.samples
-        gaussian_params = self.model.convert_etas_to_gaussian_all_patients(etas_samples)
-        physical_params = self.model.convert_gaussian_to_physical(
-            gaussian_params, self.model.log_mi
+        bins = np.unique(
+            np.quantile(
+                df_output.loc[df_output["batch_id"] == 0, "time"],
+                np.linspace(0, 1, nb_bins + 1),
+            )
         )
-        theta = self.model.convert_physical_to_thetas_all_patients(physical_params)
-        model_inputs = self.model.convert_thetas_to_model_parameters_all_patients(theta)
-        all_pred, _ = self.model.predict_all_patients(model_inputs)
 
-        # only keep output_name predicted values
-        df = self.model.data.full_obs.to_pandas(prediction=all_pred)
-        df_output = df[df["output_name"] == output_name]
-
-        obs_times = df_output["time"].values
-        obs_values = df_output["value"].values
-
-        pred = np.vstack(df_output["predicted_value"].values).T
-
-        bins = np.unique(np.quantile(obs_times, np.linspace(0, 1, nb_bins + 1)))
-        actual_nb_bins = len(bins) - 1
-
-        obs_bin = np.digitize(obs_times, bins) - 1
-        obs_bin = np.clip(obs_bin, 0, actual_nb_bins - 1)
-
-        bin_centers = []
-        obs_quantiles_lists = {q: [] for q in quantiles}
-        pred_quantiles_ci_lists = {q: [] for q in quantiles}
-
-        for b in range(actual_nb_bins):
-            in_bin = obs_bin == b
-
-            vals = obs_values[in_bin]
-            b_times = obs_times[in_bin]
-
-            if len(vals) > 0:
-                bin_centers.append(np.median(b_times))
-                sim_vals_in_bin = pred[:, in_bin]
-
-                for q in quantiles:
-                    obs_quantiles_lists[q].append(np.quantile(vals, q))
-
-                    q_per_sim = np.quantile(sim_vals_in_bin, q, axis=1)
-                    pred_quantiles_ci_lists[q].append(
-                        np.percentile(q_per_sim, [2.5, 97.5])
-                    )
-
-            else:
-                bin_centers.append(0.5 * (bins[b] + bins[b + 1]))
-                for q in quantiles:
-                    obs_quantiles_lists[q].append(np.nan)
-                    pred_quantiles_ci_lists[q].append((np.nan, np.nan))
-
-        final_obs_quantiles = {
-            q: np.array(lst) for q, lst in obs_quantiles_lists.items()
-        }
-        final_pred_quantiles_ci = {
-            q: np.array(lst) for q, lst in pred_quantiles_ci_lists.items()
-        }
-
-        self.vpc = VPCResult(
-            bins=bins,
-            bin_centers=np.array(bin_centers),
-            obs_quantiles=final_obs_quantiles,
-            pred_quantiles_ci=final_pred_quantiles_ci,
+        df_output["bin"] = pd.cut(
+            df_output["time"], bins=bins, include_lowest=True, labels=False
         )
+
+        bin_idx = range(len(bins) - 1)
+        default_centers = pd.Series(0.5 * (bins[:-1] + bins[1:]), index=bin_idx)
+        bin_centers = (
+            df_output.loc[df_output["batch_id"] == 0]
+            .groupby("bin")["time"]
+            .median()
+            .reindex(bin_idx)
+            .fillna(default_centers)
+        )
+
+        vpc_records = []
+        for q in quantiles:
+
+            pred_q_batch = df_output.groupby(["bin", "batch_id"])[
+                "predicted_value"
+            ].quantile(q)
+
+            df_q = (
+                pd.DataFrame(
+                    {
+                        "bin_center": bin_centers,
+                        "quantile": q,
+                        "obs_value": df_output.loc[df_output["batch_id"] == 0]
+                        .groupby("bin")["value"]
+                        .quantile(q),
+                        "pred_lower": pred_q_batch.groupby("bin").quantile(0.025),
+                        "pred_upper": pred_q_batch.groupby("bin").quantile(0.975),
+                    }
+                )
+                .reindex(bin_idx)
+                .reset_index(names="bin")
+            )
+            df_q = df_q.dropna()
+            vpc_records.append(df_q)
+
+        vpc_df = pd.concat(vpc_records, ignore_index=True)
+
+        self.vpc = vpc_df
