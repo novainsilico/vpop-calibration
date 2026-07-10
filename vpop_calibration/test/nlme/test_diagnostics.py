@@ -99,3 +99,7 @@ def test_diagnostics(sample_nlme_params, obs_data, struct_model):
     plotter.weighted_residuals(res_type="pwres")
     plotter.weighted_residuals(res_type="npde")
     plotter.map_vs_posterior()
+
+    cond_sampler = ConditionalDistributionSampler(nlme_model)
+    cond_sampler.live_plot = True
+    cond_sampler.run_sampler()

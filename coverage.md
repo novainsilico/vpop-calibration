@@ -10,14 +10,14 @@
 | vpop\_calibration/model/gp.py                         |      228 |       49 |       68 |       20 |     75% |62, 67, 103, 140, 142-143, 147-150, 225-226, 233, 253, 287, 309, 311, 365, 386, 390-395, 402-410, 412->347, 436-438, 466, 476-485, 515->exit, 592-599 |
 | vpop\_calibration/model/plot.py                       |      124 |       11 |       32 |        8 |     88% |77-78, 160-161, 187->190, 232->191, 237-238, 257, 266->268, 269-272 |
 | vpop\_calibration/pynlme/\_\_init\_\_.py              |        0 |        0 |        0 |        0 |    100% |           |
-| vpop\_calibration/pynlme/conditional\_distribution.py |      159 |       19 |       36 |        5 |     83% |68, 73->75, 80-83, 167, 188-194, 247-254, 271 |
+| vpop\_calibration/pynlme/conditional\_distribution.py |      160 |       13 |       36 |        5 |     87% |68, 73->75, 80-83, 167, 188-194, 272 |
 | vpop\_calibration/pynlme/config.py                    |        7 |        0 |        0 |        0 |    100% |           |
 | vpop\_calibration/pynlme/data.py                      |       47 |        0 |        8 |        0 |    100% |           |
-| vpop\_calibration/pynlme/diagnostics.py               |      112 |        5 |       14 |        4 |     93% |56-57, 128->131, 174-176, 195->199 |
+| vpop\_calibration/pynlme/diagnostics.py               |      148 |        7 |       20 |        6 |     92% |58-59, 130->133, 176-178, 197->201, 271, 291 |
 | vpop\_calibration/pynlme/indexing.py                  |       60 |        0 |        8 |        0 |    100% |           |
 | vpop\_calibration/pynlme/model.py                     |      222 |       20 |       26 |        2 |     91% |44->51, 163->159, 529-574 |
 | vpop\_calibration/pynlme/params.py                    |      106 |        3 |       16 |        2 |     96% |54, 56, 129 |
-| vpop\_calibration/pynlme/plot.py                      |      332 |       33 |      104 |       32 |     85% |36->38, 70, 72-73, 119-120, 129, 152, 185-186, 197->201, 202, 211-212, 233, 268, 283, 287->293, 299, 304, 338, 367, 380, 421, 423, 436-437, 482, 496, 502, 508, 512-513, 521, 639, 648, 650->653, 680->691 |
+| vpop\_calibration/pynlme/plot.py                      |      374 |       71 |      118 |       33 |     76% |36->38, 70, 72-73, 119-120, 131, 154, 187-188, 200->204, 205, 214-215, 236, 271, 286, 290->296, 302, 307, 341, 370, 383, 424, 426, 439-440, 485, 499, 505, 511, 515-516, 524, 642, 651, 653->656, 683->694, 731-732, 743-815 |
 | vpop\_calibration/pynlme/residuals.py                 |       61 |        2 |       12 |        2 |     95% |   49, 108 |
 | vpop\_calibration/pynlme/schemas.py                   |       13 |        0 |        0 |        0 |    100% |           |
 | vpop\_calibration/pynlme/utils.py                     |       18 |        0 |        0 |        0 |    100% |           |
@@ -39,4 +39,4 @@
 | vpop\_calibration/structural\_model/gp.py             |       26 |        0 |        2 |        0 |    100% |           |
 | vpop\_calibration/structural\_model/simwork.py        |      127 |        5 |       20 |        2 |     94% |72-83, 118 |
 | vpop\_calibration/utils.py                            |        9 |        0 |        2 |        0 |    100% |           |
-| **TOTAL**                                             | **2480** |  **241** |  **512** |  **111** | **86%** |           |
+| **TOTAL**                                             | **2559** |  **275** |  **532** |  **114** | **85%** |           |

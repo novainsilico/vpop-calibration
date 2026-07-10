@@ -283,7 +283,8 @@ class ModelDiagnostics:
     def compute_vpc(
         self,
         nb_bins: int = 10,
-        quantiles: list[float] = [0.05, 0.5, 0.95],
+        quantiles: list[float] = [0.1, 0.5, 0.9],
+        precision: float = 0.9,
     ) -> None:
 
         if not hasattr(self.sampler, "samples"):
@@ -335,12 +336,12 @@ class ModelDiagnostics:
             )
             pred_lower = (
                 pred_q_batch.groupby(["bin", "quantile"])
-                .quantile(0.025)
+                .quantile(1 - precision)
                 .rename("pred_lower")
             )
             pred_upper = (
                 pred_q_batch.groupby(["bin", "quantile"])
-                .quantile(0.975)
+                .quantile(precision)
                 .rename("pred_upper")
             )
 
