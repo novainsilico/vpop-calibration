@@ -31,8 +31,6 @@ class ConditionalDistributionSampler:
         self.progress_bar = self.model.config.progress_bar
         self.plot_frequency = self.model.config.plot_frequency
         self.max_samples = self.model.config.max_samples
-        if smoke_test:
-            self.max_samples = 2
 
     def init_samples(self):
 
@@ -77,10 +75,11 @@ class ConditionalDistributionSampler:
             for i in self.sampling_stream(nb_samples):
                 if self.live_plot:
                     self.update_convergence_plot()
-            plt.close(self.fig)
+                    plt.close(self.fig)
         except KeyboardInterrupt:
             print("Interrupting sampling.")
-            plt.close(self.fig)
+            if self.live_plot:
+                plt.close(self.fig)
 
     def sampling_stream(self, nb_samples: int):
         for i in tqdm(range(nb_samples), disable=not self.progress_bar):
@@ -198,7 +197,7 @@ class ConditionalDistributionSampler:
         theta = self.model.convert_physical_to_thetas_all_patients(
             self.ebe.physical_params_samples
         )
-        df = self.model.convert_theta_to_dataframe(theta)
+        df = self.add_unique_id(self.model.convert_theta_to_dataframe(theta))
         return df
 
     @property
@@ -221,18 +220,40 @@ class ConditionalDistributionSampler:
         return out
 
     @property
+    def total_samples_parameters_df(self) -> pd.DataFrame:
+        all_df = []
+        for sample in self.samples:
+            this_sample_theta = self.model.convert_physical_to_thetas_all_patients(
+                sample.physical_params_samples
+            )
+            this_sample_df = self.add_unique_id(
+                self.model.convert_theta_to_dataframe(this_sample_theta)
+            )
+            all_df.append(this_sample_df)
+        total_df = pd.concat(all_df)
+        return total_df
+
+    @property
     def total_samples_predictions_df(self) -> pd.DataFrame:
         all_df = []
         for i, sample in enumerate(self.samples):
-            this_sample_df = self.model.data.full_obs.to_pandas(
-                prediction=sample.predictions
-            ).rename(columns={"id": "ref_id"})
-            new_ids = {patient: str(uuid.uuid4()) for patient in self.model.patients}
-            this_sample_df["id"] = this_sample_df["ref_id"].map(new_ids)
+            this_sample_df = self.add_unique_id(
+                self.model.data.full_obs.to_pandas(prediction=sample.predictions)
+            )
             this_sample_df["batch_id"] = i
             all_df.append(this_sample_df)
         total_df = pd.concat(all_df)
         return total_df
+
+    def add_unique_id(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Create  a new `id` column with unique values, store the patient id in `id_ref`.
+
+        This function is intended to be used on dataframes before concatenating rows together.
+        """
+        out_df = df.rename(columns={"id": "id_ref"})
+        new_ids = {patient: str(uuid.uuid4()) for patient in self.model.patients}
+        out_df["id"] = out_df["id_ref"].map(new_ids)
+        return out_df
 
 
 def moving_average(x: list[float], window: int = 20) -> np.ndarray:

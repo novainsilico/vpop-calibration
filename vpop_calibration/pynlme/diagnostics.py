@@ -1,7 +1,8 @@
 import torch
-from typing import NamedTuple, Literal
+from typing import Literal
 import numpy as np
 import pandas as pd
+import pandera.pandas as pa
 
 from vpop_calibration.pynlme.model import StatisticalModel
 from vpop_calibration.pynlme.residuals import (
@@ -13,14 +14,15 @@ from vpop_calibration.pynlme.conditional_distribution import (
     ConditionalDistributionSampler,
 )
 
-
-class PatientResiduals(NamedTuple):
-    time: np.ndarray
-    res: np.ndarray
-
-
 ResidualType = Literal["pwres", "iwres", "npde"]
-ModelResiduals = dict[str, PatientResiduals]
+
+
+class WeightedResidualsSchema(pa.DataFrameModel):
+    id: str
+    time: float
+    output_name: str
+    residual_value: float = pa.Field(coerce=True)
+    residual_type: str
 
 
 class ModelDiagnostics:
@@ -30,9 +32,9 @@ class ModelDiagnostics:
     ):
         self.model = nlme_model
         self.population_parameters_predictions_df: pd.DataFrame | None = None
-        self.pwres: ModelResiduals | None = None
-        self.iwres: ModelResiduals | None = None
-        self.npde: ModelResiduals | None = None
+        self.pwres: pa.typing.DataFrame[WeightedResidualsSchema] | None = None
+        self.iwres: pa.typing.DataFrame[WeightedResidualsSchema] | None = None
+        self.npde: pa.typing.DataFrame[WeightedResidualsSchema] | None = None
         self.sampler = ConditionalDistributionSampler(nlme_model=self.model)
         self.shrinkage: torch.Tensor | None = None
         self.vpc: pd.DataFrame | None = None
@@ -90,22 +92,31 @@ class ModelDiagnostics:
         iwres_full = residuals / torch.sqrt(variance)
         iwres_full.squeeze_(0)
 
-        self.iwres = {}
+        iwres_list = []
 
         # Separate IWRES per patient in a dict
         for i, patient_id in enumerate(
             self.model.data.full_obs.obs_index.id.ref_values
         ):
             this_patient_rows = self.model.data.full_obs.obs_index.id.index_values == i
-            this_patient_iwres = iwres_full[this_patient_rows]
+            this_patient_iwres = iwres_full[this_patient_rows].squeeze().cpu().numpy()
             this_patient_time = self.model.data.individual_observations[
                 patient_id
-            ].obs_index.time.raw_values.to_numpy()
-            this_patient_residuals = PatientResiduals(
-                time=this_patient_time,
-                res=this_patient_iwres.squeeze().cpu().numpy(),
+            ].obs_index.time.raw_values
+            this_patient_output_name = self.model.data.individual_observations[
+                patient_id
+            ].obs_index.output_name.raw_values
+            this_patient_residuals = pd.DataFrame(
+                {
+                    "id": patient_id,
+                    "time": this_patient_time,
+                    "residual_value": this_patient_iwres,
+                    "residual_type": "iwres",
+                    "output_name": this_patient_output_name,
+                }
             )
-            self.iwres.update({patient_id: this_patient_residuals})
+            iwres_list.append(this_patient_residuals)
+        self.iwres = WeightedResidualsSchema.validate(pd.concat(iwres_list))
 
     def compute_pwres(self, nb_samples: int = 100) -> None:
         """Compute Population Weighted Residuals (PWRES), following the formula :
@@ -134,7 +145,7 @@ class ModelDiagnostics:
         simulated_tensor, _ = self.model.predict_all_patients(inputs=inputs)
 
         # Compute PWRES per patient
-        self.pwres = {}
+        pwres_list = []
 
         for i, patient_id in enumerate(
             self.model.data.full_obs.obs_index.id.ref_values
@@ -149,7 +160,10 @@ class ModelDiagnostics:
             obs_patient = self.model.data.individual_observations[patient_id].obs_values
             time_steps_patient = self.model.data.individual_observations[
                 patient_id
-            ].obs_index.time.raw_values.to_numpy()
+            ].obs_index.time.raw_values
+            output_names_patient = self.model.data.individual_observations[
+                patient_id
+            ].obs_index.output_name.raw_values
 
             # variance_patient shape: n_obs_patient * n_obs_patient
             variance_patient = torch.cov(obs_patient.T)
@@ -167,11 +181,17 @@ class ModelDiagnostics:
                 pwres_patient = variance_patient ** (-1 / 2) * residual
 
             # Compute patient PWRES and add them to dictionnary
-            patient_pwres = PatientResiduals(
-                time=time_steps_patient,
-                res=pwres_patient.squeeze(-1).cpu().numpy(),
+            patient_pwres = pd.DataFrame(
+                {
+                    "id": patient_id,
+                    "time": time_steps_patient,
+                    "residual_value": pwres_patient.squeeze(-1).cpu().numpy(),
+                    "residual_type": "pwres",
+                    "output_name": output_names_patient,
+                }
             )
-            self.pwres.update({patient_id: patient_pwres})
+            pwres_list.append(patient_pwres)
+        self.pwres = WeightedResidualsSchema.validate(pd.concat(pwres_list))
 
     def compute_npde(self, nb_samples: int = 100) -> None:
         if smoke_test:
@@ -205,7 +225,7 @@ class ModelDiagnostics:
         normal_dist = torch.distributions.Normal(0, 1)
         npde = normal_dist.icdf(mean_F_clamped)
 
-        self.npde = {}
+        npde_list = []
 
         for i, patient_id in enumerate(
             self.model.data.full_obs.obs_index.id.ref_values
@@ -215,12 +235,21 @@ class ModelDiagnostics:
             this_patient_data = npde[this_patient_rows]
             this_patient_time = self.model.data.individual_observations[
                 patient_id
-            ].obs_index.time.raw_values.to_numpy()
-            this_patient_npde = PatientResiduals(
-                res=this_patient_data.squeeze(-1).cpu().numpy(),
-                time=this_patient_time,
+            ].obs_index.time.raw_values
+            this_patient_output_names = self.model.data.individual_observations[
+                patient_id
+            ].obs_index.output_name.raw_values
+            this_patient_npde = pd.DataFrame(
+                {
+                    "id": patient_id,
+                    "residual_value": this_patient_data.squeeze(-1).cpu().numpy(),
+                    "residual_type": "npde",
+                    "time": this_patient_time,
+                    "output_name": this_patient_output_names,
+                }
             )
-            self.npde.update({patient_id: this_patient_npde})
+            npde_list.append(this_patient_npde)
+        self.npde = WeightedResidualsSchema.validate(pd.concat(npde_list))
 
     def zero_random_effect_predictions(self) -> None:
         eta = torch.zeros((1, self.model.nb_patients, self.model.nb_pdu))
@@ -254,7 +283,8 @@ class ModelDiagnostics:
     def compute_vpc(
         self,
         nb_bins: int = 10,
-        quantiles: list[float] = [0.05, 0.5, 0.95],
+        quantiles: list[float] = [0.1, 0.5, 0.9],
+        precision: float = 0.9,
     ) -> None:
 
         if not hasattr(self.sampler, "samples"):
@@ -306,12 +336,12 @@ class ModelDiagnostics:
             )
             pred_lower = (
                 pred_q_batch.groupby(["bin", "quantile"])
-                .quantile(0.025)
+                .quantile(1 - precision)
                 .rename("pred_lower")
             )
             pred_upper = (
                 pred_q_batch.groupby(["bin", "quantile"])
-                .quantile(0.975)
+                .quantile(precision)
                 .rename("pred_upper")
             )
 
