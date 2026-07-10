@@ -16,10 +16,8 @@ class DiagnosticsConfig(NamedTuple):
 
 class SamplesSchema(pa.DataFrameModel):
     # Morally: this is a vpop schema
-    id: str  # unique patient id
+    id: str = pa.Field(unique=True)  # unique patient id
     id_ref: str  # corresponding real patient id
-    descriptor_name: str
-    descriptor_value: float
 
 
 class DiagnosticsOutput(NamedTuple):
@@ -44,9 +42,11 @@ def run_diagnostics(model: NlmeModel, config: DiagnosticsConfig) -> DiagnosticsO
     if config.npde:
         model.diagnostics.compute_npde()
 
-    full_samples = SamplesSchema.validate(model.diagnostics.sampler.total_samples_vpop)
+    full_samples = SamplesSchema.validate(
+        model.diagnostics.sampler.total_samples_parameters_df
+    )
 
-    ebe_samples = SamplesSchema.validate(model.diagnostics.sampler.ebe_vpop)
+    ebe_samples = SamplesSchema.validate(model.diagnostics.sampler.ebe_parameters_df)
     # Format the output
     out = DiagnosticsOutput(
         iwres=model.diagnostics.iwres,
