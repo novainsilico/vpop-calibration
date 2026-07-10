@@ -84,6 +84,8 @@ def test_diagnostics(sample_nlme_params, obs_data, struct_model):
     diagnostics.compute_iwres()
     diagnostics.compute_pwres()
     diagnostics.compute_npde()
+    diagnostics.compute_shrinkage()
+    diagnostics.compute_vpc()
     plotter = PlottingUtility(diagnostics=diagnostics)
     plotter.map_estimates()
     plotter.individual_map_estimates()
@@ -93,3 +95,4 @@ def test_diagnostics(sample_nlme_params, obs_data, struct_model):
     plotter.weighted_residuals(res_type="pwres")
     plotter.weighted_residuals(res_type="npde")
     plotter.map_vs_posterior()
+    plotter.vpc()

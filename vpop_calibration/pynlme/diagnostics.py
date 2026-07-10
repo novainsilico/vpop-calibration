@@ -34,6 +34,8 @@ class ModelDiagnostics:
         self.iwres: ModelResiduals | None = None
         self.npde: ModelResiduals | None = None
         self.sampler = ConditionalDistributionSampler(nlme_model=self.model)
+        self.shrinkage: torch.Tensor | None = None
+        self.vpc: pd.DataFrame | None = None
 
     def sample_conditional_distribution(
         self,
@@ -233,3 +235,93 @@ class ModelDiagnostics:
         pred, _ = self.model.predict_all_patients(inputs)
         pred_df = self.model.data.full_obs.to_pandas(prediction=pred)
         self.population_parameters_predictions_df = pred_df
+
+    def compute_shrinkage(self, nb_samples: int = 50) -> None:
+
+        if not hasattr(self.sampler, "ebe"):
+            self.sampler.run_sampler(nb_samples=nb_samples)
+        assert self.sampler.ebe is not None
+
+        ebe_etas = self.sampler.ebe.eta_samples.squeeze(0)
+
+        eta_sd = torch.std(ebe_etas, dim=0, unbiased=True)
+        omega_sd = torch.sqrt(torch.diag(self.model.omega_pop))
+
+        shrinkage = 1 - eta_sd / omega_sd
+
+        self.shrinkage = shrinkage
+
+    def compute_vpc(
+        self,
+        nb_bins: int = 10,
+        quantiles: list[float] = [0.05, 0.5, 0.95],
+    ) -> None:
+
+        if not hasattr(self.sampler, "samples"):
+            self.sampler.run_sampler()
+
+        df = self.sampler.total_samples_predictions_df
+        all_vpc_records = []
+        quantiles_arr = np.asarray(quantiles)
+
+        for output_name in self.model.output_names:
+
+            df_output = df[df["output_name"] == output_name]
+            bin_labels, bin_edges = pd.cut(
+                df_output["time"].astype("float"),
+                bins=nb_bins,
+                include_lowest=True,
+                labels=False,
+                retbins=True,
+            )
+            df_output.insert(1, "bin", bin_labels)
+
+            default_centers = pd.Series(
+                0.5 * (bin_edges[:-1] + bin_edges[1:]), index=range(nb_bins)
+            )
+            bin_centers = (
+                df_output.loc[df_output["batch_id"] == 0]
+                .groupby("bin")["time"]
+                .median()
+                .reindex(range(nb_bins))
+                .fillna(default_centers)
+            )
+
+            q_obs = (
+                df_output.loc[df_output["batch_id"] == 0]
+                .groupby("bin")["value"]
+                .quantile(quantiles_arr)
+                .rename("q_obs")
+            )
+            q_obs.index.names = ["bin", "quantile"]
+
+            pred_q_batch = df_output.groupby(["bin", "batch_id"])[
+                "predicted_value"
+            ].quantile(quantiles_arr)
+            pred_q_batch.index.names = ["bin", "batch_id", "quantile"]
+            pred_median = (
+                pred_q_batch.groupby(["bin", "quantile"])
+                .quantile(0.5)
+                .rename("pred_median")
+            )
+            pred_lower = (
+                pred_q_batch.groupby(["bin", "quantile"])
+                .quantile(0.025)
+                .rename("pred_lower")
+            )
+            pred_upper = (
+                pred_q_batch.groupby(["bin", "quantile"])
+                .quantile(0.975)
+                .rename("pred_upper")
+            )
+
+            df_q = pd.concat(
+                [q_obs, pred_median, pred_lower, pred_upper], axis=1
+            ).reset_index()
+            df_q["bin_center"] = df_q["bin"].map(bin_centers)
+            df_q["output_name"] = output_name
+
+            all_vpc_records.append(df_q)
+
+        vpc_df = pd.concat(all_vpc_records, ignore_index=True)
+        self.vpc = vpc_df
