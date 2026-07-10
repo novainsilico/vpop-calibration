@@ -22,16 +22,6 @@ class SamplesSchema(pa.DataFrameModel):
     descriptor_value: float
 
 
-def pivot_table_to_vpop_schema(df: pd.DataFrame) -> pa.typing.DataFrame[SamplesSchema]:
-    pivotted = df.melt(
-        id_vars=["id", "id_ref"],
-        var_name="descriptor_name",
-        value_name="descriptor_value",
-    )
-    validated = SamplesSchema.validate(pivotted)
-    return validated
-
-
 class DiagnosticsOutput(NamedTuple):
     iwres: pa.typing.DataFrame[WeightedResidualsSchema] | None
     pwres: pa.typing.DataFrame[WeightedResidualsSchema] | None
@@ -54,13 +44,9 @@ def run_diagnostics(model: NlmeModel, config: DiagnosticsConfig) -> DiagnosticsO
     if config.npde:
         model.diagnostics.compute_npde()
 
-    full_samples = pivot_table_to_vpop_schema(
-        model.diagnostics.sampler.total_samples_parameters_df
-    )
+    full_samples = SamplesSchema.validate(model.diagnostics.sampler.total_samples_vpop)
 
-    ebe_samples = pivot_table_to_vpop_schema(
-        model.diagnostics.sampler.ebe_parameters_df
-    )
+    ebe_samples = SamplesSchema.validate(model.diagnostics.sampler.ebe_vpop)
     # Format the output
     out = DiagnosticsOutput(
         iwres=model.diagnostics.iwres,

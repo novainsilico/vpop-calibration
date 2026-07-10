@@ -10,6 +10,7 @@ from vpop_calibration.data_generation import (
     generate_synthetic_data,
     generate_training_data,
 )
+from vpop_calibration.sdk import create_nlme_model, run_saem, run_diagnostics
 
 __all__ = [
     "GP",
@@ -23,4 +24,7 @@ __all__ = [
     "SaemConfigDict",
     "generate_synthetic_data",
     "generate_training_data",
+    "create_nlme_model",
+    "run_saem",
+    "run_diagnostics",
 ]

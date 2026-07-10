@@ -12,6 +12,7 @@ import uuid
 from vpop_calibration.pynlme.model import StatisticalModel
 from vpop_calibration.config import smoke_test
 from vpop_calibration.metropolis_hastings import MetropolisHastingsState, mh_step
+from vpop_calibration.utils import pivot_table_to_vpop
 
 
 class ConditionalDistribSamples(NamedTuple):
@@ -206,6 +207,10 @@ class ConditionalDistributionSampler:
         return df
 
     @property
+    def ebe_vpop(self) -> pd.DataFrame:
+        return pivot_table_to_vpop(self.ebe_parameters_df)
+
+    @property
     def total_samples(self) -> ConditionalDistribSamples:
         eta = torch.cat([s.eta_samples for s in self.samples], dim=0)
         physical = torch.cat([s.physical_params_samples for s in self.samples])
@@ -232,6 +237,10 @@ class ConditionalDistributionSampler:
             all_df.append(this_sample_df)
         total_df = pd.concat(all_df)
         return total_df
+
+    @property
+    def total_samples_vpop(self) -> pd.DataFrame:
+        return pivot_table_to_vpop(self.total_samples_parameters_df)
 
     @property
     def total_samples_predictions_df(self) -> pd.DataFrame:

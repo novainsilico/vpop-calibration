@@ -12,3 +12,12 @@ def extend_schema(
         return schema.add_columns(
             {col: pa.Column(type, default=pd.NA) for col in column_list}
         )
+
+
+def pivot_table_to_vpop(df: pd.DataFrame) -> pd.DataFrame:
+    pivotted = df.melt(
+        id_vars=["id", "id_ref"],
+        var_name="descriptor_name",
+        value_name="descriptor_value",
+    )
+    return pivotted
