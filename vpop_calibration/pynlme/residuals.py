@@ -49,7 +49,7 @@ def calculate_residuals(
             raise NotImplemented(f"Unknown error model type {error_type}")
     # when the error type is proportional, a infinite predicted value will result in a NaN residual
     # so here we special case infinite (and NaN) and force the residual to be -Inf as if it were an additive error type
-    residuals[nan_or_inf_mask] = - torch.inf
+    residuals[nan_or_inf_mask] = -torch.inf
     return residuals
 
 
@@ -106,7 +106,7 @@ def compute_error_variance(
             out_variance[mask] = sigma_expanded[mask] * torch.square(predictions[mask])
         else:
             raise NotImplemented(f"Unknown error model type {error_type}")
-    # if one of the predictions is Inf or NaN, the patient will be discarded but we do not want it to pollute 
+    # if one of the predictions is Inf or NaN, the patient will be discarded but we do not want it to pollute
     # the overall variance. In such a case, we do not multiply sigma by the predicted value when the error type is proportional
     out_variance[nan_or_inf_mask] = sigma_expanded[nan_or_inf_mask]
     return out_variance
