@@ -14,7 +14,6 @@ import scipy.stats as stats
 from scipy.special import expit
 from typing import get_args
 import matplotlib.pyplot as plt
-import seaborn as sns
 
 
 def init_transform_tensors(
