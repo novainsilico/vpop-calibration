@@ -1,7 +1,7 @@
 from tqdm.notebook import tqdm
 import torch
 import pandas as pd
-from typing import NamedTuple
+from typing import NamedTuple, Any
 import numpy as np
 import matplotlib.pyplot as plt
 from IPython.display import display
@@ -19,6 +19,13 @@ class ConditionalDistribSamples(NamedTuple):
     physical_params_samples: torch.Tensor
     predictions: torch.Tensor
     log_prob: torch.Tensor
+
+    def get_state_dict(self) -> dict[str, Any]:
+        return {k: v.detach().cpu().numpy().tolist() for k, v in self._asdict().items()}
+
+    @classmethod
+    def from_state_dict(cls, state_dict: dict[str, Any]) -> "ConditionalDistribSamples":
+        return cls(**{k: torch.as_tensor(v) for k, v in state_dict.items()})
 
 
 class ConditionalDistributionSampler:
@@ -57,8 +64,40 @@ class ConditionalDistributionSampler:
         self.samples: list[ConditionalDistribSamples] = [init_samples]
         self.ebe: ConditionalDistribSamples = init_samples
         self.nb_improved_history: list[float] = [0]
-        self.mean_improved_history: list[float] = [0]
         self.indiv_log_prob: np.ndarray = init_samples.log_prob.cpu().numpy()
+
+    def get_state_dict(self) -> dict[str, Any]:
+        if hasattr(self, "ebe"):
+            state_dict = {
+                "current_state": self.current_state.get_state_dict(),
+                "ebe": self.ebe.get_state_dict(),
+                "last_sample": self.samples[-1].get_state_dict(),
+                "has_run": True,
+            }
+        else:
+            state_dict = {"has_run": False}
+        return state_dict
+
+    @classmethod
+    def from_state_dict(
+        cls, state_dict: dict[str, Any], model: StatisticalModel
+    ) -> "ConditionalDistributionSampler":
+        instance = cls(model)
+        if state_dict["has_run"]:
+            instance.current_state = MetropolisHastingsState.from_state_dict(
+                state_dict=state_dict["current_state"]
+            )
+            init_samples = ConditionalDistribSamples.from_state_dict(
+                state_dict=state_dict["last_sample"]
+            )
+            instance.samples = [init_samples]
+            instance.ebe = ConditionalDistribSamples.from_state_dict(
+                state_dict=state_dict["ebe"]
+            )
+            instance.nb_improved_history = [0]
+            instance.indiv_log_prob = init_samples.log_prob.cpu().numpy()
+
+        return instance
 
     def run_sampler(self, nb_samples: int = 100):
         if not hasattr(self, "ebe"):

@@ -74,3 +74,12 @@ def sample_nlme_model(np_rng) -> StatisticalModel:
 def test_optimizer(sample_nlme_model):
     optim = PySaem(model=sample_nlme_model, config=SaemConfigDict())
     optim.run()
+
+
+def test_save_load(sample_nlme_model):
+    optim = PySaem(model=sample_nlme_model, config=SaemConfigDict())
+    state_dict = optim.get_state_dict()
+    new_optim = PySaem.from_state_dict(state_dict=state_dict, model=sample_nlme_model)
+    optim.run()
+    state_dict = optim.get_state_dict()
+    new_optim = PySaem.from_state_dict(state_dict=state_dict, model=sample_nlme_model)

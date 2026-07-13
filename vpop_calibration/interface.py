@@ -1,6 +1,6 @@
 import pandas as pd
 from pandera.typing import DataFrame
-from typing import Literal, NamedTuple
+from typing import Literal, NamedTuple, Any
 
 from vpop_calibration.structural_model import StructuralModel
 from vpop_calibration.pynlme.model import StatisticalModel
@@ -43,3 +43,34 @@ class NlmeModel:
             raise NotImplemented
         self.diagnostics = ModelDiagnostics(self.statistical_model)
         self.plot = PlottingUtility(self.diagnostics)
+
+    def get_state_dict(self) -> dict[str, Any]:
+        state = {
+            "statistical_model": self.statistical_model.get_state_dict(),
+            "optimizer": self.optimizer.get_state_dict(),
+            "diagnostics": self.diagnostics.get_state_dict(),
+        }
+        return state
+
+    @classmethod
+    def from_state_dict(
+        cls,
+        state_dict: dict[str, Any],
+        df: pd.DataFrame,
+        structural_model: StructuralModel,
+    ) -> "NlmeModel":
+        obs_data = ObsData(DataFrame(df))
+        instance = cls.__new__(cls)
+        instance.statistical_model = StatisticalModel.from_state_dict(
+            state_dict=state_dict["statistical_model"],
+            dataset=obs_data,
+            structural_model=structural_model,
+        )
+        instance.optimizer = PySaem.from_state_dict(
+            state_dict["optimizer"], model=instance.statistical_model
+        )
+        instance.diagnostics = ModelDiagnostics.from_state_dict(
+            state_dict["diagnostics"], instance.statistical_model
+        )
+        instance.plot = PlottingUtility(instance.diagnostics)
+        return instance

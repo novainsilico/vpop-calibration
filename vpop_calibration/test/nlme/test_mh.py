@@ -97,3 +97,27 @@ def test_mh_step(sample_nlme_params, obs_data, struct_model):
     new_state = mh_step(
         nlme_model=nlme_model, previous_state=init_state, learning_rate=0.1
     )
+
+
+def test_save_load(sample_nlme_params, obs_data, struct_model):
+    nlme_model = StatisticalModel(
+        structural_model=struct_model, dataset=obs_data, prior_params=sample_nlme_params
+    )
+    nb_samples = 1
+    etas = nlme_model.sample_etas(nb_samples)
+    etas = torch.zeros_like(etas)
+    gaussian_params = nlme_model.convert_etas_to_gaussian_all_patients(etas)
+    # Test the log prior function for etas
+    predictions = nlme_model.log_posterior_etas_all_patients(etas)
+    assert predictions.log_posterior.shape == (nb_samples, nlme_model.nb_patients)
+    init_state = MetropolisHastingsState(
+        etas=etas,
+        gaussian_params=gaussian_params,
+        log_prob=predictions.log_posterior,
+        step_size=0.1,
+        complete_likelihood=predictions.log_posterior.mean(dim=0).sum(dim=0),
+        prediction=predictions.predictions,
+    )
+
+    state_dict = init_state.get_state_dict()
+    new_mh_state = MetropolisHastingsState.from_state_dict(state_dict)

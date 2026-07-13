@@ -157,3 +157,11 @@ class MixedEffectParameters(BaseModel):
         assert set(self.output_names) == set(
             data.observed_output_names
         ), f"Discrepancy in output names. The data set contains \n{data.observed_output_names}\n The input parameters contain \n{self.output_names}"
+
+    def get_state_dict(self) -> dict[str, Any]:
+        return self.model_dump(exclude_computed_fields=True, exclude_defaults=True)
+
+    @classmethod
+    def from_state_dict(cls, state_dict: dict[str, Any]) -> "MixedEffectParameters":
+        instance = cls.model_validate(state_dict)
+        return instance

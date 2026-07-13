@@ -1,4 +1,4 @@
-from typing import NamedTuple, Literal
+from typing import NamedTuple, Literal, Any
 
 
 class SaemConfigDict(NamedTuple):
@@ -38,3 +38,10 @@ class SaemConfigDict(NamedTuple):
     column_width: int = 12
 
     progress_bars: bool = mode == "notebook"
+
+    def get_state_dict(self) -> dict[str, Any]:
+        return self._asdict()
+
+    @classmethod
+    def from_state_dict(cls, state_dict: dict[str, Any]) -> "SaemConfigDict":
+        return cls(**state_dict)

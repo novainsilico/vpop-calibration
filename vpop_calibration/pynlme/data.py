@@ -1,5 +1,4 @@
 import pandera.pandas as pa
-from pandera.typing import DataFrame
 import torch
 
 from vpop_calibration.utils import extend_schema
@@ -26,16 +25,16 @@ class ObsData:
         self.descriptors_known: list[str] = patients_df_raw.columns.to_list()
         self.descriptors_known.remove("id")
         self.descriptors_known.remove("protocol_arm")
-        self.patients_schema = extend_schema(
+        patients_schema = extend_schema(
             patientDataSchema, self.descriptors_known, "float"
         )
-        self.patients_df = self.patients_schema.validate(patients_df_raw)
+        self.patients_df = patients_schema.validate(patients_df_raw)
 
         self.full_obs = IndexedObservations(
             obs_index=ObservationIndex.from_dataframe(self.input_df),
             obs_values=torch.as_tensor(self.input_df["value"].to_list(), device=device),
         )
-        self.nb_outputs = len(self.full_obs.obs_index.output_name.ref_values)
+        self.nb_outputs_obs = len(self.full_obs.obs_index.output_name.ref_values)
         self.global_timesteps = torch.tensor(
             self.full_obs.obs_index.time.ref_values, device=device
         )
@@ -45,7 +44,9 @@ class ObsData:
 
         self.individual_observations: dict[str, IndexedObservations] = {}
 
-        self.n_tot_observations_per_output = torch.zeros(self.nb_outputs, device=device)
+        self.nb_tot_observations_per_output = torch.zeros(
+            self.nb_outputs_obs, device=device
+        )
         for p in self.patients:
             patient_data = self.input_df.loc[self.input_df["id"] == p]
             index_values_p = ObservationIndex.from_dataframe(patient_data)
@@ -59,7 +60,7 @@ class ObsData:
                     )
                 }
             )
-            self.n_tot_observations_per_output.scatter_add_(
+            self.nb_tot_observations_per_output.scatter_add_(
                 0,
                 index_values_p.output_name.index_values,
                 torch.ones_like(

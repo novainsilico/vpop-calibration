@@ -1,4 +1,4 @@
-from typing import NamedTuple
+from typing import NamedTuple, Any
 import torch
 import pandas as pd
 
@@ -10,6 +10,13 @@ class PopEstimates(NamedTuple):
     sigma: torch.Tensor
     model_intrinsic: torch.Tensor
     complete_likelihood: torch.Tensor
+
+    def get_state_dict(self) -> dict[str, Any]:
+        return {k: v.detach().cpu().numpy().tolist() for k, v in self._asdict().items()}
+
+    @classmethod
+    def from_state_dict(cls, state_dict: dict[str, Any]) -> "PopEstimates":
+        return cls(**{k: torch.as_tensor(v) for k, v in state_dict.items()})
 
 
 def check_convergence(

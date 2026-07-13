@@ -1,5 +1,5 @@
 import torch
-from typing import Literal
+from typing import Literal, Any
 import numpy as np
 import pandas as pd
 import pandera.pandas as pa
@@ -38,6 +38,21 @@ class ModelDiagnostics:
         self.sampler = ConditionalDistributionSampler(nlme_model=self.model)
         self.shrinkage: torch.Tensor | None = None
         self.vpc: pd.DataFrame | None = None
+
+    def get_state_dict(self) -> dict[str, Any]:
+        state_dict = {"sampler": self.sampler.get_state_dict()}
+
+        return state_dict
+
+    @classmethod
+    def from_state_dict(
+        cls, state_dict: dict[str, Any], nlme_model: StatisticalModel
+    ) -> "ModelDiagnostics":
+        instance = cls(nlme_model=nlme_model)
+        instance.sampler = ConditionalDistributionSampler.from_state_dict(
+            state_dict=state_dict["sampler"], model=nlme_model
+        )
+        return instance
 
     def sample_conditional_distribution(
         self,

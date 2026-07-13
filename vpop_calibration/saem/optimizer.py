@@ -2,7 +2,7 @@ import numpy as np
 import torch
 from tqdm.notebook import tqdm
 from scipy.optimize import minimize
-from typing import Callable
+from typing import Callable, Any
 import pandas as pd
 
 from vpop_calibration.pynlme.model import StatisticalModel
@@ -88,13 +88,59 @@ class PySaem:
             complete_likelihood=init_likelihood,
             model_intrinsic=self.model.log_mi,
         )
-        self.sufficient_statistics = MStepState(
+        self.sufficient_statistics = MStepState.from_init_gaussian_params(
             design_matrix=self.model.full_design_matrix,
             init_gaussian_params=output.gaussian_params,
             nb_chains=self.model.nb_chains,
             nb_patients=self.model.nb_patients,
             nb_pdu=self.model.nb_pdu,
         )
+
+    def get_state_dict(self) -> dict[str, Any]:
+        state_dict = {
+            "config": self.config.get_state_dict(),
+            "scheduler": self.scheduler.get_state_dict(),
+            "history": self.history.to_dict(),
+            "consecutive_converged_iters": self.consecutive_converged_iters,
+        }
+        if hasattr(self, "mh_state"):
+            state_dict.update(
+                {
+                    "mh_state": self.mh_state.get_state_dict(),
+                    "pop_estimates": self.pop_estimates.get_state_dict(),
+                    "sufficient_statistics": self.sufficient_statistics.get_state_dict(),
+                    "has_run": True,
+                }
+            )
+        else:
+            state_dict.update({"has_run": False})
+
+        return state_dict
+
+    @classmethod
+    def from_state_dict(
+        cls, state_dict: dict[str, Any], model: StatisticalModel
+    ) -> "PySaem":
+        instance = cls(
+            model=model, config=SaemConfigDict.from_state_dict(state_dict["config"])
+        )
+        instance.scheduler = SaemScheduler.from_state_dict(
+            state_dict=state_dict["scheduler"]
+        )
+        instance.history = pd.DataFrame.from_dict(state_dict["history"])
+        instance.consecutive_converged_iters = state_dict["consecutive_converged_iters"]
+
+        if state_dict["has_run"]:
+            instance.mh_state = MetropolisHastingsState.from_state_dict(
+                state_dict=state_dict["mh_state"]
+            )
+            instance.pop_estimates = PopEstimates.from_state_dict(
+                state_dict=state_dict["pop_estimates"]
+            )
+            instance.sufficient_statistics = MStepState.from_state_dict(
+                state_dict=state_dict["sufficient_statistics"]
+            )
+        return instance
 
     def run(self):
         if self.scheduler.iteration == 0:
@@ -172,7 +218,7 @@ class PySaem:
 
             # Update the residual error variance
             target_res_var: torch.Tensor = (
-                sum_sq_res / self.model.data.n_tot_observations_per_output
+                sum_sq_res / self.model.data.nb_tot_observations_per_output
             )
             current_res_var: torch.Tensor = self.model.residual_var
 

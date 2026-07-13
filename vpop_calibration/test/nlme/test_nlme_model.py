@@ -228,3 +228,14 @@ def test_log_posterior(sample_nlme_params, obs_data, struct_model):
     predictions = nlme_model.log_posterior_etas_all_patients(etas)
     assert predictions.log_posterior.shape == (nb_samples, nlme_model.nb_patients)
     # No analytical value here :sadface:, if someone has the courage to write it feel free
+
+
+def test_save_load(sample_nlme_params, obs_data, struct_model):
+    nlme_model = StatisticalModel(
+        structural_model=struct_model, dataset=obs_data, prior_params=sample_nlme_params
+    )
+    state_dict = nlme_model.get_state_dict()
+
+    new_nlme_model = StatisticalModel.from_state_dict(
+        state_dict=state_dict, dataset=obs_data, structural_model=struct_model
+    )

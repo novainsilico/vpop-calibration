@@ -1,5 +1,5 @@
 import torch
-from typing import NamedTuple
+from typing import NamedTuple, Any
 import numpy as np
 
 from vpop_calibration.pynlme.model import StatisticalModel
@@ -13,6 +13,36 @@ class MetropolisHastingsState(NamedTuple):
     log_prob: torch.Tensor
     step_size: float
     complete_likelihood: torch.Tensor
+
+    def get_state_dict(self) -> dict[str, Any]:
+        state_dict = {}
+        for tens in [
+            "etas",
+            "gaussian_params",
+            "prediction",
+            "log_prob",
+            "complete_likelihood",
+        ]:
+            state_dict.update(
+                {tens: getattr(self, tens).detach().cpu().numpy().tolist()}
+            )
+        state_dict.update({"step_size": self.step_size})
+        return state_dict
+
+    @classmethod
+    def from_state_dict(cls, state_dict: dict[str, Any]) -> "MetropolisHastingsState":
+        inputs_dict = {}
+        for tens in [
+            "etas",
+            "gaussian_params",
+            "prediction",
+            "log_prob",
+            "complete_likelihood",
+        ]:
+            inputs_dict.update({tens: torch.as_tensor(state_dict[tens])})
+        inputs_dict.update({"step_size": state_dict["step_size"]})
+
+        return cls(**inputs_dict)
 
 
 def mh_step(
