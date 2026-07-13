@@ -18,7 +18,7 @@ class ImportanceSampler:
 
         if not hasattr(self.model_diag.sampler, "ebe"):
             self.model_diag.sample_conditional_distribution()
-        samples = self.model_diag.sampler.ebe.eta_samples
+        samples = self.model_diag.sampler.total_samples.eta_samples
 
         N, P, D = samples.shape
 
