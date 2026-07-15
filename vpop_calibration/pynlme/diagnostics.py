@@ -13,6 +13,7 @@ from vpop_calibration.config import smoke_test
 from vpop_calibration.pynlme.conditional_distribution import (
     ConditionalDistributionSampler,
 )
+from vpop_calibration.pynlme.importance_sampling import ImportanceSampler
 
 ResidualType = Literal["pwres", "iwres", "npde"]
 
@@ -36,6 +37,10 @@ class ModelDiagnostics:
         self.iwres: pa.typing.DataFrame[WeightedResidualsSchema] | None = None
         self.npde: pa.typing.DataFrame[WeightedResidualsSchema] | None = None
         self.sampler = ConditionalDistributionSampler(nlme_model=self.model)
+        self.importance_sampler = ImportanceSampler(
+            model=self.model,
+            df=self.model.config.importance_sampling_df,
+        )
         self.shrinkage: torch.Tensor | None = None
         self.vpc: pd.DataFrame | None = None
 
@@ -371,3 +376,14 @@ class ModelDiagnostics:
 
         vpc_df = pd.concat(all_vpc_records, ignore_index=True)
         self.vpc = vpc_df
+
+    def compute_log_likelihood_importance_sampling(
+        self, nb_samples: int = 100
+    ) -> float:
+        if not hasattr(self.sampler, "samples"):
+            self.sample_conditional_distribution()
+        self.importance_sampler.fit_sudent_t_proposal(
+            conditional_samples=self.sampler.total_samples
+        )
+        ll = self.importance_sampler.compute_likelihood(nb_samples=nb_samples)
+        return ll

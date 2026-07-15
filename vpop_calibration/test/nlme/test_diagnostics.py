@@ -89,6 +89,7 @@ def test_diagnostics(sample_nlme_params, obs_data, struct_model):
     diagnostics.compute_npde()
     diagnostics.compute_shrinkage()
     diagnostics.compute_vpc()
+    diagnostics.compute_log_likelihood_importance_sampling()
     # Test the plotter in isolation
     plotter = PlottingUtility(diagnostics=diagnostics)
     plotter.map_estimates()

@@ -9,8 +9,10 @@ from vpop_calibration.pynlme.params import MixedEffectParameters
 from vpop_calibration.pynlme.model import StatisticalModel
 from vpop_calibration.structural_model.base import StructuralModel
 from vpop_calibration.structural_model.analytical import StructuralAnalytical
-from vpop_calibration.pynlme.diagnostics import ModelDiagnostics
 from vpop_calibration.pynlme.importance_sampling import ImportanceSampler
+from vpop_calibration.pynlme.conditional_distribution import (
+    ConditionalDistributionSampler,
+)
 
 
 @pytest.fixture
@@ -79,9 +81,8 @@ def test_importance_sampling(sample_nlme_params, obs_data, struct_model):
     nlme_model = StatisticalModel(
         structural_model=struct_model, dataset=obs_data, prior_params=sample_nlme_params
     )
-    diagnostics = ModelDiagnostics(nlme_model)
-    sampler = ImportanceSampler(diagnostics)
-    sampler.fit_sudent_t_proposal()
-    sampler._student_t_log_prob()
-    sampler._generate_student_samples()
+    cond_sampler = ConditionalDistributionSampler(nlme_model)
+    cond_sampler.run_sampler()
+    sampler = ImportanceSampler(nlme_model)
+    sampler.fit_sudent_t_proposal(conditional_samples=cond_sampler.total_samples)
     sampler.compute_likelihood()
