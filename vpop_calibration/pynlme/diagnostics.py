@@ -377,13 +377,12 @@ class ModelDiagnostics:
         vpc_df = pd.concat(all_vpc_records, ignore_index=True)
         self.vpc = vpc_df
 
-    def compute_log_likelihood_importance_sampling(
-        self, nb_samples: int = 100
-    ) -> float:
+    def compute_log_likelihood_importance_sampling(self, nb_samples: int = 100) -> None:
         if not hasattr(self.sampler, "samples"):
             self.sample_conditional_distribution()
         self.importance_sampler.fit_sudent_t_proposal(
             conditional_samples=self.sampler.total_samples
         )
-        ll = self.importance_sampler.compute_likelihood(nb_samples=nb_samples)
-        return ll
+        self.log_likelihood = self.importance_sampler.compute_likelihood(
+            nb_samples=nb_samples
+        )

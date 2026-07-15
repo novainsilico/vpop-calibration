@@ -24,7 +24,7 @@ class ImportanceSampler:
         ), "Need more than one sample to estimate the student distribution."
 
         mu = torch.mean(etas, dim=0)
-        sigma = torch.var(etas, 0)
+        sigma = torch.clamp(torch.var(etas, 0), 1e-6)
 
         self.dist = dist.StudentT(df=torch.tensor(self.df), loc=mu, scale=sigma)
 
