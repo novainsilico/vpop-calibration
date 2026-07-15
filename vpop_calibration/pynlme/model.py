@@ -32,8 +32,28 @@ class NlmeModelState(NamedTuple):
 
     @classmethod
     def from_state_dict(cls, state_dict: dict[str, Any]) -> "NlmeModelState":
-        instance = cls(**{key: torch.as_tensor(val) for key, val in state_dict.items()})
+        instance = cls(
+            **{
+                key: torch.as_tensor(val, device=device)
+                for key, val in state_dict.items()
+            }
+        )
         return instance
+
+    def __eq__(self, other) -> bool:
+        compared_attributes = [
+            "beta",
+            "omega",
+            "log_mi",
+            "res_var",
+        ]
+
+        return all(
+            (
+                torch.testing.assert_close(getattr(self, elem), getattr(other, elem))
+                for elem in compared_attributes
+            )
+        )
 
 
 class StatisticalModel:
@@ -132,17 +152,20 @@ class StatisticalModel:
                 [
                     self.prior_params.pdu[param].prior_omega
                     for param in self.prior_params.pdu_names
-                ]
+                ],
+                device=device,
             )
         )
         init_mi = torch.as_tensor(
             [
                 self.prior_params.model_intrinsic[param].tansformed_prior
                 for param in self.mi_names
-            ]
+            ],
+            device=device,
         )
         init_res_var = torch.as_tensor(
-            [self.prior_params.error_model[out].sigma for out in self.output_names]
+            [self.prior_params.error_model[out].sigma for out in self.output_names],
+            device=device,
         )
         init_params = NlmeModelState(
             beta=init_beta, omega=init_omega, log_mi=init_mi, res_var=init_res_var

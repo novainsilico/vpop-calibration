@@ -77,7 +77,8 @@ def test_nlme_params(sample_nlme_params, obs_data):
     nlme_params.validate_data(obs_data)
 
 
-def test_save_load(sample_nlme_params):
+def test_state_dict(sample_nlme_params):
     nlme_params = MixedEffectParameters.model_validate(sample_nlme_params)
     state_dict = nlme_params.get_state_dict()
     new_params = MixedEffectParameters.from_state_dict(state_dict)
+    assert nlme_params == new_params

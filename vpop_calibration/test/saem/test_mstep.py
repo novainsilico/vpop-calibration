@@ -24,7 +24,7 @@ def test_mstep():
     proposal = state.update(new_gaussian_params=new_gaussian_params, learning_rate=0.1)
 
 
-def test_save_load():
+def test_state_dict():
     nb_pdu = 3
     indiv_design_matrix = torch.eye(nb_pdu).float()
     nb_chains = 1
@@ -42,3 +42,5 @@ def test_save_load():
     )
     state_dict = state.get_state_dict()
     new_mstep_state = MStepState.from_state_dict(state_dict=state_dict)
+
+    assert state == new_mstep_state

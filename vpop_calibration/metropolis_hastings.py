@@ -39,10 +39,26 @@ class MetropolisHastingsState(NamedTuple):
             "log_prob",
             "complete_likelihood",
         ]:
-            inputs_dict.update({tens: torch.as_tensor(state_dict[tens])})
+            inputs_dict.update({tens: torch.as_tensor(state_dict[tens], device=device)})
         inputs_dict.update({"step_size": state_dict["step_size"]})
 
         return cls(**inputs_dict)
+
+    def __eq__(self, other) -> bool:
+        compared_attributes = [
+            "etas",
+            "gaussian_params",
+            "prediction",
+            "log_prob",
+            "complete_likelihood",
+        ]
+
+        return all(
+            (
+                torch.testing.assert_close(getattr(self, elem), getattr(other, elem))
+                for elem in compared_attributes
+            )
+        )
 
 
 def mh_step(

@@ -67,15 +67,34 @@ class MStepState:
     @classmethod
     def from_state_dict(cls, state_dict: dict[str, Any]) -> "MStepState":
         instance = cls(
-            design_matrix=torch.as_tensor(state_dict["design_matrix"]),
+            design_matrix=torch.as_tensor(state_dict["design_matrix"], device=device),
             nb_chains=state_dict["nb_chains"],
             nb_patients=state_dict["nb_patients"],
             nb_pdu=state_dict["nb_pdu"],
         )
-        instance.cross_product = torch.as_tensor(state_dict["cross_product"])
-        instance.outer_product = torch.as_tensor(state_dict["outer_product"])
+        instance.cross_product = torch.as_tensor(
+            state_dict["cross_product"], device=device
+        )
+        instance.outer_product = torch.as_tensor(
+            state_dict["outer_product"], device=device
+        )
 
         return instance
+
+    def __eq__(self, other) -> bool:
+        compared_attributes = [
+            "cross_product",
+            "outer_product",
+            "X",
+            "gram_matrix",
+        ]
+
+        return all(
+            (
+                torch.testing.assert_close(getattr(self, elem), getattr(other, elem))
+                for elem in compared_attributes
+            )
+        )
 
     def compute_cross_product(self, gaussian_params: torch.Tensor) -> torch.Tensor:
         prod = (

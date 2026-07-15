@@ -2,7 +2,6 @@ import pytest
 import numpy as np
 import pandas as pd
 import torch
-import json
 
 from vpop_calibration.interface import NlmeModel
 from vpop_calibration.structural_model import StructuralAnalytical, StructuralModel
@@ -66,7 +65,7 @@ def test_nlme_interface(sample_inputs):
     nlme_model = NlmeModel(df=df, prior_params=priors, structural_model=struct_model)
 
 
-def test_save_load(sample_inputs):
+def test_state_dict(sample_inputs):
     priors, df, struct_model = sample_inputs
     nlme_model = NlmeModel(df=df, prior_params=priors, structural_model=struct_model)
     state_dict = nlme_model.get_state_dict()
@@ -85,14 +84,29 @@ def test_save_load(sample_inputs):
     )
 
 
-def test_serialization(sample_inputs):
+def test_save_load(sample_inputs, tmp_path):
     priors, df, struct_model = sample_inputs
     nlme_model = NlmeModel(df=df, prior_params=priors, structural_model=struct_model)
     nlme_model.optimizer.run()
     nlme_model.diagnostics.sample_conditional_distribution()
-    state_dict = nlme_model.get_state_dict()
-    json_payload = json.dumps(state_dict)
-    new_state = json.loads(json_payload)
-    new_model = NlmeModel.from_state_dict(
-        state_dict=new_state, df=df, structural_model=struct_model
+
+    model_path = tmp_path / "model.json"
+    nlme_model.save(model_path)
+    new_nlme_model = NlmeModel.load(model_path, df=df, struct_model=struct_model)
+
+    torch.testing.assert_close(
+        nlme_model.statistical_model.omega_pop,
+        new_nlme_model.statistical_model.omega_pop,
+    )
+    torch.testing.assert_close(
+        nlme_model.statistical_model.population_betas,
+        new_nlme_model.statistical_model.population_betas,
+    )
+    torch.testing.assert_close(
+        nlme_model.statistical_model.residual_var,
+        new_nlme_model.statistical_model.residual_var,
+    )
+    torch.testing.assert_close(
+        nlme_model.statistical_model.log_mi,
+        new_nlme_model.statistical_model.log_mi,
     )

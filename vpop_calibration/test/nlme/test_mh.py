@@ -99,7 +99,7 @@ def test_mh_step(sample_nlme_params, obs_data, struct_model):
     )
 
 
-def test_save_load(sample_nlme_params, obs_data, struct_model):
+def test_state_dict(sample_nlme_params, obs_data, struct_model):
     nlme_model = StatisticalModel(
         structural_model=struct_model, dataset=obs_data, prior_params=sample_nlme_params
     )
@@ -121,3 +121,5 @@ def test_save_load(sample_nlme_params, obs_data, struct_model):
 
     state_dict = init_state.get_state_dict()
     new_mh_state = MetropolisHastingsState.from_state_dict(state_dict)
+
+    assert init_state == new_mh_state

@@ -86,7 +86,7 @@ def test_conditional_sampling(sample_nlme_params, obs_data, struct_model):
     sampler.run_sampler()
 
 
-def test_save_load(sample_nlme_params, obs_data, struct_model):
+def test_state_dict(sample_nlme_params, obs_data, struct_model):
     nlme_model = StatisticalModel(
         structural_model=struct_model,
         dataset=obs_data,
@@ -103,3 +103,5 @@ def test_save_load(sample_nlme_params, obs_data, struct_model):
     new_sampler = ConditionalDistributionSampler.from_state_dict(
         state_dict=state_dict, model=nlme_model
     )
+    assert sampler.ebe == new_sampler.ebe
+    assert sampler.samples[-1] == new_sampler.samples[0]

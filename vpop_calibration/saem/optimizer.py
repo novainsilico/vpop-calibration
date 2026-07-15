@@ -134,7 +134,7 @@ class PySaem:
             instance.mh_state = MetropolisHastingsState.from_state_dict(
                 state_dict=state_dict["mh_state"]
             )
-            instance.pop_estimates = PopEstimates.from_state_dict(
+            instance.current_estimates = PopEstimates.from_state_dict(
                 state_dict=state_dict["pop_estimates"]
             )
             instance.sufficient_statistics = MStepState.from_state_dict(

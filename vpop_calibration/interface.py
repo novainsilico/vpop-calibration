@@ -1,6 +1,8 @@
 import pandas as pd
 from pandera.typing import DataFrame
 from typing import Literal, NamedTuple, Any
+import json
+import os
 
 from vpop_calibration.structural_model import StructuralModel
 from vpop_calibration.pynlme.model import StatisticalModel
@@ -74,3 +76,21 @@ class NlmeModel:
         )
         instance.plot = PlottingUtility(instance.diagnostics)
         return instance
+
+    def save(self, f: str | bytes | os.PathLike):
+        state_dict = self.get_state_dict()
+        with open(f, "w") as file:
+            json.dump(state_dict, file)
+
+    @classmethod
+    def load(
+        cls,
+        f: str | bytes | os.PathLike,
+        df: pd.DataFrame,
+        struct_model: StructuralModel,
+    ) -> "NlmeModel":
+        with open(f, "r") as file:
+            state_dict = json.load(file)
+        return NlmeModel.from_state_dict(
+            state_dict=state_dict, df=df, structural_model=struct_model
+        )

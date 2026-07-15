@@ -230,7 +230,7 @@ def test_log_posterior(sample_nlme_params, obs_data, struct_model):
     # No analytical value here :sadface:, if someone has the courage to write it feel free
 
 
-def test_save_load(sample_nlme_params, obs_data, struct_model):
+def test_state_dict(sample_nlme_params, obs_data, struct_model):
     nlme_model = StatisticalModel(
         structural_model=struct_model, dataset=obs_data, prior_params=sample_nlme_params
     )
@@ -239,3 +239,5 @@ def test_save_load(sample_nlme_params, obs_data, struct_model):
     new_nlme_model = StatisticalModel.from_state_dict(
         state_dict=state_dict, dataset=obs_data, structural_model=struct_model
     )
+
+    assert nlme_model.current_params == new_nlme_model.current_params
