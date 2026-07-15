@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.4.4] - 2026-07-10
+
+### Added
+
+- Save/load methods for the `NlmeModel` interface class. Quickly export the current state of the model and optimizer to a json file. Restore it, by providing the json snapshot and the initial data + structural model.
+
 ## [4.4.3] - 2026-07-10
 
 ### Added

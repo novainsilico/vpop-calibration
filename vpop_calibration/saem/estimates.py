@@ -1,6 +1,8 @@
-from typing import NamedTuple
+from typing import NamedTuple, Any
 import torch
 import pandas as pd
+
+from vpop_calibration.config import device, default_dtype
 
 
 class PopEstimates(NamedTuple):
@@ -10,6 +12,34 @@ class PopEstimates(NamedTuple):
     sigma: torch.Tensor
     model_intrinsic: torch.Tensor
     complete_likelihood: torch.Tensor
+
+    def get_state_dict(self) -> dict[str, Any]:
+        return {k: v.detach().cpu().numpy().tolist() for k, v in self._asdict().items()}
+
+    @classmethod
+    def from_state_dict(cls, state_dict: dict[str, Any]) -> "PopEstimates":
+        return cls(
+            **{
+                k: torch.as_tensor(v, device=device, dtype=default_dtype)
+                for k, v in state_dict.items()
+            }
+        )
+
+    def __eq__(self, other) -> bool:
+        compared_attributes = [
+            "beta",
+            "omega",
+            "psi",
+            "sigma",
+            "model_intrinsic",
+            "complete_likelihood",
+        ]
+
+        for elem in compared_attributes:
+            torch.testing.assert_close(
+                getattr(self, elem), getattr(other, elem), equal_nan=True
+            )
+        return True
 
 
 def check_convergence(

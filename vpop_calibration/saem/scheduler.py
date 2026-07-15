@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Literal, Any
 import numpy as np
 
 
@@ -68,3 +68,27 @@ class SaemScheduler:
             )
         else:
             raise NotImplemented
+
+    def get_state_dict(self) -> dict[str, Any]:
+        return {
+            "nb_iter_burnin": self.nb_iter_burnin,
+            "nb_iter_learning": self.nb_iter_learning,
+            "nb_iter_smoothing": self.nb_iter_smoothing,
+            "init_step_adaptation": self.init_step_adaptation,
+            "learning_rate_power": self.learning_rate_power,
+            "patience": self.patience,
+            "iteration": self.iteration,
+        }
+
+    @classmethod
+    def from_state_dict(cls, state_dict: dict[str, Any]) -> "SaemScheduler":
+        instance = cls(
+            nb_iter_burnin=state_dict["nb_iter_burnin"],
+            nb_iter_learning=state_dict["nb_iter_learning"],
+            nb_iter_smoothing=state_dict["nb_iter_smoothing"],
+            init_step_adaptation=state_dict["init_step_adaptation"],
+            learning_rate_power=state_dict["learning_rate_power"],
+            patience=state_dict["patience"],
+        )
+        instance.iteration = state_dict["iteration"]
+        return instance

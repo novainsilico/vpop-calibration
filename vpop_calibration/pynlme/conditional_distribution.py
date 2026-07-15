@@ -1,7 +1,7 @@
 from tqdm.notebook import tqdm
 import torch
 import pandas as pd
-from typing import NamedTuple
+from typing import NamedTuple, Any
 import numpy as np
 import matplotlib.pyplot as plt
 from IPython.display import display
@@ -10,7 +10,7 @@ import uuid
 
 
 from vpop_calibration.pynlme.model import StatisticalModel
-from vpop_calibration.config import smoke_test
+from vpop_calibration.config import smoke_test, device, default_dtype
 from vpop_calibration.metropolis_hastings import MetropolisHastingsState, mh_step
 
 
@@ -19,6 +19,30 @@ class ConditionalDistribSamples(NamedTuple):
     physical_params_samples: torch.Tensor
     predictions: torch.Tensor
     log_prob: torch.Tensor
+
+    def get_state_dict(self) -> dict[str, Any]:
+        return {k: v.detach().cpu().numpy().tolist() for k, v in self._asdict().items()}
+
+    @classmethod
+    def from_state_dict(cls, state_dict: dict[str, Any]) -> "ConditionalDistribSamples":
+        return cls(
+            **{
+                k: torch.as_tensor(v, device=device, dtype=default_dtype)
+                for k, v in state_dict.items()
+            }
+        )
+
+    def __eq__(self, other) -> bool:
+        compared_attributes = [
+            "eta_samples",
+            "physical_params_samples",
+            "predictions",
+            "log_prob",
+        ]
+
+        for elem in compared_attributes:
+            torch.testing.assert_close(getattr(self, elem), getattr(other, elem))
+        return True
 
 
 class ConditionalDistributionSampler:
@@ -57,8 +81,40 @@ class ConditionalDistributionSampler:
         self.samples: list[ConditionalDistribSamples] = [init_samples]
         self.ebe: ConditionalDistribSamples = init_samples
         self.nb_improved_history: list[float] = [0]
-        self.mean_improved_history: list[float] = [0]
         self.indiv_log_prob: np.ndarray = init_samples.log_prob.cpu().numpy()
+
+    def get_state_dict(self) -> dict[str, Any]:
+        if hasattr(self, "ebe"):
+            state_dict = {
+                "current_state": self.current_state.get_state_dict(),
+                "ebe": self.ebe.get_state_dict(),
+                "last_sample": self.samples[-1].get_state_dict(),
+                "has_run": True,
+            }
+        else:
+            state_dict = {"has_run": False}
+        return state_dict
+
+    @classmethod
+    def from_state_dict(
+        cls, state_dict: dict[str, Any], model: StatisticalModel
+    ) -> "ConditionalDistributionSampler":
+        instance = cls(model)
+        if state_dict["has_run"]:
+            instance.current_state = MetropolisHastingsState.from_state_dict(
+                state_dict=state_dict["current_state"]
+            )
+            init_samples = ConditionalDistribSamples.from_state_dict(
+                state_dict=state_dict["last_sample"]
+            )
+            instance.samples = [init_samples]
+            instance.ebe = ConditionalDistribSamples.from_state_dict(
+                state_dict=state_dict["ebe"]
+            )
+            instance.nb_improved_history = [0]
+            instance.indiv_log_prob = init_samples.log_prob.cpu().numpy()
+
+        return instance
 
     def run_sampler(self, nb_samples: int = 100):
         if not hasattr(self, "ebe"):
@@ -127,7 +183,7 @@ class ConditionalDistributionSampler:
             log_prob=new_log_prob,
         )
 
-        nb_improved = accept_mask.float().sum().item()
+        nb_improved = accept_mask.double().sum().item()
         self.nb_improved_history.append(nb_improved)
         self.indiv_log_prob = np.concat((self.indiv_log_prob, new_log_prob), axis=0)
 

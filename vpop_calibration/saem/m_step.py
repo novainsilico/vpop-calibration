@@ -1,9 +1,9 @@
 import torch
-from typing import NamedTuple
+from typing import NamedTuple, Any
 
 
 from vpop_calibration.saem.utils import stochastic_approximation, clamp_eigen_values
-from vpop_calibration.config import device
+from vpop_calibration.config import device, default_dtype
 
 
 class MStepProposal(NamedTuple):
@@ -18,7 +18,6 @@ class MStepState:
         nb_chains: int,
         nb_patients: int,
         nb_pdu: int,
-        init_gaussian_params: torch.Tensor,
     ):
         # Gather the required properties from the statistical model
         self.X = design_matrix
@@ -29,15 +28,72 @@ class MStepState:
         self.nb_chains = nb_chains
         self.nb_patients = nb_patients
         self.nb_pdu = nb_pdu
-        # Initiate the sufficient statistics
-        assert init_gaussian_params.shape == (
-            self.nb_chains,
-            self.nb_patients,
-            self.nb_pdu,
+
+    @classmethod
+    def from_init_gaussian_params(
+        cls,
+        design_matrix: torch.Tensor,
+        nb_chains: int,
+        nb_patients: int,
+        nb_pdu: int,
+        init_gaussian_params: torch.Tensor,
+    ) -> "MStepState":
+        instance = cls(
+            design_matrix=design_matrix,
+            nb_chains=nb_chains,
+            nb_patients=nb_patients,
+            nb_pdu=nb_pdu,
         )
 
-        self.cross_product = self.compute_cross_product(init_gaussian_params)
-        self.outer_product, _ = self.compute_outer_product(init_gaussian_params)
+        assert init_gaussian_params.shape == (
+            instance.nb_chains,
+            instance.nb_patients,
+            instance.nb_pdu,
+        )
+        instance.cross_product = instance.compute_cross_product(init_gaussian_params)
+        instance.outer_product, _ = instance.compute_outer_product(init_gaussian_params)
+        return instance
+
+    def get_state_dict(self) -> dict[str, Any]:
+        return {
+            "design_matrix": self.X.detach().cpu().numpy().tolist(),
+            "nb_chains": self.nb_chains,
+            "nb_patients": self.nb_patients,
+            "nb_pdu": self.nb_pdu,
+            "cross_product": self.cross_product.detach().cpu().numpy().tolist(),
+            "outer_product": self.outer_product.detach().cpu().numpy().tolist(),
+        }
+
+    @classmethod
+    def from_state_dict(cls, state_dict: dict[str, Any]) -> "MStepState":
+        instance = cls(
+            design_matrix=torch.as_tensor(
+                state_dict["design_matrix"], device=device, dtype=default_dtype
+            ),
+            nb_chains=state_dict["nb_chains"],
+            nb_patients=state_dict["nb_patients"],
+            nb_pdu=state_dict["nb_pdu"],
+        )
+        instance.cross_product = torch.as_tensor(
+            state_dict["cross_product"], device=device, dtype=default_dtype
+        )
+        instance.outer_product = torch.as_tensor(
+            state_dict["outer_product"], device=device, dtype=default_dtype
+        )
+
+        return instance
+
+    def __eq__(self, other) -> bool:
+        compared_attributes = [
+            "cross_product",
+            "outer_product",
+            "X",
+            "gram_matrix",
+        ]
+
+        for elem in compared_attributes:
+            torch.testing.assert_close(getattr(self, elem), getattr(other, elem))
+        return True
 
     def compute_cross_product(self, gaussian_params: torch.Tensor) -> torch.Tensor:
         prod = (

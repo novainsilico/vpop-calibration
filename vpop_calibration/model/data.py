@@ -6,7 +6,7 @@ import pandera.pandas as pa
 from functools import reduce
 from typing import Optional
 
-from ..config import device
+from ..config import device, default_dtype
 
 
 class TrainingDataSchema(pa.DataFrameModel):
@@ -139,12 +139,24 @@ class TrainingDataSet:
                 self.full_df_reshaped, ["id"]
             )
             self.normalizing_input_mean, self.normalizing_input_std = (
-                torch.as_tensor(mean.loc[self.parameter_names].values, device=device),
-                torch.as_tensor(std.loc[self.parameter_names].values, device=device),
+                torch.as_tensor(
+                    mean.loc[self.parameter_names].values,
+                    device=device,
+                    dtype=default_dtype,
+                ),
+                torch.as_tensor(
+                    std.loc[self.parameter_names].values,
+                    device=device,
+                    dtype=default_dtype,
+                ),
             )
             self.normalizing_output_mean, self.normalizing_output_std = (
-                torch.as_tensor(mean.loc[self.tasks].values, device=device),
-                torch.as_tensor(std.loc[self.tasks].values, device=device),
+                torch.as_tensor(
+                    mean.loc[self.tasks].values, device=device, dtype=default_dtype
+                ),
+                torch.as_tensor(
+                    std.loc[self.tasks].values, device=device, dtype=default_dtype
+                ),
             )
 
         # Compute the number of patients for training
@@ -174,9 +186,12 @@ class TrainingDataSet:
             self.X_validation = torch.as_tensor(
                 self.validation_df_normalized[self.parameter_names].values,
                 device=device,
+                dtype=default_dtype,
             )
             self.Y_validation = torch.as_tensor(
-                self.validation_df_normalized[self.tasks].values, device=device
+                self.validation_df_normalized[self.tasks].values,
+                device=device,
+                dtype=default_dtype,
             )
 
         else:  # no validation data set provided
@@ -187,10 +202,14 @@ class TrainingDataSet:
             self.Y_validation = None
 
         self.X_training: torch.Tensor = torch.as_tensor(
-            self.training_df_normalized[self.parameter_names].values, device=device
+            self.training_df_normalized[self.parameter_names].values,
+            device=device,
+            dtype=default_dtype,
         )
         self.Y_training: torch.Tensor = torch.as_tensor(
-            self.training_df_normalized[self.tasks].values, device=device
+            self.training_df_normalized[self.tasks].values,
+            device=device,
+            dtype=default_dtype,
         )
 
     def pivot_input_data(self, data_in: pd.DataFrame) -> pd.DataFrame:
@@ -290,7 +309,7 @@ class TrainingDataSet:
         """Given wide outputs from a model and a comparison data frame (wide format), add the patient descriptors and reshape to a long format, with a `protocol_arm` and an `output_name` column."""
         # Assuming Y is a wide output from the model, its columns are self.tasks
         base_df = pd.DataFrame(
-            data=Y.cpu().detach().float().numpy(),
+            data=Y.cpu().detach().double().numpy(),
             columns=self.tasks,
         )
         # The rows are assumed to correspond to the rows of the comparison data frame
@@ -385,7 +404,7 @@ class TrainingDataSet:
 
         wide_df = self.pivot_input_data(new_data)
         tensor_inputs_wide = torch.as_tensor(
-            wide_df[self.parameter_names].values, device=device
+            wide_df[self.parameter_names].values, device=device, dtype=default_dtype
         )
 
         return tensor_inputs_wide, wide_df, new_data, remove_value

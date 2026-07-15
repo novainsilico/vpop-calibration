@@ -6,7 +6,7 @@ import torch
 from vpop_calibration.structural_model.base import StructuralModel
 from vpop_calibration.pynlme.indexing import ObservationIndex
 from vpop_calibration.utils import extend_schema
-from vpop_calibration.config import device
+from vpop_calibration.config import device, default_dtype
 
 
 class StructuralAnalytical(StructuralModel):
@@ -58,6 +58,7 @@ class StructuralAnalytical(StructuralModel):
             .drop(columns="protocol_arm")
             .values,
             device=device,
+            dtype=default_dtype,
         )
         # the parameters of the "equations" function which are NOT protocol overrides and NOT time, in this order
         parameter_names_without_protocol_overrides = [

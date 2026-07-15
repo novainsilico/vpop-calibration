@@ -1,9 +1,9 @@
 import torch
-from typing import NamedTuple
+from typing import NamedTuple, Any
 import numpy as np
 
 from vpop_calibration.pynlme.model import StatisticalModel
-from vpop_calibration.config import device
+from vpop_calibration.config import device, default_dtype
 
 
 class MetropolisHastingsState(NamedTuple):
@@ -13,6 +13,57 @@ class MetropolisHastingsState(NamedTuple):
     log_prob: torch.Tensor
     step_size: float
     complete_likelihood: torch.Tensor
+
+    def get_state_dict(self) -> dict[str, Any]:
+        state_dict = {}
+        for tens in [
+            "etas",
+            "gaussian_params",
+            "prediction",
+            "log_prob",
+            "complete_likelihood",
+        ]:
+            state_dict.update(
+                {tens: getattr(self, tens).detach().cpu().numpy().tolist()}
+            )
+        state_dict.update({"step_size": self.step_size})
+        return state_dict
+
+    @classmethod
+    def from_state_dict(cls, state_dict: dict[str, Any]) -> "MetropolisHastingsState":
+        inputs_dict = {}
+        for tens in [
+            "etas",
+            "gaussian_params",
+            "prediction",
+            "log_prob",
+            "complete_likelihood",
+        ]:
+            inputs_dict.update(
+                {
+                    tens: torch.as_tensor(
+                        state_dict[tens], device=device, dtype=default_dtype
+                    )
+                }
+            )
+        inputs_dict.update({"step_size": state_dict["step_size"]})
+
+        return cls(**inputs_dict)
+
+    def __eq__(self, other) -> bool:
+        compared_attributes = [
+            "etas",
+            "gaussian_params",
+            "prediction",
+            "log_prob",
+            "complete_likelihood",
+        ]
+
+        for elem in compared_attributes:
+            torch.testing.assert_close(
+                getattr(self, elem), getattr(other, elem), equal_nan=True
+            )
+        return True
 
 
 def mh_step(
@@ -77,7 +128,7 @@ def mh_step(
     new_pred = torch.where(
         accept_mask_predictions, proposal.predictions, previous_state.prediction
     ).to(device)
-    new_acceptance_rate: float = accept_mask.cpu().float().mean().mean().item()
+    new_acceptance_rate: float = accept_mask.cpu().double().mean().mean().item()
     if verbose:
         print(f"  Acceptance rate: {new_acceptance_rate:.2f}")
     new_step_size: float = previous_state.step_size * np.exp(

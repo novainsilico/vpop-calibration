@@ -1,5 +1,5 @@
 import torch
-from typing import get_args, NamedTuple, Callable
+from typing import get_args, NamedTuple, Callable, Any
 import pandas as pd
 
 from vpop_calibration.structural_model.base import StructuralModel
@@ -9,13 +9,48 @@ from vpop_calibration.pynlme.params import MixedEffectParameters, ErrorType
 from vpop_calibration.pynlme.utils import init_transform_function
 from vpop_calibration.pynlme.residuals import log_likelihood_observation
 from vpop_calibration.pynlme.config import NlmeConfigDict
-from vpop_calibration.config import device, smoke_test
+from vpop_calibration.config import device, smoke_test, default_dtype
 
 
 class LogPosteriorPrediction(NamedTuple):
     log_posterior: torch.Tensor
     gaussian_params: torch.Tensor
     predictions: torch.Tensor
+
+
+class NlmeModelState(NamedTuple):
+    beta: torch.Tensor
+    omega: torch.Tensor
+    log_mi: torch.Tensor
+    res_var: torch.Tensor
+
+    def get_state_dict(self) -> dict[str, Any]:
+        return {
+            key: val.detach().cpu().numpy().tolist()
+            for key, val in self._asdict().items()
+        }
+
+    @classmethod
+    def from_state_dict(cls, state_dict: dict[str, Any]) -> "NlmeModelState":
+        instance = cls(
+            **{
+                key: torch.as_tensor(val, device=device, dtype=default_dtype)
+                for key, val in state_dict.items()
+            }
+        )
+        return instance
+
+    def __eq__(self, other) -> bool:
+        compared_attributes = [
+            "beta",
+            "omega",
+            "log_mi",
+            "res_var",
+        ]
+
+        for elem in compared_attributes:
+            torch.testing.assert_close(getattr(self, elem), getattr(other, elem))
+        return True
 
 
 class StatisticalModel:
@@ -108,31 +143,37 @@ class StatisticalModel:
 
         # -- NLME state initialization
         # Initiate the nlme model parameters in torch tensors
-        self.init_beta = torch.as_tensor(self.prior_params.beta_init, device=device)
-        self.init_omega = torch.diag(
+        init_beta = torch.as_tensor(
+            self.prior_params.beta_init, device=device, dtype=default_dtype
+        )
+        init_omega = torch.diag(
             torch.as_tensor(
                 [
                     self.prior_params.pdu[param].prior_omega
                     for param in self.prior_params.pdu_names
-                ]
+                ],
+                device=device,
+                dtype=default_dtype,
             )
         )
-        self.init_mi = torch.as_tensor(
+        init_mi = torch.as_tensor(
             [
                 self.prior_params.model_intrinsic[param].tansformed_prior
                 for param in self.mi_names
-            ]
+            ],
+            device=device,
+            dtype=default_dtype,
         )
-        self.init_res_var = torch.as_tensor(
-            [self.prior_params.error_model[out].sigma for out in self.output_names]
+        init_res_var = torch.as_tensor(
+            [self.prior_params.error_model[out].sigma for out in self.output_names],
+            device=device,
+            dtype=default_dtype,
+        )
+        init_params = NlmeModelState(
+            beta=init_beta, omega=init_omega, log_mi=init_mi, res_var=init_res_var
         )
 
-        self.set_current_parameters(
-            omega=self.init_omega,
-            beta=self.init_beta,
-            log_mi=self.init_mi,
-            res_var=self.init_res_var,
-        )
+        self.set_current_parameters(pop_params=init_params)
 
         # Create design matrices
         self.init_all_design_matrices()
@@ -148,6 +189,35 @@ class StatisticalModel:
         self.mi_transform = init_transform_function(
             self.prior_params.model_intrinsic, self.mi_names
         )
+
+    def get_state_dict(self) -> dict[str, Any]:
+        state_dict = {
+            "prior_params": self.prior_params.get_state_dict(),
+            "config": self.config.get_state_dict(),
+            "current_params": self.current_params.get_state_dict(),
+        }
+        return state_dict
+
+    @classmethod
+    def from_state_dict(
+        cls,
+        state_dict: dict[str, Any],
+        dataset: ObsData,
+        structural_model: StructuralModel,
+    ) -> "StatisticalModel":
+        instance = cls(
+            structural_model=structural_model,
+            dataset=dataset,
+            prior_params=MixedEffectParameters.from_state_dict(
+                state_dict=state_dict["prior_params"]
+            ),
+            config=NlmeConfigDict.from_state_dict(state_dict=state_dict["config"]),
+        )
+        pop_params = NlmeModelState.from_state_dict(
+            state_dict=state_dict["current_params"]
+        )
+        instance.set_current_parameters(pop_params=pop_params)
+        return instance
 
     def init_design_matrix(self, patient_covariates: dict) -> torch.Tensor:
         """
@@ -254,13 +324,7 @@ class StatisticalModel:
 
         self.log_mi = log_mi
 
-    def set_current_parameters(
-        self,
-        omega: torch.Tensor,
-        beta: torch.Tensor,
-        log_mi: torch.Tensor,
-        res_var: torch.Tensor,
-    ):
+    def set_current_parameters(self, pop_params: NlmeModelState):
         """Update or initialize the current population parameter values
 
         Args:
@@ -269,10 +333,11 @@ class StatisticalModel:
             log_mi (torch.Tensor): The model intrinsic parameters (log-transformed)
             res_var (torch.Tensor): The residual error variance per output
         """
-        self.update_omega(omega)
-        self.update_betas(beta)
-        self.update_log_mi(log_mi)
-        self.update_res_var(res_var)
+        self.current_params = pop_params
+        self.update_omega(pop_params.omega)
+        self.update_betas(pop_params.beta)
+        self.update_log_mi(pop_params.log_mi)
+        self.update_res_var(pop_params.res_var)
 
     # @torch.compile
     def sample_etas(self, nb_samples: int) -> torch.Tensor:
@@ -528,7 +593,7 @@ class StatisticalModel:
     ) -> Callable[[torch.Tensor], LogPosteriorPrediction]:
         observations = self.data.individual_observations[id]
         time_steps = torch.as_tensor(
-            observations.obs_index.time.ref_values, device=device
+            observations.obs_index.time.ref_values, device=device, dtype=default_dtype
         )
         design_matrix = self.design_matrices[id].unsqueeze(0)
         pdk = self.data.patients_pdk[id]

@@ -25,7 +25,7 @@ def test_data_container(obs_data):
     ds = ObsData(df)
 
     torch.testing.assert_close(
-        ds.n_tot_observations_per_output, torch.tensor([6, 6]), check_dtype=False
+        ds.nb_tot_observations_per_output, torch.tensor([6, 6]), check_dtype=False
     )
 
 

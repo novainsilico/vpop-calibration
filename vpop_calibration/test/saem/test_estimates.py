@@ -64,3 +64,29 @@ def test_iter_summary():
         mi_names=mi_names,
         output_names=output_names,
     )
+
+
+def test_state_dict():
+    beta = torch.tensor([0.0, 0.0, 0.0])
+    omega = torch.tensor([[0.0, 0.0], [0.0, 0.0]])
+    beta_names = ["pdu_1", "cov_1", "pdu_2"]
+    pdu_names = ["pdu_1", "pdu_2"]
+    mi = torch.tensor([0.0])
+    mi_names = ["mi_1"]
+    cov_coeff_names = ["cov_1"]
+    sigma = torch.tensor([1.0, 1.0])
+    output_names = ["out_1", "out_2"]
+
+    pop_estimates = PopEstimates(
+        beta=beta,
+        omega=omega,
+        model_intrinsic=mi,
+        sigma=sigma,
+        psi=torch.tensor([0.0]),
+        complete_likelihood=torch.tensor([0.0]),
+    )
+
+    state_dict = pop_estimates.get_state_dict()
+    new_estimates = PopEstimates.from_state_dict(state_dict)
+
+    assert pop_estimates == new_estimates
