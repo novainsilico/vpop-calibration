@@ -1,5 +1,7 @@
 from vpop_calibration.sdk import (
     create_nlme_model,
+    export_nlme_model,
+    load_nlme_model,
     run_saem,
     run_diagnostics,
     DiagnosticsConfig,
@@ -84,3 +86,18 @@ def test_sdk(obs_data, sample_nlme_params):
     # 3. Run diagnostics
     diag_config = DiagnosticsConfig()
     out = run_diagnostics(model=model, config=diag_config)
+
+    # 4. Export the model
+    payload = export_nlme_model(model)
+
+    # 5 Reload it
+    new_model = load_nlme_model(
+        payload=payload,
+        data_table=obs_data,
+        model_path=path_to_model,
+        solving_options_path=path_to_solving_options,
+        protocol_design=protocol_design,
+        struct_model_inputs=inputs,
+        struct_model_outputs=outputs,
+        categorical_attributes=None,
+    )

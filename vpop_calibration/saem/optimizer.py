@@ -134,7 +134,7 @@ class PySaem:
             instance.mh_state = MetropolisHastingsState.from_state_dict(
                 state_dict=state_dict["mh_state"]
             )
-            instance.current_estimates = PopEstimates.from_state_dict(
+            instance.pop_estimates = PopEstimates.from_state_dict(
                 state_dict=state_dict["pop_estimates"]
             )
             instance.sufficient_statistics = MStepState.from_state_dict(
@@ -350,16 +350,16 @@ class PySaem:
     ) -> None:
         """Update the optimizer state with new population estimates, also updating the number of converged iterations."""
 
-        if not hasattr(self, "current_estimates"):
+        if not hasattr(self, "pop_estimates"):
             # This is the first iteration
-            self.current_estimates = new_estimates
+            self.pop_estimates = new_estimates
             converged = False
         else:
-            self.previous_estimates = self.current_estimates
-            self.current_estimates = new_estimates
+            self.previous_estimates = self.pop_estimates
+            self.pop_estimates = new_estimates
             converged = self.check_convergence(
                 self.previous_estimates,
-                self.current_estimates,
+                self.pop_estimates,
             )
 
         if converged:

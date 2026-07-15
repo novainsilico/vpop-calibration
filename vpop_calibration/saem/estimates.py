@@ -2,7 +2,7 @@ from typing import NamedTuple, Any
 import torch
 import pandas as pd
 
-from vpop_calibration.config import device
+from vpop_calibration.config import device, default_dtype
 
 
 class PopEstimates(NamedTuple):
@@ -19,7 +19,10 @@ class PopEstimates(NamedTuple):
     @classmethod
     def from_state_dict(cls, state_dict: dict[str, Any]) -> "PopEstimates":
         return cls(
-            **{k: torch.as_tensor(v, device=device) for k, v in state_dict.items()}
+            **{
+                k: torch.as_tensor(v, device=device, dtype=default_dtype)
+                for k, v in state_dict.items()
+            }
         )
 
     def __eq__(self, other) -> bool:
@@ -32,12 +35,11 @@ class PopEstimates(NamedTuple):
             "complete_likelihood",
         ]
 
-        return all(
-            (
-                torch.testing.assert_close(getattr(self, elem), getattr(other, elem))
-                for elem in compared_attributes
+        for elem in compared_attributes:
+            torch.testing.assert_close(
+                getattr(self, elem), getattr(other, elem), equal_nan=True
             )
-        )
+        return True
 
 
 def check_convergence(

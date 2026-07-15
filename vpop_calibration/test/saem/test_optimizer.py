@@ -77,14 +77,19 @@ def test_optimizer(sample_nlme_model):
 
 
 def test_state_dict(sample_nlme_model):
+    # Fresh optimizer
     optim = PySaem(model=sample_nlme_model, config=SaemConfigDict())
     state_dict = optim.get_state_dict()
     new_optim = PySaem.from_state_dict(state_dict=state_dict, model=sample_nlme_model)
+
+    assert optim.scheduler.iteration == new_optim.scheduler.iteration
+
+    # Run the algorithm
     optim.run()
     state_dict = optim.get_state_dict()
     new_optim = PySaem.from_state_dict(state_dict=state_dict, model=sample_nlme_model)
 
-    assert optim.current_estimates == new_optim.current_estimates
+    assert optim.pop_estimates == new_optim.pop_estimates
     assert optim.mh_state == new_optim.mh_state
     assert optim.sufficient_statistics == new_optim.sufficient_statistics
     assert optim.scheduler.iteration == new_optim.scheduler.iteration

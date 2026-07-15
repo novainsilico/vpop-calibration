@@ -265,10 +265,10 @@ class PlottingUtility:
 
             title = f"{output_name}"
             ax.set_title(title)
-            plt.tight_layout()
 
         if not smoke_test:
             plt.show()
+            plt.tight_layout()
 
         plt.close(fig)
 
@@ -365,9 +365,9 @@ class PlottingUtility:
 
                 title = f"patient {ind_to_plot[k]}"
                 ax.set_title(title)
-                plt.tight_layout()
             if not smoke_test:
                 plt.show()
+                plt.tight_layout()
 
             plt.close(fig)
 
@@ -834,7 +834,7 @@ class PlottingUtility:
         n_cols = n_columns
         n_rows = int(np.ceil(n_plots / n_cols))
 
-        _, axes1 = plt.subplots(
+        fig1, axes1 = plt.subplots(
             n_rows,
             n_cols,
             squeeze=False,
@@ -850,7 +850,7 @@ class PlottingUtility:
             ax.hist([cond_samples, map_samples], density=True)
             ax.set_title(f"{param}")
 
-        _, axes2 = plt.subplots(
+        fig2, axes2 = plt.subplots(
             n_plots,
             n_plots,
             squeeze=False,
@@ -879,3 +879,6 @@ class PlottingUtility:
         if not smoke_test:
             plt.tight_layout()
             plt.show()
+
+        plt.close(fig1)
+        plt.close(fig2)

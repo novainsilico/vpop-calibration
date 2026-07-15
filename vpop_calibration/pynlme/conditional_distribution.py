@@ -10,7 +10,7 @@ import uuid
 
 
 from vpop_calibration.pynlme.model import StatisticalModel
-from vpop_calibration.config import smoke_test, device
+from vpop_calibration.config import smoke_test, device, default_dtype
 from vpop_calibration.metropolis_hastings import MetropolisHastingsState, mh_step
 
 
@@ -26,7 +26,10 @@ class ConditionalDistribSamples(NamedTuple):
     @classmethod
     def from_state_dict(cls, state_dict: dict[str, Any]) -> "ConditionalDistribSamples":
         return cls(
-            **{k: torch.as_tensor(v, device=device) for k, v in state_dict.items()}
+            **{
+                k: torch.as_tensor(v, device=device, dtype=default_dtype)
+                for k, v in state_dict.items()
+            }
         )
 
     def __eq__(self, other) -> bool:
@@ -37,12 +40,9 @@ class ConditionalDistribSamples(NamedTuple):
             "log_prob",
         ]
 
-        return all(
-            (
-                torch.testing.assert_close(getattr(self, elem), getattr(other, elem))
-                for elem in compared_attributes
-            )
-        )
+        for elem in compared_attributes:
+            torch.testing.assert_close(getattr(self, elem), getattr(other, elem))
+        return True
 
 
 class ConditionalDistributionSampler:
@@ -183,7 +183,7 @@ class ConditionalDistributionSampler:
             log_prob=new_log_prob,
         )
 
-        nb_improved = accept_mask.float().sum().item()
+        nb_improved = accept_mask.double().sum().item()
         self.nb_improved_history.append(nb_improved)
         self.indiv_log_prob = np.concat((self.indiv_log_prob, new_log_prob), axis=0)
 

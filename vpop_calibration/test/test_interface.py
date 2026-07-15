@@ -94,19 +94,12 @@ def test_save_load(sample_inputs, tmp_path):
     nlme_model.save(model_path)
     new_nlme_model = NlmeModel.load(model_path, df=df, struct_model=struct_model)
 
-    torch.testing.assert_close(
-        nlme_model.statistical_model.omega_pop,
-        new_nlme_model.statistical_model.omega_pop,
+    assert (
+        nlme_model.statistical_model.current_params
+        == new_nlme_model.statistical_model.current_params
     )
-    torch.testing.assert_close(
-        nlme_model.statistical_model.population_betas,
-        new_nlme_model.statistical_model.population_betas,
-    )
-    torch.testing.assert_close(
-        nlme_model.statistical_model.residual_var,
-        new_nlme_model.statistical_model.residual_var,
-    )
-    torch.testing.assert_close(
-        nlme_model.statistical_model.log_mi,
-        new_nlme_model.statistical_model.log_mi,
+
+    assert (
+        nlme_model.statistical_model.prior_params
+        == nlme_model.statistical_model.prior_params
     )

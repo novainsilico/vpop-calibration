@@ -3,7 +3,7 @@ from typing import NamedTuple, Any
 
 
 from vpop_calibration.saem.utils import stochastic_approximation, clamp_eigen_values
-from vpop_calibration.config import device
+from vpop_calibration.config import device, default_dtype
 
 
 class MStepProposal(NamedTuple):
@@ -67,16 +67,18 @@ class MStepState:
     @classmethod
     def from_state_dict(cls, state_dict: dict[str, Any]) -> "MStepState":
         instance = cls(
-            design_matrix=torch.as_tensor(state_dict["design_matrix"], device=device),
+            design_matrix=torch.as_tensor(
+                state_dict["design_matrix"], device=device, dtype=default_dtype
+            ),
             nb_chains=state_dict["nb_chains"],
             nb_patients=state_dict["nb_patients"],
             nb_pdu=state_dict["nb_pdu"],
         )
         instance.cross_product = torch.as_tensor(
-            state_dict["cross_product"], device=device
+            state_dict["cross_product"], device=device, dtype=default_dtype
         )
         instance.outer_product = torch.as_tensor(
-            state_dict["outer_product"], device=device
+            state_dict["outer_product"], device=device, dtype=default_dtype
         )
 
         return instance
@@ -89,12 +91,9 @@ class MStepState:
             "gram_matrix",
         ]
 
-        return all(
-            (
-                torch.testing.assert_close(getattr(self, elem), getattr(other, elem))
-                for elem in compared_attributes
-            )
-        )
+        for elem in compared_attributes:
+            torch.testing.assert_close(getattr(self, elem), getattr(other, elem))
+        return True
 
     def compute_cross_product(self, gaussian_params: torch.Tensor) -> torch.Tensor:
         prod = (

@@ -2,7 +2,7 @@ import torch
 import pandas as pd
 
 from vpop_calibration.pynlme.indexing import ObservationIndex
-from vpop_calibration.config import device
+from vpop_calibration.config import device, default_dtype
 from vpop_calibration.pynlme.schemas import ObsDataSchema, patientDataSchema
 
 
@@ -49,10 +49,14 @@ class StructuralModel:
         )
 
         patient_descriptors = torch.as_tensor(
-            order_patient_data[self.parameter_names].values, device=device
+            order_patient_data[self.parameter_names].values,
+            device=device,
+            dtype=default_dtype,
         )
         nb_patients, nb_parameters = patient_descriptors.shape
-        timesteps = torch.as_tensor(obs_index.time.ref_values, device=device)
+        timesteps = torch.as_tensor(
+            obs_index.time.ref_values, device=device, dtype=default_dtype
+        )
         nb_timesteps = timesteps.shape[0]
         X = torch.cat(
             (

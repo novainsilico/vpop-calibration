@@ -18,7 +18,6 @@ from .plot import (
 )
 from ..config import smoke_test, device
 
-torch.set_default_dtype(torch.float64)
 gpytorch.settings.cholesky_jitter(1e-6)
 
 

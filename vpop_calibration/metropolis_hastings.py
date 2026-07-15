@@ -3,7 +3,7 @@ from typing import NamedTuple, Any
 import numpy as np
 
 from vpop_calibration.pynlme.model import StatisticalModel
-from vpop_calibration.config import device
+from vpop_calibration.config import device, default_dtype
 
 
 class MetropolisHastingsState(NamedTuple):
@@ -39,7 +39,13 @@ class MetropolisHastingsState(NamedTuple):
             "log_prob",
             "complete_likelihood",
         ]:
-            inputs_dict.update({tens: torch.as_tensor(state_dict[tens], device=device)})
+            inputs_dict.update(
+                {
+                    tens: torch.as_tensor(
+                        state_dict[tens], device=device, dtype=default_dtype
+                    )
+                }
+            )
         inputs_dict.update({"step_size": state_dict["step_size"]})
 
         return cls(**inputs_dict)
@@ -53,12 +59,11 @@ class MetropolisHastingsState(NamedTuple):
             "complete_likelihood",
         ]
 
-        return all(
-            (
-                torch.testing.assert_close(getattr(self, elem), getattr(other, elem))
-                for elem in compared_attributes
+        for elem in compared_attributes:
+            torch.testing.assert_close(
+                getattr(self, elem), getattr(other, elem), equal_nan=True
             )
-        )
+        return True
 
 
 def mh_step(
@@ -123,7 +128,7 @@ def mh_step(
     new_pred = torch.where(
         accept_mask_predictions, proposal.predictions, previous_state.prediction
     ).to(device)
-    new_acceptance_rate: float = accept_mask.cpu().float().mean().mean().item()
+    new_acceptance_rate: float = accept_mask.cpu().double().mean().mean().item()
     if verbose:
         print(f"  Acceptance rate: {new_acceptance_rate:.2f}")
     new_step_size: float = previous_state.step_size * np.exp(

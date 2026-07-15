@@ -2,7 +2,7 @@ import pandera.pandas as pa
 import torch
 
 from vpop_calibration.utils import extend_schema
-from vpop_calibration.config import device
+from vpop_calibration.config import device, default_dtype
 from vpop_calibration.pynlme.indexing import ObservationIndex, IndexedObservations
 from vpop_calibration.pynlme.schemas import ObsDataSchema, patientDataSchema
 
@@ -32,7 +32,9 @@ class ObsData:
 
         self.full_obs = IndexedObservations(
             obs_index=ObservationIndex.from_dataframe(self.input_df),
-            obs_values=torch.as_tensor(self.input_df["value"].to_list(), device=device),
+            obs_values=torch.as_tensor(
+                self.input_df["value"].to_list(), device=device, dtype=default_dtype
+            ),
         )
         self.nb_outputs_obs = len(self.full_obs.obs_index.output_name.ref_values)
         self.global_timesteps = torch.tensor(
@@ -51,7 +53,7 @@ class ObsData:
             patient_data = self.input_df.loc[self.input_df["id"] == p]
             index_values_p = ObservationIndex.from_dataframe(patient_data)
             obs_values_p = torch.as_tensor(
-                patient_data["value"].to_list(), device=device
+                patient_data["value"].to_list(), device=device, dtype=default_dtype
             )
             self.individual_observations.update(
                 {
@@ -92,7 +94,9 @@ class ObsData:
                 self.patients_pdk.update(
                     {
                         patient: torch.as_tensor(
-                            row[self.pdk_names].values, device=device
+                            row[self.pdk_names].values,
+                            device=device,
+                            dtype=default_dtype,
                         )
                     }
                 )

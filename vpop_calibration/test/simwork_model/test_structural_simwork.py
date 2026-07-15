@@ -126,7 +126,9 @@ def test_categorical_override(dummy_simwork_model):
     vpop = struct_model.assemble_numeric_vpop(X=X, prediction_index=obs_index)
     temporary_ids = vpop["id"]
     expected_vpop = pd.DataFrame({"id": temporary_ids, "k_12": [0, 1], "k_21": [1, 0]})
-    pd.testing.assert_frame_equal(vpop, expected_vpop, check_like=True)
+    pd.testing.assert_frame_equal(
+        vpop, expected_vpop, check_like=True, check_dtype=False
+    )
     cat_df = struct_model.assemble_categorical_vpop(
         nb_patients, nb_chains, temporary_ids, prediction_index=obs_index
     )
@@ -134,4 +136,6 @@ def test_categorical_override(dummy_simwork_model):
     expected_cat_df = pd.DataFrame(
         {"id": temporary_ids, "PatientId": ["Totoro", "Pikachu"]}
     )
-    pd.testing.assert_frame_equal(cat_df, expected_cat_df, check_like=True)
+    pd.testing.assert_frame_equal(
+        cat_df, expected_cat_df, check_like=True, check_dtype=False
+    )

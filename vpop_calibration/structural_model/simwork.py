@@ -14,7 +14,7 @@ import os
 from vpop_calibration.structural_model.base import StructuralModel
 from vpop_calibration.pynlme.indexing import ObservationIndex
 from vpop_calibration.utils import extend_schema
-from vpop_calibration.config import device, smoke_test
+from vpop_calibration.config import device, smoke_test, default_dtype
 
 
 class TimeseriesOutput(BaseModel):
@@ -239,6 +239,7 @@ class StructuralSimwork(StructuralModel):
             .drop(columns="protocol_arm")
             .values,
             device=device,
+            dtype=default_dtype,
         )
 
         self.task_names = [
@@ -358,7 +359,9 @@ class StructuralSimwork(StructuralModel):
         patient_id_ordered = pd.DataFrame({"id": temporary_ids})
         outputs_df_ordered = patient_id_ordered.merge(outputs_df, on="id", how="left")
         outputs_tensor = torch.as_tensor(
-            outputs_df_ordered[self.output_names].values, device=device
+            outputs_df_ordered[self.output_names].values,
+            device=device,
+            dtype=default_dtype,
         )
         # Pivot to a wide tensor
         outputs_wide = outputs_tensor.view(

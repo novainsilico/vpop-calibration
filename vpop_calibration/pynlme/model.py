@@ -9,7 +9,7 @@ from vpop_calibration.pynlme.params import MixedEffectParameters, ErrorType
 from vpop_calibration.pynlme.utils import init_transform_function
 from vpop_calibration.pynlme.residuals import log_likelihood_observation
 from vpop_calibration.pynlme.config import NlmeConfigDict
-from vpop_calibration.config import device, smoke_test
+from vpop_calibration.config import device, smoke_test, default_dtype
 
 
 class LogPosteriorPrediction(NamedTuple):
@@ -34,7 +34,7 @@ class NlmeModelState(NamedTuple):
     def from_state_dict(cls, state_dict: dict[str, Any]) -> "NlmeModelState":
         instance = cls(
             **{
-                key: torch.as_tensor(val, device=device)
+                key: torch.as_tensor(val, device=device, dtype=default_dtype)
                 for key, val in state_dict.items()
             }
         )
@@ -48,12 +48,9 @@ class NlmeModelState(NamedTuple):
             "res_var",
         ]
 
-        return all(
-            (
-                torch.testing.assert_close(getattr(self, elem), getattr(other, elem))
-                for elem in compared_attributes
-            )
-        )
+        for elem in compared_attributes:
+            torch.testing.assert_close(getattr(self, elem), getattr(other, elem))
+        return True
 
 
 class StatisticalModel:
@@ -146,7 +143,9 @@ class StatisticalModel:
 
         # -- NLME state initialization
         # Initiate the nlme model parameters in torch tensors
-        init_beta = torch.as_tensor(self.prior_params.beta_init, device=device)
+        init_beta = torch.as_tensor(
+            self.prior_params.beta_init, device=device, dtype=default_dtype
+        )
         init_omega = torch.diag(
             torch.as_tensor(
                 [
@@ -154,6 +153,7 @@ class StatisticalModel:
                     for param in self.prior_params.pdu_names
                 ],
                 device=device,
+                dtype=default_dtype,
             )
         )
         init_mi = torch.as_tensor(
@@ -162,10 +162,12 @@ class StatisticalModel:
                 for param in self.mi_names
             ],
             device=device,
+            dtype=default_dtype,
         )
         init_res_var = torch.as_tensor(
             [self.prior_params.error_model[out].sigma for out in self.output_names],
             device=device,
+            dtype=default_dtype,
         )
         init_params = NlmeModelState(
             beta=init_beta, omega=init_omega, log_mi=init_mi, res_var=init_res_var
@@ -591,7 +593,7 @@ class StatisticalModel:
     ) -> Callable[[torch.Tensor], LogPosteriorPrediction]:
         observations = self.data.individual_observations[id]
         time_steps = torch.as_tensor(
-            observations.obs_index.time.ref_values, device=device
+            observations.obs_index.time.ref_values, device=device, dtype=default_dtype
         )
         design_matrix = self.design_matrices[id].unsqueeze(0)
         pdk = self.data.patients_pdk[id]
