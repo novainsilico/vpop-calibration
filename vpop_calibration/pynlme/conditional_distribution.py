@@ -12,6 +12,7 @@ import uuid
 from vpop_calibration.pynlme.model import StatisticalModel
 from vpop_calibration.config import smoke_test, device, default_dtype
 from vpop_calibration.metropolis_hastings import MetropolisHastingsState, mh_step
+from vpop_calibration.utils import seed_everything
 
 
 class ConditionalDistribSamples(NamedTuple):
@@ -116,7 +117,9 @@ class ConditionalDistributionSampler:
 
         return instance
 
-    def run_sampler(self, nb_samples: int = 100):
+    def run_sampler(self, nb_samples: int = 100, seed: int | None = None):
+        if seed is not None:
+            seed_everything(seed)
         if not hasattr(self, "ebe"):
             self.init_samples()
         else:
