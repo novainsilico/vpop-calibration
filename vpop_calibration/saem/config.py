@@ -2,6 +2,8 @@ from typing import NamedTuple, Literal, Any
 
 
 class SaemConfigDict(NamedTuple):
+    # Reproducibility
+    seed: int = 0
     ## Schedule
     nb_iter_burnin: int = 0
     nb_iter_learning: int = 100

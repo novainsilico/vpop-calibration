@@ -12,6 +12,7 @@ import uuid
 from vpop_calibration.pynlme.model import StatisticalModel
 from vpop_calibration.config import smoke_test, device, default_dtype
 from vpop_calibration.metropolis_hastings import MetropolisHastingsState, mh_step
+from vpop_calibration.utils import reproducible_uuid4, seed_everything
 
 
 class ConditionalDistribSamples(NamedTuple):
@@ -116,8 +117,11 @@ class ConditionalDistributionSampler:
 
         return instance
 
-    def run_sampler(self, nb_samples: int = 100):
+    def run_sampler(self, nb_samples: int = 100, seed: int | None = None):
         if not hasattr(self, "ebe"):
+            if seed is not None:
+                self.model.config = self.model.config._replace(seed=seed)
+            seed_everything(self.model.config.seed)
             self.init_samples()
         else:
             print(f"Sampling already started, adding {nb_samples} new samples.")
@@ -307,7 +311,9 @@ class ConditionalDistributionSampler:
         This function is intended to be used on dataframes before concatenating rows together.
         """
         out_df = df.rename(columns={"id": "id_ref"})
-        new_ids = {patient: str(uuid.uuid4()) for patient in self.model.patients}
+        new_ids = {
+            patient: str(reproducible_uuid4()) for patient in self.model.patients
+        }
         out_df["id"] = out_df["id_ref"].map(new_ids)
         return out_df
 
