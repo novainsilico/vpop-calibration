@@ -2,6 +2,7 @@ from typing import NamedTuple, Any
 
 
 class NlmeConfigDict(NamedTuple):
+    seed: int = 0
     nb_chains: int = 1
     live_plot: bool = True
     plot_frequency: int = 5

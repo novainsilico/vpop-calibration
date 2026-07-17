@@ -145,8 +145,9 @@ class PySaem:
 
     def run(self, seed: int | None = None):
         if seed is not None:
-            seed_everything(seed)
+            self.config = self.config._replace(seed=seed)
         if self.scheduler.iteration == 0:
+            seed_everything(self.config.seed)
             # Inititate the SAEM state with current estimates and Metropolis Hastings state
             self.init_state()
         else:

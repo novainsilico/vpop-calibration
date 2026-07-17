@@ -118,9 +118,10 @@ class ConditionalDistributionSampler:
         return instance
 
     def run_sampler(self, nb_samples: int = 100, seed: int | None = None):
-        if seed is not None:
-            seed_everything(seed)
         if not hasattr(self, "ebe"):
+            if seed is not None:
+                self.model.config = self.model.config._replace(seed=seed)
+            seed_everything(self.model.config.seed)
             self.init_samples()
         else:
             print(f"Sampling already started, adding {nb_samples} new samples.")
