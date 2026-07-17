@@ -3,6 +3,7 @@ import pandera.pandas as pa
 import random
 import numpy as np
 import torch
+import uuid
 
 
 def extend_schema(
@@ -23,3 +24,9 @@ def seed_everything(seed: int) -> None:
     torch.manual_seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
+
+
+def reproducible_uuid4(seed=None):
+    if seed is not None:
+        random.seed(seed)
+    return uuid.UUID(int=random.getrandbits(128), version=4)
