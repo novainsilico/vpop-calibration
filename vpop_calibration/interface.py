@@ -15,9 +15,11 @@ from vpop_calibration.saem.optimizer import PySaem
 from vpop_calibration.saem.config import SaemConfigDict
 from vpop_calibration.pynlme.plot import PlottingUtility
 from vpop_calibration.pynlme.config import NlmeConfigDict
+from vpop_calibration.utils import seed_everything
 
 
 class Config(NamedTuple):
+    seed: int = 0
     saem: SaemConfigDict = SaemConfigDict()
     nlme: NlmeConfigDict = NlmeConfigDict()
 
@@ -31,6 +33,7 @@ class NlmeModel:
         optim: Literal["saem"] = "saem",
         config: Config = Config(),
     ):
+        seed_everything(config.seed)
         obs_data = ObsData(DataFrame(df))
         nlme_params = MixedEffectParameters.model_validate(prior_params)
         self.statistical_model = StatisticalModel(

@@ -68,9 +68,8 @@ class ModelDiagnostics:
     def sample_conditional_distribution(
         self,
         nb_samples: int = 100,
-        seed: int | None = None,
     ) -> None:
-        self.sampler.run_sampler(nb_samples=nb_samples, seed=seed)
+        self.sampler.run_sampler(nb_samples=nb_samples)
 
     def compute_iwres(self) -> None:
         """Compute Individual Weighted Residuals (IWRES), following the formula :
