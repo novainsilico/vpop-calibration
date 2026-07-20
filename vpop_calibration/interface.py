@@ -79,7 +79,7 @@ class NlmeModel:
             state_dict["diagnostics"], instance.statistical_model
         )
         instance.plot = PlottingUtility(instance.diagnostics)
-        instance.priors = PriorVisualizer(instance)
+        instance.priors = PriorVisualizer(instance.diagnostics)
         return instance
 
     def save(self, f: str | bytes | os.PathLike):
