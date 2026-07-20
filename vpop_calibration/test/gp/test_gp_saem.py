@@ -5,7 +5,6 @@ import numpy as np
 from vpop_calibration.interface import NlmeModel
 from vpop_calibration.structural_model.gp import StructuralGp
 from vpop_calibration.model.gp import GP
-from vpop_calibration.pynlme.plot import PlottingUtility
 
 
 @pytest.fixture

@@ -21,7 +21,6 @@ from vpop_calibration.config import device
 from vpop_calibration.pynlme.residuals import log_likelihood_observation
 from vpop_calibration.saem.plot import OptimizerPlot
 from vpop_calibration.config import smoke_test
-from vpop_calibration.utils import seed_everything
 
 
 class PySaem:

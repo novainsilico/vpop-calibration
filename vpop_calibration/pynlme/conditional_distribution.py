@@ -12,7 +12,7 @@ import uuid
 from vpop_calibration.pynlme.model import StatisticalModel
 from vpop_calibration.config import smoke_test, device, default_dtype
 from vpop_calibration.metropolis_hastings import MetropolisHastingsState, mh_step
-from vpop_calibration.utils import reproducible_uuid4, seed_everything
+from vpop_calibration.utils import reproducible_uuid4
 
 
 class ConditionalDistribSamples(NamedTuple):

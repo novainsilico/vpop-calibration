@@ -3,7 +3,6 @@ from vpop_calibration.pynlme.diagnostics import WeightedResidualsSchema
 
 from typing import NamedTuple
 import pandera.pandas as pa
-import pandas as pd
 
 
 class DiagnosticsConfig(NamedTuple):
