@@ -11,7 +11,7 @@ pytest_golden.yaml.add_representer(
 @pytest.fixture(scope="session")
 def np_rng():
     # Initialize the seeds for all random operators used in the tests
-    rng = np.random.default_rng(42)
+    rng = np.random.default_rng(0)
     return rng
 
 

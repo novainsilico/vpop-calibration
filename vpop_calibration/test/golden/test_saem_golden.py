@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import torch
 from deepdiff import DeepDiff
+import json
 
 from vpop_calibration.structural_model.base import StructuralModel
 from vpop_calibration.structural_model.analytical import StructuralAnalytical
@@ -96,4 +97,4 @@ def test_saem_golden(sample_nlme_params, obs_data, struct_model, golden, request
             ignore_order=True,
             ignore_type_in_groups=[(tuple, list), (float, np.float64)],
         )
-        assert diff == {}, diff
+        assert diff == {}, json.dumps(diff, indent=2)
