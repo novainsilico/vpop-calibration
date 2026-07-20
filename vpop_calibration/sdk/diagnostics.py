@@ -54,7 +54,7 @@ def run_diagnostics(model: NlmeModel, config: DiagnosticsConfig) -> DiagnosticsO
         model.diagnostics.compute_log_likelihood_importance_sampling(
             config.importance_sampling_nb_samples
         )
-        ll = model.diagnostics.log_likelihood
+        ll = model.diagnostics.importance_sampler.log_lik
     else:
         ll = None
 

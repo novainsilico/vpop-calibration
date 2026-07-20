@@ -86,3 +86,28 @@ def test_importance_sampling(sample_nlme_params, obs_data, struct_model):
     sampler = ImportanceSampler(nlme_model)
     sampler.fit_sudent_t_proposal(conditional_samples=cond_sampler.total_samples)
     sampler.compute_likelihood()
+
+
+def test_state_dict(sample_nlme_params, obs_data, struct_model):
+    nlme_model = StatisticalModel(
+        structural_model=struct_model, dataset=obs_data, prior_params=sample_nlme_params
+    )
+    cond_sampler = ConditionalDistributionSampler(nlme_model)
+    cond_sampler.run_sampler()
+    sampler = ImportanceSampler(nlme_model)
+    state_dict_empty = sampler.get_state_dict()
+
+    new_sampler_empty = ImportanceSampler.from_state_dict(
+        model=nlme_model, state_dict=state_dict_empty
+    )
+    assert new_sampler_empty.dist is None
+
+    sampler.fit_sudent_t_proposal(conditional_samples=cond_sampler.total_samples)
+    sampler.compute_likelihood()
+    state_dict_not_empty = sampler.get_state_dict()
+
+    new_sampler_not_empty = ImportanceSampler.from_state_dict(
+        model=nlme_model, state_dict=state_dict_not_empty
+    )
+    assert new_sampler_not_empty.dist is not None
+    assert new_sampler_not_empty.log_lik == sampler.log_lik

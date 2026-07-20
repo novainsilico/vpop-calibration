@@ -45,7 +45,10 @@ class ModelDiagnostics:
         self.vpc: pd.DataFrame | None = None
 
     def get_state_dict(self) -> dict[str, Any]:
-        state_dict = {"sampler": self.sampler.get_state_dict()}
+        state_dict = {
+            "sampler": self.sampler.get_state_dict(),
+            "importance_sampler": self.importance_sampler.get_state_dict(),
+        }
 
         return state_dict
 
@@ -56,6 +59,9 @@ class ModelDiagnostics:
         instance = cls(nlme_model=nlme_model)
         instance.sampler = ConditionalDistributionSampler.from_state_dict(
             state_dict=state_dict["sampler"], model=nlme_model
+        )
+        instance.importance_sampler = ImportanceSampler.from_state_dict(
+            model=nlme_model, state_dict=state_dict["importance_sampler"]
         )
         return instance
 
@@ -383,6 +389,4 @@ class ModelDiagnostics:
         self.importance_sampler.fit_sudent_t_proposal(
             conditional_samples=self.sampler.total_samples
         )
-        self.log_likelihood = self.importance_sampler.compute_likelihood(
-            nb_samples=nb_samples
-        )
+        self.importance_sampler.compute_likelihood(nb_samples=nb_samples)

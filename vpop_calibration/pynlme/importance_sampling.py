@@ -1,10 +1,10 @@
 import torch
 import torch.distributions as dist
-import numpy as np
+from typing import Any
 
 from vpop_calibration.pynlme.model import StatisticalModel
 from vpop_calibration.pynlme.conditional_distribution import ConditionalDistribSamples
-from vpop_calibration.config import smoke_test
+from vpop_calibration.config import smoke_test, device, default_dtype
 
 
 class ImportanceSampler:
@@ -12,6 +12,40 @@ class ImportanceSampler:
         self.model = model
         self.dist: dist.StudentT | None = None
         self.df = df
+
+    def get_state_dict(self) -> dict[str, Any]:
+        if self.dist is None:
+            loc = None
+            scale = None
+        else:
+            loc = self.dist.loc.detach().cpu().numpy().tolist()
+            scale = self.dist.scale.detach().cpu().numpy().tolist()
+        if hasattr(self, "log_lik"):
+            ll = self.log_lik
+        else:
+            ll = None
+        state = {"df": self.df, "loc": loc, "scale": scale, "log_lik": ll}
+        return state
+
+    @classmethod
+    def from_state_dict(
+        cls, model: StatisticalModel, state_dict: dict[str, Any]
+    ) -> "ImportanceSampler":
+        instance = cls(model=model, df=state_dict["df"])
+        if state_dict["loc"]:
+            instance.dist = dist.StudentT(
+                df=torch.tensor(instance.df),
+                loc=torch.as_tensor(
+                    state_dict["loc"], device=device, dtype=default_dtype
+                ),
+                scale=torch.as_tensor(
+                    state_dict["scale"], device=device, dtype=default_dtype
+                ),
+            )
+        if state_dict["log_lik"]:
+            instance.log_lik = state_dict["log_lik"]
+
+        return instance
 
     def fit_sudent_t_proposal(
         self, conditional_samples: ConditionalDistribSamples
@@ -44,7 +78,7 @@ class ImportanceSampler:
         samples = self.dist.rsample((nb_samples,))
         return samples
 
-    def compute_likelihood(self, nb_samples: int = 100) -> float:
+    def compute_likelihood(self, nb_samples: int = 100) -> None:
 
         if smoke_test:
             nb_samples = 2
@@ -62,5 +96,4 @@ class ImportanceSampler:
             N_tensor
         )
         log_lik = marginal_log_lik.sum()
-
-        return log_lik.item()
+        self.log_lik = log_lik.item()
