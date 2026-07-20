@@ -1,7 +1,11 @@
 import pytest
 import numpy as np
 import matplotlib.pyplot as plt
-import torch
+import pytest_golden.yaml
+
+pytest_golden.yaml.add_representer(
+    np.float64, lambda dumper, data: dumper.represent_float(float(data))
+)
 
 
 @pytest.fixture(scope="session")
@@ -20,8 +24,3 @@ def clean_matplotlib_figures():
 
     # Teardown: Close all open figures
     plt.close("all")
-
-
-@pytest.fixture(autouse=True)
-def torch_seed():
-    torch.manual_seed(0)
