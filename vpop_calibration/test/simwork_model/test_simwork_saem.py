@@ -26,7 +26,7 @@ def simwork_model() -> StructuralModel:
     return struct_model
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def obs_data(np_rng) -> pd.DataFrame:
     protocol_arms = ["dose-1", "dose-10"]
     patients = {

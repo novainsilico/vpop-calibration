@@ -35,7 +35,7 @@ def sample_nlme_params() -> dict:
     return input
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def obs_data(np_rng) -> pd.DataFrame:
     protocol_arms = ["arm-A", "arm-B"]
     patients = {

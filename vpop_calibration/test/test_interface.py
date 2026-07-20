@@ -7,7 +7,7 @@ from vpop_calibration.interface import NlmeModel
 from vpop_calibration.structural_model import StructuralAnalytical, StructuralModel
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def sample_inputs(np_rng) -> tuple[dict, pd.DataFrame, StructuralModel]:
     priors = {
         "model_intrinsic": {"mi_1": {"prior": 10.0}},

@@ -5,7 +5,7 @@ import pandas as pd
 from vpop_calibration.model.data import TrainingDataSet
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def training_data(np_rng, include_protocol):
     # Use this fixture for testing GP training
     patients = {"id": ["p1", "p2"], "k1": [1.0, 2.0]}

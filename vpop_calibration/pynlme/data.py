@@ -68,7 +68,7 @@ class ObsData:
                 torch.ones_like(
                     index_values_p.output_name.index_values,
                     device=device,
-                    dtype=torch.float64,
+                    dtype=default_dtype,
                 ),
             )
 
