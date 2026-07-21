@@ -383,10 +383,14 @@ class ModelDiagnostics:
         vpc_df = pd.concat(all_vpc_records, ignore_index=True)
         self.vpc = vpc_df
 
-    def compute_log_likelihood_importance_sampling(self, nb_samples: int = 100) -> None:
+    def compute_log_likelihood_importance_sampling(
+        self, nb_proposal_samples: int = 100
+    ) -> None:
         if not hasattr(self.sampler, "samples"):
-            self.sample_conditional_distribution()
+            raise ValueError(
+                "The conditional distribution has not yet been sampled from. Use `sample_conditional_distribution` first."
+            )
         self.importance_sampler.fit_sudent_t_proposal(
             conditional_samples=self.sampler.total_samples
         )
-        self.importance_sampler.compute_likelihood(nb_samples=nb_samples)
+        self.importance_sampler.compute_likelihood(nb_samples=nb_proposal_samples)
