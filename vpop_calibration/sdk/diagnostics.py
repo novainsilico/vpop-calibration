@@ -52,7 +52,7 @@ def run_diagnostics(model: NlmeModel, config: DiagnosticsConfig) -> DiagnosticsO
                 "Cannot estimate the log-likelihood via importance sampling without sampling the conditional distribution"
             )
         model.diagnostics.compute_log_likelihood_importance_sampling(
-            config.importance_sampling_nb_samples
+            nb_proposal_samples=config.importance_sampling_nb_samples
         )
         ll = model.diagnostics.importance_sampler.log_lik
     else:
