@@ -1943,6 +1943,100 @@ nearley = ["js2py"]
 regex = ["regex"]
 
 [[package]]
+name = "libroadrunner"
+version = "2.9.2"
+description = "libRoadRunner: A simulation and analysis library for SBML"
+optional = false
+python-versions = "*"
+groups = ["main"]
+files = [
+    {file = "libroadrunner-2.9.2-cp311-cp311-macosx_14_0_arm64.whl", hash = "sha256:041054438406c4210e438e1a968fe8d527bff5c52858c1b702e211f5001dc4c6"},
+    {file = "libroadrunner-2.9.2-cp311-cp311-macosx_15_0_x86_64.whl", hash = "sha256:f58ee34433e9f2b38b6195726f71015cb20216348ab095d7355263f58de858c8"},
+    {file = "libroadrunner-2.9.2-cp311-cp311-manylinux_2_28_x86_64.whl", hash = "sha256:0cb0ef8d8e7eea6065c04345394be2fc335f76d7df339097f5f8739a5bece6dc"},
+    {file = "libroadrunner-2.9.2-cp311-cp311-win_amd64.whl", hash = "sha256:04860fab5fdbb3aabec9bfdb2ebd24ebae3321d5c06d6e774b8a8ff5056c5eba"},
+    {file = "libroadrunner-2.9.2-cp312-cp312-macosx_14_0_arm64.whl", hash = "sha256:24363b0b85f0e3fcaedded1589e56c18b609d1de4119490bb71947db428efffd"},
+    {file = "libroadrunner-2.9.2-cp312-cp312-macosx_15_0_x86_64.whl", hash = "sha256:436c9034b0452634e9791bd6d37616ca3fff526cefe547150578763a9acc3611"},
+    {file = "libroadrunner-2.9.2-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:11d2ff6605f67fbd78f6829b1235db8d159a61a65235261974b997ff4bbf16ae"},
+    {file = "libroadrunner-2.9.2-cp312-cp312-win_amd64.whl", hash = "sha256:9818ea4e51a002181a10dd997c69f9e7cd96c6fbcf3115797cfc2728f18b79b7"},
+    {file = "libroadrunner-2.9.2-cp313-cp313-macosx_14_0_arm64.whl", hash = "sha256:4db3380366e3312a07370be9ed969e6f79bca77f56c5e31c89a749bc9993b0b4"},
+    {file = "libroadrunner-2.9.2-cp313-cp313-macosx_15_0_x86_64.whl", hash = "sha256:cbd1744f62d655d4e692080bcd5f42aac390c6b13c70fab81e6c7fc136c69b4f"},
+    {file = "libroadrunner-2.9.2-cp313-cp313-manylinux_2_28_x86_64.whl", hash = "sha256:56f0c1888507b94b7a7a79877fa5f3f7e73f7838145df53fb3c9982bd25d6b5f"},
+    {file = "libroadrunner-2.9.2-cp313-cp313-win_amd64.whl", hash = "sha256:9555f9087e96002dc10bd9924f25f61e2759b5135061b1bf1fd14276e070c3c9"},
+    {file = "libroadrunner-2.9.2-cp314-cp314-macosx_14_0_arm64.whl", hash = "sha256:8a14b5fb9f191b703ad0e304e8c39190d6f26a3cada47329224514b1dbe86010"},
+    {file = "libroadrunner-2.9.2-cp314-cp314-macosx_15_0_x86_64.whl", hash = "sha256:fa1876e0962f45b6344e1697d2b4f0ffbc79188f46a4fccec758cc95c2850fb1"},
+    {file = "libroadrunner-2.9.2-cp314-cp314-manylinux_2_28_x86_64.whl", hash = "sha256:01d5a5f1b3df72ca9d3c330096e75004ddccb8d6073911f9a068bff5bd1bfbe3"},
+    {file = "libroadrunner-2.9.2-cp314-cp314-win_amd64.whl", hash = "sha256:52862d3520bb04565a31e420e4c37fa334c74a5071c121c962e7c0d356d245d4"},
+]
+
+[package.dependencies]
+numpy = ">=2.2,<3.0"
+
+[[package]]
+name = "lightning"
+version = "2.6.1"
+description = "The Deep Learning framework to train, deploy, and ship AI products Lightning fast."
+optional = false
+python-versions = ">=3.10"
+groups = ["main"]
+files = [
+    {file = "lightning-2.6.1-py3-none-any.whl", hash = "sha256:30e1adac23004c713663928541bd72ecb1371b7abc9aff9f46b7fd2644988d30"},
+    {file = "lightning-2.6.1.tar.gz", hash = "sha256:859104b98c61add6fe60d0c623abf749baf25f2950a66ebdfb4bd18aa7decba9"},
+]
+
+[package.dependencies]
+fsspec = {version = ">=2022.5.0,<2028.0", extras = ["http"]}
+lightning-utilities = ">=0.10.0,<2.0"
+packaging = ">=23.0,<27.0"
+pytorch-lightning = "*"
+PyYAML = ">5.4,<8.0"
+torch = ">=2.1.0,<4.0"
+torchmetrics = ">0.7.0,<3.0"
+tqdm = ">=4.57.0,<6.0"
+typing-extensions = ">4.5.0,<6.0"
+
+[package.extras]
+all = ["bitsandbytes (>=0.45.2,<1.0) ; platform_system != \"Darwin\"", "deepspeed (>=0.15.0,<0.17.0) ; platform_system != \"Windows\" and platform_system != \"Darwin\"", "hydra-core (>=1.2.0,<2.0)", "ipython[all] (>=8.0.0,<11.0)", "jsonargparse[jsonnet,signatures] (>=4.39.0,<5.0)", "matplotlib (>3.1,<4.0)", "omegaconf (>=2.2.3,<3.0)", "requests (<3.0)", "rich (>=12.3.0,<15.0)", "tensorboardX (>=2.2,<3.0)", "torchmetrics (>=0.10.0,<2.0)", "torchvision (>=0.16.0,<1.0)"]
+data = ["litdata (>=0.2.0rc0,<1.0)"]
+dev = ["bitsandbytes (>=0.45.2,<1.0) ; platform_system != \"Darwin\"", "click (==8.1.8) ; python_version < \"3.11\"", "click (==8.3.1) ; python_version > \"3.10\"", "cloudpickle (>=1.3,<4.0)", "coverage (==7.10.7) ; python_version < \"3.10\"", "coverage (==7.13.1) ; python_version >= \"3.10\"", "deepspeed (>=0.15.0,<0.17.0) ; platform_system != \"Windows\" and platform_system != \"Darwin\"", "fastapi", "huggingface-hub", "hydra-core (>=1.2.0,<2.0)", "ipython[all] (>=8.0.0,<11.0)", "jsonargparse[jsonnet,signatures] (>=4.39.0,<5.0)", "matplotlib (>3.1,<4.0)", "numpy (>1.21.0,<2.0) ; python_version < \"3.12\"", "numpy (>2.1.0,<3.0) ; python_version >= \"3.12\"", "omegaconf (>=2.2.3,<3.0)", "onnx (>1.12.0,<2.0)", "onnxruntime (>=1.12.0,<2.0)", "onnxscript (>=0.1.0,<1.0)", "pandas (>2.0,<3.0)", "psutil (<8.0)", "pytest (==9.0.2)", "pytest-cov (==7.0.0)", "pytest-random-order (==1.2.0)", "pytest-rerunfailures (==16.0.1) ; python_version < \"3.10\"", "pytest-rerunfailures (==16.1) ; python_version >= \"3.10\"", "pytest-timeout (==2.4.0)", "requests (<3.0)", "rich (>=12.3.0,<15.0)", "scikit-learn (>0.22.1,<2.0)", "tensorboard (>=2.11,<3.0)", "tensorboardX (>=2.2,<3.0)", "tensorboardX (>=2.6,<3.0)", "torch-tensorrt ; platform_system != \"Darwin\" and python_version >= \"3.12\"", "torchmetrics (>=0.10.0,<2.0)", "torchvision (>=0.16.0,<1.0)", "uvicorn"]
+examples = ["ipython[all] (>=8.0.0,<11.0)", "requests (<3.0)", "torchmetrics (>=0.10.0,<2.0)", "torchvision (>=0.16.0,<1.0)"]
+extra = ["bitsandbytes (>=0.45.2,<1.0) ; platform_system != \"Darwin\"", "hydra-core (>=1.2.0,<2.0)", "jsonargparse[jsonnet,signatures] (>=4.39.0,<5.0)", "matplotlib (>3.1,<4.0)", "omegaconf (>=2.2.3,<3.0)", "rich (>=12.3.0,<15.0)", "tensorboardX (>=2.2,<3.0)"]
+fabric-all = ["bitsandbytes (>=0.45.2,<1.0) ; platform_system != \"Darwin\"", "deepspeed (>=0.15.0,<0.17.0) ; platform_system != \"Windows\" and platform_system != \"Darwin\"", "hydra-core (>=1.2.0,<2.0)", "torchmetrics (>=0.10.0,<2.0)", "torchvision (>=0.16.0,<1.0)"]
+fabric-dev = ["bitsandbytes (>=0.45.2,<1.0) ; platform_system != \"Darwin\"", "click (==8.1.8) ; python_version < \"3.11\"", "click (==8.3.1) ; python_version > \"3.10\"", "coverage (==7.10.7) ; python_version < \"3.10\"", "coverage (==7.13.1) ; python_version >= \"3.10\"", "deepspeed (>=0.15.0,<0.17.0) ; platform_system != \"Windows\" and platform_system != \"Darwin\"", "huggingface-hub", "hydra-core (>=1.2.0,<2.0)", "numpy (>1.21.0,<2.0) ; python_version < \"3.12\"", "numpy (>2.1.0,<3.0) ; python_version >= \"3.12\"", "pytest (==9.0.2)", "pytest-cov (==7.0.0)", "pytest-random-order (==1.2.0)", "pytest-rerunfailures (==16.0.1) ; python_version < \"3.10\"", "pytest-rerunfailures (==16.1) ; python_version >= \"3.10\"", "pytest-timeout (==2.4.0)", "tensorboardX (>=2.6,<3.0)", "torchmetrics (>=0.10.0,<2.0)", "torchvision (>=0.16.0,<1.0)"]
+fabric-examples = ["torchmetrics (>=0.10.0,<2.0)", "torchvision (>=0.16.0,<1.0)"]
+fabric-extra = ["hydra-core (>=1.2.0,<2.0)"]
+fabric-strategies = ["bitsandbytes (>=0.45.2,<1.0) ; platform_system != \"Darwin\"", "deepspeed (>=0.15.0,<0.17.0) ; platform_system != \"Windows\" and platform_system != \"Darwin\""]
+fabric-test = ["click (==8.1.8) ; python_version < \"3.11\"", "click (==8.3.1) ; python_version > \"3.10\"", "coverage (==7.10.7) ; python_version < \"3.10\"", "coverage (==7.13.1) ; python_version >= \"3.10\"", "huggingface-hub", "numpy (>1.21.0,<2.0) ; python_version < \"3.12\"", "numpy (>2.1.0,<3.0) ; python_version >= \"3.12\"", "pytest (==9.0.2)", "pytest-cov (==7.0.0)", "pytest-random-order (==1.2.0)", "pytest-rerunfailures (==16.0.1) ; python_version < \"3.10\"", "pytest-rerunfailures (==16.1) ; python_version >= \"3.10\"", "pytest-timeout (==2.4.0)", "tensorboardX (>=2.6,<3.0)"]
+pytorch-all = ["bitsandbytes (>=0.45.2,<1.0) ; platform_system != \"Darwin\"", "deepspeed (>=0.15.0,<0.17.0) ; platform_system != \"Windows\" and platform_system != \"Darwin\"", "hydra-core (>=1.2.0,<2.0)", "ipython[all] (>=8.0.0,<11.0)", "jsonargparse[jsonnet,signatures] (>=4.39.0,<5.0)", "matplotlib (>3.1,<4.0)", "omegaconf (>=2.2.3,<3.0)", "requests (<3.0)", "rich (>=12.3.0,<15.0)", "tensorboardX (>=2.2,<3.0)", "torchmetrics (>=0.10.0,<2.0)", "torchvision (>=0.16.0,<1.0)"]
+pytorch-dev = ["bitsandbytes (>=0.45.2,<1.0) ; platform_system != \"Darwin\"", "cloudpickle (>=1.3,<4.0)", "coverage (==7.10.7) ; python_version < \"3.10\"", "coverage (==7.13.1) ; python_version >= \"3.10\"", "deepspeed (>=0.15.0,<0.17.0) ; platform_system != \"Windows\" and platform_system != \"Darwin\"", "fastapi", "huggingface-hub", "hydra-core (>=1.2.0,<2.0)", "ipython[all] (>=8.0.0,<11.0)", "jsonargparse[jsonnet,signatures] (>=4.39.0,<5.0)", "matplotlib (>3.1,<4.0)", "numpy (>1.21.0,<2.0) ; python_version < \"3.12\"", "numpy (>2.1.0,<3.0) ; python_version >= \"3.12\"", "omegaconf (>=2.2.3,<3.0)", "onnx (>1.12.0,<2.0)", "onnxruntime (>=1.12.0,<2.0)", "onnxscript (>=0.1.0,<1.0)", "pandas (>2.0,<3.0)", "psutil (<8.0)", "pytest (==9.0.2)", "pytest-cov (==7.0.0)", "pytest-random-order (==1.2.0)", "pytest-rerunfailures (==16.0.1) ; python_version < \"3.10\"", "pytest-rerunfailures (==16.1) ; python_version >= \"3.10\"", "pytest-timeout (==2.4.0)", "requests (<3.0)", "rich (>=12.3.0,<15.0)", "scikit-learn (>0.22.1,<2.0)", "tensorboard (>=2.11,<3.0)", "tensorboardX (>=2.2,<3.0)", "torch-tensorrt ; platform_system != \"Darwin\" and python_version >= \"3.12\"", "torchmetrics (>=0.10.0,<2.0)", "torchvision (>=0.16.0,<1.0)", "uvicorn"]
+pytorch-examples = ["ipython[all] (>=8.0.0,<11.0)", "requests (<3.0)", "torchmetrics (>=0.10.0,<2.0)", "torchvision (>=0.16.0,<1.0)"]
+pytorch-extra = ["bitsandbytes (>=0.45.2,<1.0) ; platform_system != \"Darwin\"", "hydra-core (>=1.2.0,<2.0)", "jsonargparse[jsonnet,signatures] (>=4.39.0,<5.0)", "matplotlib (>3.1,<4.0)", "omegaconf (>=2.2.3,<3.0)", "rich (>=12.3.0,<15.0)", "tensorboardX (>=2.2,<3.0)"]
+pytorch-strategies = ["deepspeed (>=0.15.0,<0.17.0) ; platform_system != \"Windows\" and platform_system != \"Darwin\""]
+pytorch-test = ["cloudpickle (>=1.3,<4.0)", "coverage (==7.10.7) ; python_version < \"3.10\"", "coverage (==7.13.1) ; python_version >= \"3.10\"", "fastapi", "huggingface-hub", "numpy (>1.21.0,<2.0) ; python_version < \"3.12\"", "numpy (>2.1.0,<3.0) ; python_version >= \"3.12\"", "onnx (>1.12.0,<2.0)", "onnxruntime (>=1.12.0,<2.0)", "onnxscript (>=0.1.0,<1.0)", "pandas (>2.0,<3.0)", "psutil (<8.0)", "pytest (==9.0.2)", "pytest-cov (==7.0.0)", "pytest-random-order (==1.2.0)", "pytest-rerunfailures (==16.0.1) ; python_version < \"3.10\"", "pytest-rerunfailures (==16.1) ; python_version >= \"3.10\"", "pytest-timeout (==2.4.0)", "scikit-learn (>0.22.1,<2.0)", "tensorboard (>=2.11,<3.0)", "torch-tensorrt ; platform_system != \"Darwin\" and python_version >= \"3.12\"", "uvicorn"]
+strategies = ["bitsandbytes (>=0.45.2,<1.0) ; platform_system != \"Darwin\"", "deepspeed (>=0.15.0,<0.17.0) ; platform_system != \"Windows\" and platform_system != \"Darwin\""]
+test = ["click (==8.1.8) ; python_version < \"3.11\"", "click (==8.3.1) ; python_version > \"3.10\"", "cloudpickle (>=1.3,<4.0)", "coverage (==7.10.7) ; python_version < \"3.10\"", "coverage (==7.13.1) ; python_version >= \"3.10\"", "fastapi", "huggingface-hub", "numpy (>1.21.0,<2.0) ; python_version < \"3.12\"", "numpy (>2.1.0,<3.0) ; python_version >= \"3.12\"", "onnx (>1.12.0,<2.0)", "onnxruntime (>=1.12.0,<2.0)", "onnxscript (>=0.1.0,<1.0)", "pandas (>2.0,<3.0)", "psutil (<8.0)", "pytest (==9.0.2)", "pytest-cov (==7.0.0)", "pytest-random-order (==1.2.0)", "pytest-rerunfailures (==16.0.1) ; python_version < \"3.10\"", "pytest-rerunfailures (==16.1) ; python_version >= \"3.10\"", "pytest-timeout (==2.4.0)", "scikit-learn (>0.22.1,<2.0)", "tensorboard (>=2.11,<3.0)", "tensorboardX (>=2.6,<3.0)", "torch-tensorrt ; platform_system != \"Darwin\" and python_version >= \"3.12\"", "uvicorn"]
+
+[[package]]
+name = "lightning-utilities"
+version = "0.15.3"
+description = "Lightning toolbox for across the our ecosystem."
+optional = false
+python-versions = ">=3.10"
+groups = ["main"]
+files = [
+    {file = "lightning_utilities-0.15.3-py3-none-any.whl", hash = "sha256:6c55f1bee70084a1cbeaa41ada96e4b3a0fea5909e844dd335bd80f5a73c5f91"},
+    {file = "lightning_utilities-0.15.3.tar.gz", hash = "sha256:792ae0204c79f6859721ac7f386c237a33b0ed06ba775009cb894e010a842033"},
+]
+
+[package.dependencies]
+packaging = ">=22"
+typing_extensions = "*"
+
+[package.extras]
+cli = ["jsonargparse[signatures] (>=4.38.0)", "tomlkit"]
+docs = ["requests (>=2.0.0)"]
+typing = ["mypy (>=1.0.0)", "types-setuptools"]
+
+[[package]]
 name = "linear-operator"
 version = "0.6.1"
 description = "A linear operator implementation, primarily designed for finite-dimensional positive definite operators (i.e. kernel matrices)."
@@ -4620,4 +4714,4 @@ files = [
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<3.15"
-content-hash = "76b9262288b81f6c69c1a6e3fb14633636ce2a3c4a5bacbb992d3bc833a7bfd4"
+content-hash = "e05363a07581f0adfabb8278bcd9d625db9eb2128ef05249b55973e1fb026cc2"
