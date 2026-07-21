@@ -26,7 +26,7 @@ def obs_data(np_rng) -> pd.DataFrame:
     df = pd.DataFrame.from_dict(patients)
     df = df.merge(pd.DataFrame(outputs, columns=["output_name"]), how="cross")
     df = df.merge(pd.DataFrame(time_steps, columns=["time"]), how="cross")
-    df["value"] = np.abs(np_rng.normal(0, 1, df.shape[0]))
+    df["value"] = np.abs(np_rng.normal(10, 1, df.shape[0]))
     df = df.sample(frac=0.7, random_state=np_rng)
 
     return df
@@ -35,11 +35,11 @@ def obs_data(np_rng) -> pd.DataFrame:
 @pytest.fixture
 def sample_nlme_params() -> dict:
     input = {
-        "model_intrinsic": {"k_a": {"prior": 10.0}},
+        "model_intrinsic": {"k_a": {"prior": 5.0}},
         "pdu": {
             "k_12": {
-                "prior": 10.0,
-                "prior_omega": 0.1,
+                "prior": 1.0,
+                "prior_omega": 0.2,
             },
             "k_21": {
                 "prior": 10.0,

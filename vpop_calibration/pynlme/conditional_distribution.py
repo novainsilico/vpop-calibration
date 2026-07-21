@@ -135,10 +135,12 @@ class ConditionalDistributionSampler:
             for i in self.sampling_stream(nb_samples):
                 if self.live_plot:
                     self.update_convergence_plot()
-                    plt.close(self.fig)
+            if self.live_plot:
+                plt.close(self.fig)
         except KeyboardInterrupt:
             print("Interrupting sampling.")
             if self.live_plot:
+                self.update_convergence_plot()
                 plt.close(self.fig)
 
     def sampling_stream(self, nb_samples: int):

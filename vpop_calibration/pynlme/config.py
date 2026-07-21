@@ -9,6 +9,8 @@ class NlmeConfigDict(NamedTuple):
     progress_bar: bool = True
     max_samples: int = 1000
 
+    importance_sampling_df: float = 5.0
+
     def get_state_dict(self) -> dict[str, Any]:
         return {k: v for k, v in self._asdict().items()}
 

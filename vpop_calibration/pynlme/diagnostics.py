@@ -13,6 +13,7 @@ from vpop_calibration.config import smoke_test
 from vpop_calibration.pynlme.conditional_distribution import (
     ConditionalDistributionSampler,
 )
+from vpop_calibration.pynlme.importance_sampling import ImportanceSampler
 
 ResidualType = Literal["pwres", "iwres", "npde"]
 
@@ -36,11 +37,18 @@ class ModelDiagnostics:
         self.iwres: pa.typing.DataFrame[WeightedResidualsSchema] | None = None
         self.npde: pa.typing.DataFrame[WeightedResidualsSchema] | None = None
         self.sampler = ConditionalDistributionSampler(nlme_model=self.model)
+        self.importance_sampler = ImportanceSampler(
+            model=self.model,
+            df=self.model.config.importance_sampling_df,
+        )
         self.shrinkage: torch.Tensor | None = None
         self.vpc: pd.DataFrame | None = None
 
     def get_state_dict(self) -> dict[str, Any]:
-        state_dict = {"sampler": self.sampler.get_state_dict()}
+        state_dict = {
+            "sampler": self.sampler.get_state_dict(),
+            "importance_sampler": self.importance_sampler.get_state_dict(),
+        }
 
         return state_dict
 
@@ -51,6 +59,9 @@ class ModelDiagnostics:
         instance = cls(nlme_model=nlme_model)
         instance.sampler = ConditionalDistributionSampler.from_state_dict(
             state_dict=state_dict["sampler"], model=nlme_model
+        )
+        instance.importance_sampler = ImportanceSampler.from_state_dict(
+            model=nlme_model, state_dict=state_dict["importance_sampler"]
         )
         return instance
 
@@ -371,3 +382,15 @@ class ModelDiagnostics:
 
         vpc_df = pd.concat(all_vpc_records, ignore_index=True)
         self.vpc = vpc_df
+
+    def compute_log_likelihood_importance_sampling(
+        self, nb_proposal_samples: int = 100
+    ) -> None:
+        if not hasattr(self.sampler, "samples"):
+            raise ValueError(
+                "The conditional distribution has not yet been sampled from. Use `sample_conditional_distribution` first."
+            )
+        self.importance_sampler.fit_sudent_t_proposal(
+            conditional_samples=self.sampler.total_samples
+        )
+        self.importance_sampler.compute_likelihood(nb_samples=nb_proposal_samples)

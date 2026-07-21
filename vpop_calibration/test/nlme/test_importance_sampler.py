@@ -9,8 +9,7 @@ from vpop_calibration.pynlme.params import MixedEffectParameters
 from vpop_calibration.pynlme.model import StatisticalModel
 from vpop_calibration.structural_model.base import StructuralModel
 from vpop_calibration.structural_model.analytical import StructuralAnalytical
-from vpop_calibration.pynlme.diagnostics import ModelDiagnostics
-from vpop_calibration.pynlme.plot import PlottingUtility
+from vpop_calibration.pynlme.importance_sampling import ImportanceSampler
 from vpop_calibration.pynlme.conditional_distribution import (
     ConditionalDistributionSampler,
 )
@@ -78,30 +77,37 @@ def struct_model() -> StructuralModel:
     return struct_model
 
 
-def test_diagnostics(sample_nlme_params, obs_data, struct_model):
+def test_importance_sampling(sample_nlme_params, obs_data, struct_model):
     nlme_model = StatisticalModel(
         structural_model=struct_model, dataset=obs_data, prior_params=sample_nlme_params
     )
-    diagnostics = ModelDiagnostics(nlme_model)
-    diagnostics.sample_conditional_distribution()
-    diagnostics.compute_iwres()
-    diagnostics.compute_pwres()
-    diagnostics.compute_npde()
-    diagnostics.compute_shrinkage()
-    diagnostics.compute_vpc()
-    diagnostics.compute_log_likelihood_importance_sampling()
-    # Test the plotter in isolation
-    plotter = PlottingUtility(diagnostics=diagnostics)
-    plotter.map_estimates()
-    plotter.individual_map_estimates()
-    plotter.all_individual_map_estimates()
-    plotter.map_estimates_gof()
-    plotter.weighted_residuals(res_type="iwres")
-    plotter.weighted_residuals(res_type="pwres")
-    plotter.weighted_residuals(res_type="npde")
-    plotter.map_vs_posterior()
-    plotter.vpc()
-    plotter.conditional_codistributions()
     cond_sampler = ConditionalDistributionSampler(nlme_model)
-    cond_sampler.live_plot = True
     cond_sampler.run_sampler()
+    sampler = ImportanceSampler(nlme_model)
+    sampler.fit_sudent_t_proposal(conditional_samples=cond_sampler.total_samples)
+    sampler.compute_likelihood()
+
+
+def test_state_dict(sample_nlme_params, obs_data, struct_model):
+    nlme_model = StatisticalModel(
+        structural_model=struct_model, dataset=obs_data, prior_params=sample_nlme_params
+    )
+    cond_sampler = ConditionalDistributionSampler(nlme_model)
+    cond_sampler.run_sampler()
+    sampler = ImportanceSampler(nlme_model)
+    state_dict_empty = sampler.get_state_dict()
+
+    new_sampler_empty = ImportanceSampler.from_state_dict(
+        model=nlme_model, state_dict=state_dict_empty
+    )
+    assert new_sampler_empty.dist is None
+
+    sampler.fit_sudent_t_proposal(conditional_samples=cond_sampler.total_samples)
+    sampler.compute_likelihood()
+    state_dict_not_empty = sampler.get_state_dict()
+
+    new_sampler_not_empty = ImportanceSampler.from_state_dict(
+        model=nlme_model, state_dict=state_dict_not_empty
+    )
+    assert new_sampler_not_empty.dist is not None
+    assert new_sampler_not_empty.log_lik == sampler.log_lik
