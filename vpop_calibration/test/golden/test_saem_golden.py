@@ -36,7 +36,7 @@ def sample_nlme_params() -> dict:
 
 
 @pytest.fixture(scope="function")
-def obs_data(np_rng) -> pd.DataFrame:
+def obs_data() -> pd.DataFrame:
     protocol_arms = ["arm-A", "arm-B"]
     patients = {
         "id": ["p1", "p2"],
@@ -49,17 +49,17 @@ def obs_data(np_rng) -> pd.DataFrame:
     df = pd.DataFrame.from_dict(patients)
     df = df.merge(pd.DataFrame(outputs, columns=["output_name"]), how="cross")
     df = df.merge(pd.DataFrame(time_steps, columns=["time"]), how="cross")
-    df["value"] = np.abs(np_rng.normal(10, 1, df.shape[0]))
+    df["value"] = np.linspace(0, 10, df.shape[0])
     df["task"] = df.apply(lambda r: r["output_name"] + "_" + r["protocol_arm"], axis=1)
-    df = df.sample(frac=0.9, random_state=np_rng)
     return df
 
 
 @pytest.fixture
 def struct_model() -> StructuralModel:
     def equations(mi_1, pdu_1, pdu_2, pdk_1, t, protocol_ovr_1):
-        out = torch.ones_like(t)
-        return torch.cat((out, out), dim=-1)
+        out_1 = t * pdu_1 + pdu_2
+        out_2 = pdk_1 - mi_1 + t * protocol_ovr_1
+        return torch.cat((out_1, out_2), dim=-1)
 
     protocol_design = pd.DataFrame(
         {"protocol_arm": ["arm-A", "arm-B"], "protocol_ovr_1": [1, 2]}
