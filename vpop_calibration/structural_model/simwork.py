@@ -67,7 +67,6 @@ class SimworkModelBinding:
         self.solving_options = path_to_solving_options
         self.inputs = inputs
         self.outputs = outputs
-        self.nb_outputs = len(outputs)
         if not smoke_test:
             build_result = subprocess.run(
                 [
@@ -368,7 +367,7 @@ class StructuralSimwork(StructuralModel):
             nb_chains,
             nb_patients,
             nb_timesteps,
-            self.model.nb_outputs,
+            self.nb_outputs,
         )
         # Build the 4d tensor index for row observations
         nb_obs_per_chain = prediction_index.id.index_values.shape[0]

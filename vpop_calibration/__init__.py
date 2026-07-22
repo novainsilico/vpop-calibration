@@ -4,6 +4,7 @@ from vpop_calibration.structural_model import (
     StructuralGp,
     StructuralSimwork,
     SimworkModelBinding,
+    StructuralSbml,
 )
 from vpop_calibration.model import GP
 from vpop_calibration.data_generation import (
@@ -18,6 +19,7 @@ __all__ = [
     "StructuralAnalytical",
     "StructuralSimwork",
     "SimworkModelBinding",
+    "StructuralSbml",
     "NlmeModel",
     "Config",
     "NlmeConfigDict",

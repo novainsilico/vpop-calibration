@@ -1,15 +1,29 @@
 import pandas as pd
 import torch
+import pytest
 
-from vpop_calibration.structural_model.sbml import SbmlModelBinding, StructuralSbml
+from vpop_calibration.structural_model.sbml import StructuralSbml
 from vpop_calibration.pynlme.indexing import ObservationIndex, ObsDataSchema
+
+
+def test_sbml_model_wrong_inputs():
+    file = "vpop_calibration/test/sbml/assets/model.xml"
+
+    with pytest.raises(Exception):
+
+        model = StructuralSbml(
+            model_path=file, inputs=["incorrect_input"], outputs=["A0"]
+        )
+
+
+def test_sbml_model_wrong_outputs():
+    file = "vpop_calibration/test/sbml/assets/model.xml"
+    with pytest.raises(Exception):
+        model = StructuralSbml(model_path=file, inputs=[], outputs=["incorrect_output"])
 
 
 def test_sbml_model():
     file = "vpop_calibration/test/sbml/assets/model.xml"
-    model = SbmlModelBinding(
-        file=file, inputs=["k__12", "k__21"], outputs=["A0", "A1", "A2"]
-    )
 
     df = (
         pd.DataFrame({"id": ["p1", "p2"], "protocol_arm": ["arm-B", "arm-A"]})
@@ -22,11 +36,13 @@ def test_sbml_model():
     protocol_design = pd.DataFrame(
         {"protocol_arm": ["arm-A", "arm-B"], "k__21": [0, 1]}
     )
-
     struct_model = StructuralSbml(
-        model=model,
+        model_path=file,
+        inputs=["k__12", "k__21"],
+        outputs=["A0", "A1", "A2"],
         protocol_design=protocol_design,
     )
+
     X = torch.tensor(
         # k_12 time
         [[[[0, 0], [0, 1], [0, 2]], [[1, 0], [1, 1], [1, 2]]]]

@@ -5,6 +5,7 @@ import roadrunner
 import pandera.pandas as pa
 import torch
 import uuid
+from functools import partial
 
 from vpop_calibration.structural_model.base import StructuralModel
 from vpop_calibration.utils import extend_schema
@@ -12,58 +13,45 @@ from vpop_calibration.config import default_dtype, device
 from vpop_calibration.pynlme.indexing import ObservationIndex
 
 
-class SbmlModelBinding:
-    def __init__(self, file, inputs: list[str], outputs: list[str]):
-        self.rr = roadrunner.RoadRunner(file)
+def simulate_rr_single_patient(
+    input: tuple[str, dict[Hashable, float]],
+    rr: roadrunner.RoadRunner,
+    time_steps: list[float],
+    outputs: list[str],
+) -> pd.DataFrame:
+    patient_id, patient_overrides = input
+    rr.resetToOrigin()
+    # Change the patient overrides
+    rr.setValues(patient_overrides)
+    # Reset the floating species to their init value
+    rr.reset()
+    out = rr.simulate(times=time_steps, selections=outputs)
+    patient_df = pd.DataFrame(data=out, columns=outputs)
+    patient_df["time"] = time_steps
+    patient_df["id"] = patient_id
+    return patient_df
+
+
+class StructuralSbml(StructuralModel):
+    def __init__(
+        self,
+        model_path: str,
+        inputs: list[str],
+        outputs: list[str],
+        protocol_design: pd.DataFrame | None = None,
+    ):
+        self.rr = roadrunner.RoadRunner(model_path)
         self.valid_ids = self.rr.keys()
         invalid_inputs = [o for o in inputs if o not in self.valid_ids]
         if invalid_inputs:
             raise ValueError(
                 f"The following inputs are not part of the SBML model: {invalid_inputs}"
             )
-        self.inputs = inputs
         invalid_outputs = [o for o in outputs if o not in self.valid_ids]
         if invalid_outputs:
             raise ValueError(
                 f"The following outputs are not part of the SBML model: {invalid_outputs}"
             )
-        self.outputs = outputs
-        self.nb_outputs = len(self.outputs)
-
-    def run_single_patient(
-        self, patient_overrides: dict[Hashable, float], time_steps: list[float]
-    ) -> np.ndarray:
-        self.rr.reset()
-        self.rr.setValues(patient_overrides)
-        out = self.rr.simulate(times=time_steps, selections=self.outputs)
-        return out
-
-    def run_vpop(self, vpop: pd.DataFrame, time_steps: list[float]) -> pd.DataFrame:
-        full_out = []
-        for patient, overrides in vpop.groupby("id"):
-            patient_out = self.run_single_patient(
-                patient_overrides=overrides.drop(columns={"id"})
-                .iloc[0]
-                .astype("float")
-                .to_dict(),
-                time_steps=time_steps,
-            )
-            patient_df = pd.DataFrame(data=patient_out, columns=self.outputs)
-            patient_df["time"] = time_steps
-            patient_df["id"] = patient
-            full_out.append(patient_df)
-
-        out_df = pd.concat(full_out)
-        return out_df
-
-
-class StructuralSbml(StructuralModel):
-    def __init__(
-        self,
-        model: SbmlModelBinding,
-        protocol_design: pd.DataFrame | None = None,
-    ):
-        self.model = model
 
         if protocol_design is None:
             protocol_design = pd.DataFrame({"protocol_arm": ["identity"]})
@@ -85,10 +73,10 @@ class StructuralSbml(StructuralModel):
         protocol_arms = protocol_design["protocol_arm"].drop_duplicates().tolist()
         # the parameters of the simwork model which are NOT protocol overrides
         parameter_names_without_protocol_overrides = [
-            p for p in model.inputs if p not in protocol_overrides
+            p for p in inputs if p not in protocol_overrides
         ]
         # the parameters of the simwork model which are protocol overrides
-        self.protocol_parameters = [p for p in model.inputs if p in protocol_overrides]
+        self.protocol_parameters = [p for p in inputs if p in protocol_overrides]
         self.nb_protocol_overrides = len(self.protocol_parameters)
 
         # Ordered list of parameters that the NLME model expects to find in the function arguments
@@ -112,14 +100,12 @@ class StructuralSbml(StructuralModel):
         )
 
         self.task_names = [
-            output + "_" + protocol
-            for output in self.model.outputs
-            for protocol in protocol_arms
+            output + "_" + protocol for output in outputs for protocol in protocol_arms
         ]
 
         super().__init__(
             parameter_names=parameter_names_without_protocol_overrides,
-            output_names=self.model.outputs,
+            output_names=outputs,
             protocol_arms=protocol_arms,
             task_names=self.task_names,
         )
@@ -172,6 +158,30 @@ class StructuralSbml(StructuralModel):
         vpop["id"] = temporary_ids
         return vpop
 
+    def run_vpop(self, vpop: pd.DataFrame, time_steps: list[float]) -> pd.DataFrame:
+        simulation_inputs = [
+            (
+                row["id"],
+                row.drop("id").to_dict(),
+            )
+            for _, row in vpop.iterrows()
+        ]
+        worker_fn = partial(
+            simulate_rr_single_patient,
+            rr=self.rr,
+            time_steps=time_steps,
+            outputs=self.output_names,
+        )
+        full_out = []
+        for inputs in simulation_inputs:
+            full_out.append(
+                simulate_rr_single_patient(
+                    inputs, rr=self.rr, time_steps=time_steps, outputs=self.output_names
+                )
+            )
+        output_df = pd.concat(full_out)
+        return output_df
+
     def simulate(
         self,
         X: torch.Tensor,
@@ -183,7 +193,7 @@ class StructuralSbml(StructuralModel):
         # Assemble the time values
         time = prediction_index.time.ref_values
         # Run the model
-        outputs_df = self.model.run_vpop(vpop=vpop, time_steps=time)
+        outputs_df = self.run_vpop(vpop=vpop, time_steps=time)
         patient_id_ordered = pd.DataFrame({"id": temporary_ids})
         outputs_df_ordered = patient_id_ordered.merge(outputs_df, on="id", how="left")
         outputs_tensor = torch.as_tensor(
@@ -196,7 +206,7 @@ class StructuralSbml(StructuralModel):
             nb_chains,
             nb_patients,
             nb_timesteps,
-            self.model.nb_outputs,
+            self.nb_outputs,
         )
         # Build the 4d tensor index for row observations
         nb_obs_per_chain = prediction_index.id.index_values.shape[0]

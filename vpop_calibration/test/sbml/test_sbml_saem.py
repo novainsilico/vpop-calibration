@@ -2,26 +2,23 @@ import pytest
 import pandas as pd
 import numpy as np
 
-from vpop_calibration.structural_model.sbml import (
-    SbmlModelBinding,
-    StructuralSbml,
-)
+from vpop_calibration.structural_model.sbml import StructuralSbml
 from vpop_calibration.structural_model.base import StructuralModel
 from vpop_calibration.interface import NlmeModel, Config, SaemConfigDict, NlmeConfigDict
 
 
 @pytest.fixture
 def sbml_model() -> StructuralModel:
-    model = SbmlModelBinding(
-        file="vpop_calibration/test/sbml/assets/model.xml",
-        inputs=["k__12", "k__21", "k__el", "dose", "k__a"],
-        outputs=["A0", "A1", "A2"],
-    )
 
     protocol_design = pd.DataFrame(
         {"protocol_arm": ["dose-1", "dose-10"], "dose": [1, 10]}
     )
-    struct_model = StructuralSbml(model=model, protocol_design=protocol_design)
+    struct_model = StructuralSbml(
+        model_path="vpop_calibration/test/sbml/assets/model.xml",
+        inputs=["k__12", "k__21", "k__el", "dose", "k__a"],
+        outputs=["A0", "A1", "A2"],
+        protocol_design=protocol_design,
+    )
     return struct_model
 
 

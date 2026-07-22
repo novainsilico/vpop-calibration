@@ -5,6 +5,7 @@ from vpop_calibration.structural_model.simwork import (
     StructuralSimwork,
     SimworkModelBinding,
 )
+from vpop_calibration.structural_model.sbml import StructuralSbml
 
 __all__ = [
     "StructuralModel",
@@ -12,4 +13,5 @@ __all__ = [
     "StructuralAnalytical",
     "StructuralSimwork",
     "SimworkModelBinding",
+    "StructuralSbml",
 ]
