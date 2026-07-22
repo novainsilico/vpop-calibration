@@ -55,6 +55,7 @@ output:
       plot_frequency: 5
       progress_bar: false
       max_samples: 10
+      importance_sampling_df: 5.0
     current_params:
       beta:
       - 2.302585092994046
@@ -300,3 +301,8 @@ output:
         - - -16.78018023449483
           - -16.977202449279183
       has_run: true
+    importance_sampler:
+      df: 5.0
+      loc:
+      scale:
+      log_lik:
