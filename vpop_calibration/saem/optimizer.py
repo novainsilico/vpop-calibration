@@ -377,7 +377,3 @@ class PySaem:
             )
         else:
             self.plot.update(self.history)
-
-    @property
-    def has_run(self) -> bool:
-        return hasattr(self, "mh_state")
