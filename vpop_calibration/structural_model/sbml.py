@@ -1,6 +1,5 @@
 import pandas as pd
 from typing import Hashable
-import numpy as np
 import roadrunner
 import pandera.pandas as pa
 import torch
@@ -166,12 +165,6 @@ class StructuralSbml(StructuralModel):
             )
             for _, row in vpop.iterrows()
         ]
-        worker_fn = partial(
-            simulate_rr_single_patient,
-            rr=self.rr,
-            time_steps=time_steps,
-            outputs=self.output_names,
-        )
         full_out = []
         for inputs in simulation_inputs:
             full_out.append(
