@@ -118,6 +118,10 @@ class PriorVisualizer:
         ax.fill_between(x_grid, y, color=color, alpha=0.3)
         median = inverse_transform_param(np.array(mu), constraint)
         ax.axvline(median, color=color, linestyle="--", alpha=0.8)
+        if constraint.low is not None:
+            ax.axvline(constraint.low, color="crimson", alpha=0.8, label="constraints")
+        if constraint.high is not None:
+            ax.axvline(constraint.high, color="crimson", alpha=0.8)
 
     def _format_axis(self, ax, name: str, transform_name: str, log_scale: bool) -> None:
         ax.set_title(f"{name} (Transform: {transform_name})")
