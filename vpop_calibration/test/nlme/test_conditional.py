@@ -80,7 +80,7 @@ def test_conditional_sampling(sample_nlme_params, obs_data, struct_model):
     nlme_model = StatisticalModel(
         structural_model=struct_model,
         dataset=obs_data,
-        prior_params=sample_nlme_params,
+        input_params=sample_nlme_params,
     )
     sampler = ConditionalDistributionSampler(nlme_model)
     sampler.run_sampler()
@@ -90,7 +90,7 @@ def test_state_dict(sample_nlme_params, obs_data, struct_model):
     nlme_model = StatisticalModel(
         structural_model=struct_model,
         dataset=obs_data,
-        prior_params=sample_nlme_params,
+        input_params=sample_nlme_params,
     )
     sampler = ConditionalDistributionSampler(nlme_model)
     state_dict = sampler.get_state_dict()

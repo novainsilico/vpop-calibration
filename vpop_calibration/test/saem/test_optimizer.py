@@ -68,7 +68,7 @@ def sample_nlme_model(np_rng) -> StatisticalModel:
     nlme_model = StatisticalModel(
         structural_model=struct_model,
         dataset=obs_data,
-        prior_params=params,
+        input_params=params,
         config=NlmeConfigDict(nb_chains=3),
     )
 

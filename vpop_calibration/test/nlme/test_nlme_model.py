@@ -77,7 +77,7 @@ def struct_model() -> StructuralModel:
 
 def test_nlme_init(sample_nlme_params, obs_data, struct_model, tmp_path):
     nlme_model = StatisticalModel(
-        structural_model=struct_model, dataset=obs_data, prior_params=sample_nlme_params
+        structural_model=struct_model, dataset=obs_data, input_params=sample_nlme_params
     )
     assert nlme_model.descriptors == ["pdk_1", "pdu_1", "pdu_2", "mi_1"]
 
@@ -156,7 +156,7 @@ def test_nlme_init(sample_nlme_params, obs_data, struct_model, tmp_path):
 
 def test_nlme_simulate(sample_nlme_params, obs_data, struct_model):
     nlme_model = StatisticalModel(
-        structural_model=struct_model, dataset=obs_data, prior_params=sample_nlme_params
+        structural_model=struct_model, dataset=obs_data, input_params=sample_nlme_params
     )
     nb_samples = 1
     etas = nlme_model.sample_etas(nb_samples)
@@ -167,7 +167,9 @@ def test_nlme_simulate(sample_nlme_params, obs_data, struct_model):
     psi = nlme_model.convert_etas_to_gaussian_all_patients(etas)
     assert psi.shape == (nb_samples, nlme_model.nb_patients, nlme_model.nb_pdu)
 
-    phi = nlme_model.convert_gaussian_to_physical(psi, nlme_model.log_mi)
+    phi = nlme_model.convert_gaussian_to_physical(
+        psi=psi, log_mi=nlme_model.log_mi, surv_coeffs=nlme_model.surv_coeffs
+    )
 
     # Ensure the parameter converted back to physical space are actually equal to the prior values: this is only valid for patient 1 as it has a foo covariate = 0.
     pdu_1_prior = sample_nlme_params.pdu["pdu_1"].prior
@@ -196,7 +198,7 @@ def test_nlme_simulate(sample_nlme_params, obs_data, struct_model):
 
 def test_log_prior(sample_nlme_params, obs_data, struct_model):
     nlme_model = StatisticalModel(
-        structural_model=struct_model, dataset=obs_data, prior_params=sample_nlme_params
+        structural_model=struct_model, dataset=obs_data, input_params=sample_nlme_params
     )
     nb_samples = 1
     etas = nlme_model.sample_etas(nb_samples)
@@ -219,7 +221,7 @@ def test_log_prior(sample_nlme_params, obs_data, struct_model):
 
 def test_log_posterior(sample_nlme_params, obs_data, struct_model):
     nlme_model = StatisticalModel(
-        structural_model=struct_model, dataset=obs_data, prior_params=sample_nlme_params
+        structural_model=struct_model, dataset=obs_data, input_params=sample_nlme_params
     )
     nb_samples = 1
     etas = nlme_model.sample_etas(nb_samples)
@@ -232,7 +234,7 @@ def test_log_posterior(sample_nlme_params, obs_data, struct_model):
 
 def test_state_dict(sample_nlme_params, obs_data, struct_model):
     nlme_model = StatisticalModel(
-        structural_model=struct_model, dataset=obs_data, prior_params=sample_nlme_params
+        structural_model=struct_model, dataset=obs_data, input_params=sample_nlme_params
     )
     state_dict = nlme_model.get_state_dict()
 

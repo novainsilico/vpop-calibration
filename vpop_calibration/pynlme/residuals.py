@@ -2,9 +2,9 @@ import torch
 
 from typing import Any, NamedTuple
 
-from vpop_calibration.pynlme.indexing import IndexedObservations
+from vpop_calibration.pynlme.indexing import ObservationsDataSet
 from vpop_calibration.pynlme.params import ErrorModel, ErrorType
-from vpop_calibration.config import device
+from vpop_calibration.config import device, default_dtype
 
 
 class ResidualErrorEstimates(NamedTuple):
@@ -20,7 +20,12 @@ class ResidualErrorEstimates(NamedTuple):
         output_names: list[str],
     ) -> "ResidualErrorEstimates":
         """Build the initial estimates from the user-specified priors."""
-        priors = [error_model_priors[name] for name in output_names]
+        empty_error_model = ErrorModel(
+            error_type="survival", sigma=None, sigma_add=None, sigma_prop=None
+        )
+        priors = [
+            error_model_priors.get(name, empty_error_model) for name in output_names
+        ]
         variances = [prior.variance_components for prior in priors]
         active = [prior.active_components for prior in priors]
         return cls(
@@ -121,10 +126,10 @@ class ResidualErrorEstimates(NamedTuple):
 
 # @torch.compile
 def calculate_residuals(
-    observed_data: IndexedObservations,
+    observed_data: ObservationsDataSet,
     predictions: torch.Tensor,
 ) -> torch.Tensor:
-    """Calculates residuals based on the error model for each output
+    """Calculates residuals based on the error model for each continuous output
 
     Args:
         observed_data: Indexed observations
@@ -150,7 +155,7 @@ def calculate_residuals(
 
 # @torch.compile
 def compute_error_variance(
-    observations: IndexedObservations,
+    observations: ObservationsDataSet,
     predictions: torch.Tensor,
     residual_error: ResidualErrorEstimates,
     min_variance: float,
@@ -163,36 +168,108 @@ def compute_error_variance(
     )
 
 
-# @torch.compile
-def log_likelihood_observation(
-    observations: IndexedObservations,
+def compute_survival_likelihood(
+    observations: ObservationsDataSet, predictions: torch.Tensor
+) -> torch.Tensor:
+    nb_samples = predictions.shape[0]
+    nb_patients = len(observations.obs_index.id.ref_values)
+
+    if not observations.survival_outputs:
+        # No survival data, contribution to LL is 0
+        return torch.zeros(
+            (nb_samples, nb_patients), device=device, dtype=default_dtype
+        )
+
+    log_hz_rows = torch.as_tensor(
+        observations.obs_index.output_name.raw_values.values
+        == observations.survival_outputs.log_hazard,
+        dtype=torch.bool,
+        device=device,
+    )
+
+    cumulative_hz_rows = torch.as_tensor(
+        observations.obs_index.output_name.raw_values.values
+        == observations.survival_outputs.cumulative_hazard,
+        dtype=torch.bool,
+        device=device,
+    )
+    log_hz_rows_expanded = log_hz_rows.expand(nb_samples, -1)
+    cumulative_hz_rows_expanded = cumulative_hz_rows.expand(nb_samples, -1)
+    # Patient indices have no reason to be sorted in the observation data set
+    # Get the ordering index tensor for each required output
+    patient_index_log_hz = torch.argsort(
+        observations.obs_index.id.index_values[log_hz_rows]
+    )
+    # Gather the rows where the prediction contains the log_hazard, and order them by increasing patient index
+    log_hz_predicted = (
+        predictions[log_hz_rows_expanded]
+        .view(nb_samples, nb_patients)
+        .index_select(1, patient_index_log_hz)
+    )
+
+    # Same thing for cumulative hazard
+    patient_index_cum_hz = torch.argsort(
+        observations.obs_index.id.index_values[cumulative_hz_rows]
+    )
+    cumulative_hz_predicted = (
+        predictions[cumulative_hz_rows_expanded]
+        .view(nb_samples, nb_patients)
+        .index_select(1, patient_index_cum_hz)
+    )
+
+    event_status = observations.obs_values[log_hz_rows].expand(nb_samples, -1)
+
+    # Log likelihood is computed as
+    # (event is occurred) * log_hz (event_time) - cumulative_hazard(event_time)
+    ll = event_status * log_hz_predicted - cumulative_hz_predicted
+
+    return ll.view(nb_samples, nb_patients)
+
+
+def compute_normal_likelihood(
+    observations: ObservationsDataSet,
     predictions: torch.Tensor,
     residual_error: ResidualErrorEstimates,
     min_variance: float,
 ) -> torch.Tensor:
     """Compute log-likelihood of predictions given corresponding observations.
 
+    A nomal distribution is assumed for continuous model outputs.
+
     The output contains one total likelihood per patient, per sample.
     """
+
     nb_samples = predictions.shape[0]
     nb_patients = len(observations.obs_index.id.ref_values)
 
+    continuous_outputs_indicator = torch.logical_or(
+        residual_error.sigma_add, residual_error.sigma_prop
+    )
+    obs_output_indices = observations.obs_index.output_name.index_values
+    continuous_outputs_mask = torch.index_select(
+        continuous_outputs_indicator, 0, obs_output_indices
+    ).expand(nb_samples, -1)
+    # Compute residuals on all outputs (survival outputs are simply masked out)
     residuals = calculate_residuals(
         observed_data=observations,
         predictions=predictions,
     )
 
-    # Log-likelihood of normal distribution
+    # Log-likelihood of normal distribution (survival outputs are simply masked out)
     variance = compute_error_variance(
         observations=observations,
         predictions=predictions,
         residual_error=residual_error,
         min_variance=min_variance,
     )
-    # Normal likelihood function
-    log_lik_full = -0.5 * (
-        torch.log(2 * torch.pi * variance) + (residuals**2 / variance)
+
+    log_lik_full = torch.zeros_like(residuals, device=device, dtype=residuals.dtype)
+    # Normal likelihood function for the continuous outputs
+    log_lik_full[continuous_outputs_mask] = -0.5 * (
+        torch.log(2 * torch.pi * variance[continuous_outputs_mask])
+        + (residuals[continuous_outputs_mask] ** 2 / variance[continuous_outputs_mask])
     )
+
     log_lik_per_patient = torch.zeros(
         (nb_samples, nb_patients), device=device, dtype=predictions.dtype
     )
@@ -208,8 +285,34 @@ def log_likelihood_observation(
 
 
 # @torch.compile
+def log_likelihood_observation(
+    observations: ObservationsDataSet,
+    predictions: torch.Tensor,
+    residual_error: ResidualErrorEstimates,
+    min_variance: float,
+) -> torch.Tensor:
+    """Compute the joint log-likelihood of observations, for all outputs.
+
+    The output contains one likelihood per sample and per patient.
+    """
+    log_lik_continuous = compute_normal_likelihood(
+        observations=observations,
+        predictions=predictions,
+        residual_error=residual_error,
+        min_variance=min_variance,
+    )
+
+    log_lik_survival = compute_survival_likelihood(
+        observations=observations, predictions=predictions
+    )
+
+    log_lik_final = log_lik_continuous + log_lik_survival
+    return log_lik_final
+
+
+# @torch.compile
 def add_predictive_error(
-    observations: IndexedObservations,
+    observations: ObservationsDataSet,
     predictions: torch.Tensor,
     residual_error: ResidualErrorEstimates,
     min_variance: float,

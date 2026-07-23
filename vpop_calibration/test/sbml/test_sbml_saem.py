@@ -75,7 +75,7 @@ def test_sbml_saem(sample_nlme_params, obs_data, sbml_model):
     nlme_model = NlmeModel(
         structural_model=sbml_model,
         df=obs_data,
-        prior_params=sample_nlme_params,
+        input_params=sample_nlme_params,
         config=config,
     )
     nlme_model.optimizer.run()

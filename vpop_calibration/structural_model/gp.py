@@ -3,7 +3,7 @@ import torch
 
 from vpop_calibration.structural_model.base import StructuralModel
 from vpop_calibration.model.gp import GP
-from vpop_calibration.pynlme.indexing import ObservationIndex
+from vpop_calibration.pynlme.indexing import DataIndex
 
 
 class StructuralGp(StructuralModel):
@@ -34,7 +34,7 @@ class StructuralGp(StructuralModel):
     def simulate(
         self,
         X: torch.Tensor,
-        prediction_index: ObservationIndex,
+        prediction_index: DataIndex,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         num_chains, nb_patients, nb_timesteps, nb_params = X.shape
 

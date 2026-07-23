@@ -79,7 +79,7 @@ def struct_model() -> StructuralModel:
 
 def test_importance_sampling(sample_nlme_params, obs_data, struct_model):
     nlme_model = StatisticalModel(
-        structural_model=struct_model, dataset=obs_data, prior_params=sample_nlme_params
+        structural_model=struct_model, dataset=obs_data, input_params=sample_nlme_params
     )
     cond_sampler = ConditionalDistributionSampler(nlme_model)
     cond_sampler.run_sampler()
@@ -90,7 +90,7 @@ def test_importance_sampling(sample_nlme_params, obs_data, struct_model):
 
 def test_state_dict(sample_nlme_params, obs_data, struct_model):
     nlme_model = StatisticalModel(
-        structural_model=struct_model, dataset=obs_data, prior_params=sample_nlme_params
+        structural_model=struct_model, dataset=obs_data, input_params=sample_nlme_params
     )
     cond_sampler = ConditionalDistributionSampler(nlme_model)
     cond_sampler.run_sampler()

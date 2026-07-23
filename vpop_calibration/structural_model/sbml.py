@@ -8,7 +8,7 @@ import uuid
 from vpop_calibration.structural_model.base import StructuralModel
 from vpop_calibration.utils import extend_schema
 from vpop_calibration.config import default_dtype, device
-from vpop_calibration.pynlme.indexing import ObservationIndex
+from vpop_calibration.pynlme.indexing import DataIndex
 
 
 def simulate_rr_single_patient(
@@ -111,7 +111,7 @@ class StructuralSbml(StructuralModel):
     def assemble_numeric_vpop(
         self,
         X: torch.Tensor,
-        prediction_index: ObservationIndex,
+        prediction_index: DataIndex,
     ) -> pd.DataFrame:
         nb_chains, nb_patients, nb_timesteps, _ = X.shape
         # Create a mapping from patient index to protocol index
@@ -180,7 +180,7 @@ class StructuralSbml(StructuralModel):
     def simulate(
         self,
         X: torch.Tensor,
-        prediction_index: ObservationIndex,
+        prediction_index: DataIndex,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         nb_chains, nb_patients, nb_timesteps, _ = X.shape
         vpop = self.assemble_numeric_vpop(X, prediction_index)
