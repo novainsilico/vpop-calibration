@@ -63,7 +63,7 @@ class PriorVisualizer:
                 omega,
                 pdu.constraint,
                 color="steelblue",
-                label=f"Prior initial: {pdu.prior:.1f}",
+                label=f"Initial prior: {pdu.prior:.1f}",
                 log_scale=log_scale,
             )
             self._format_axis(ax, name, pdu.constraint.transform, log_scale)
