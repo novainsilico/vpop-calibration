@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.4.5] - 2026-07-23
+
+### Added
+
+- Initial estimates distribution visualization tool: call `nlme_model.initial_estimates.plot_distribution()` to visualize the parameter distributions in physical space
+- Golden tests for SAEM on an analytical model
+- SBML support via libroadrunner -> `StructuralSbml`
+
 ## [4.4.4] - 2026-07-10
 
 ### Added
