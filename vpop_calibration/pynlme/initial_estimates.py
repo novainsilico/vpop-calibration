@@ -51,7 +51,10 @@ class PriorVisualizer:
         for ax, (name, pdu) in zip(axes, pdu_dict.items()):
             mu, omega = pdu.transformed_prior, pdu.prior_omega
             x_grid = self._make_x_grid(
-                mu - 3.5 * omega, mu + 3.5 * omega, pdu.constraint, log_scale
+                phi_min=mu - 3.5 * omega,
+                phi_max=mu + 3.5 * omega,
+                constraint=pdu.constraint,
+                log_scale=log_scale,
             )
             self._draw_density(
                 ax,
@@ -76,8 +79,17 @@ class PriorVisualizer:
     def _make_x_grid(
         self, phi_min: float, phi_max: float, constraint: Constraint, log_scale: bool
     ) -> np.ndarray:
-        theta_min = inverse_transform_param(np.array(phi_min), constraint)
-        theta_max = inverse_transform_param(np.array(phi_max), constraint)
+
+        theta_min = (
+            constraint.low
+            if constraint.low is not None
+            else inverse_transform_param(np.array(phi_min), constraint)
+        )
+        theta_max = (
+            constraint.high
+            if constraint.high is not None
+            else inverse_transform_param(np.array(phi_max), constraint)
+        )
         if log_scale:
             if theta_min > 0:
                 return np.geomspace(theta_min, theta_max, 500)
