@@ -1943,6 +1943,35 @@ nearley = ["js2py"]
 regex = ["regex"]
 
 [[package]]
+name = "libroadrunner"
+version = "2.9.2"
+description = "libRoadRunner: A simulation and analysis library for SBML"
+optional = false
+python-versions = "*"
+groups = ["main"]
+files = [
+    {file = "libroadrunner-2.9.2-cp311-cp311-macosx_14_0_arm64.whl", hash = "sha256:041054438406c4210e438e1a968fe8d527bff5c52858c1b702e211f5001dc4c6"},
+    {file = "libroadrunner-2.9.2-cp311-cp311-macosx_15_0_x86_64.whl", hash = "sha256:f58ee34433e9f2b38b6195726f71015cb20216348ab095d7355263f58de858c8"},
+    {file = "libroadrunner-2.9.2-cp311-cp311-manylinux_2_28_x86_64.whl", hash = "sha256:0cb0ef8d8e7eea6065c04345394be2fc335f76d7df339097f5f8739a5bece6dc"},
+    {file = "libroadrunner-2.9.2-cp311-cp311-win_amd64.whl", hash = "sha256:04860fab5fdbb3aabec9bfdb2ebd24ebae3321d5c06d6e774b8a8ff5056c5eba"},
+    {file = "libroadrunner-2.9.2-cp312-cp312-macosx_14_0_arm64.whl", hash = "sha256:24363b0b85f0e3fcaedded1589e56c18b609d1de4119490bb71947db428efffd"},
+    {file = "libroadrunner-2.9.2-cp312-cp312-macosx_15_0_x86_64.whl", hash = "sha256:436c9034b0452634e9791bd6d37616ca3fff526cefe547150578763a9acc3611"},
+    {file = "libroadrunner-2.9.2-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:11d2ff6605f67fbd78f6829b1235db8d159a61a65235261974b997ff4bbf16ae"},
+    {file = "libroadrunner-2.9.2-cp312-cp312-win_amd64.whl", hash = "sha256:9818ea4e51a002181a10dd997c69f9e7cd96c6fbcf3115797cfc2728f18b79b7"},
+    {file = "libroadrunner-2.9.2-cp313-cp313-macosx_14_0_arm64.whl", hash = "sha256:4db3380366e3312a07370be9ed969e6f79bca77f56c5e31c89a749bc9993b0b4"},
+    {file = "libroadrunner-2.9.2-cp313-cp313-macosx_15_0_x86_64.whl", hash = "sha256:cbd1744f62d655d4e692080bcd5f42aac390c6b13c70fab81e6c7fc136c69b4f"},
+    {file = "libroadrunner-2.9.2-cp313-cp313-manylinux_2_28_x86_64.whl", hash = "sha256:56f0c1888507b94b7a7a79877fa5f3f7e73f7838145df53fb3c9982bd25d6b5f"},
+    {file = "libroadrunner-2.9.2-cp313-cp313-win_amd64.whl", hash = "sha256:9555f9087e96002dc10bd9924f25f61e2759b5135061b1bf1fd14276e070c3c9"},
+    {file = "libroadrunner-2.9.2-cp314-cp314-macosx_14_0_arm64.whl", hash = "sha256:8a14b5fb9f191b703ad0e304e8c39190d6f26a3cada47329224514b1dbe86010"},
+    {file = "libroadrunner-2.9.2-cp314-cp314-macosx_15_0_x86_64.whl", hash = "sha256:fa1876e0962f45b6344e1697d2b4f0ffbc79188f46a4fccec758cc95c2850fb1"},
+    {file = "libroadrunner-2.9.2-cp314-cp314-manylinux_2_28_x86_64.whl", hash = "sha256:01d5a5f1b3df72ca9d3c330096e75004ddccb8d6073911f9a068bff5bd1bfbe3"},
+    {file = "libroadrunner-2.9.2-cp314-cp314-win_amd64.whl", hash = "sha256:52862d3520bb04565a31e420e4c37fa334c74a5071c121c962e7c0d356d245d4"},
+]
+
+[package.dependencies]
+numpy = ">=2.2,<3.0"
+
+[[package]]
 name = "linear-operator"
 version = "0.6.1"
 description = "A linear operator implementation, primarily designed for finite-dimensional positive definite operators (i.e. kernel matrices)."
@@ -4620,4 +4649,4 @@ files = [
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<3.15"
-content-hash = "76b9262288b81f6c69c1a6e3fb14633636ce2a3c4a5bacbb992d3bc833a7bfd4"
+content-hash = "e6c230f4ef49e0cd3a9fe6f507b7a6de056e96fa4e40db3885d2c7440ec39041"

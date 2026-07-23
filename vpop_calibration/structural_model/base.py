@@ -26,6 +26,7 @@ class StructuralModel:
         """
         self.parameter_names: list[str] = parameter_names
         self.output_names: list[str] = output_names
+        self.nb_outputs: int = len(output_names)
         self.protocol_arms: list[str] = protocol_arms
         self.task_names: list[str] = task_names
 
