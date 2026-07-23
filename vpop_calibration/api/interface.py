@@ -27,18 +27,18 @@ class NlmeModel:
     def __init__(
         self,
         df: pd.DataFrame,
-        prior_params: dict,
+        input_params: dict,
         structural_model: StructuralModel,
         optim: Literal["saem"] = "saem",
         config: Config = Config(),
     ):
         seed_everything(config.seed)
         obs_data = ObsData(DataFrame(df))
-        nlme_params = MixedEffectParameters.model_validate(prior_params)
+        nlme_params = MixedEffectParameters.model_validate(input_params)
         self.statistical_model = StatisticalModel(
             structural_model=structural_model,
             dataset=obs_data,
-            prior_params=nlme_params,
+            input_params=nlme_params,
             config=config.nlme,
         )
         if optim == "saem":
@@ -79,7 +79,7 @@ class NlmeModel:
         )
         instance.plot = PlottingUtility(instance.diagnostics)
         instance.initial_estimates = PriorVisualizer(
-            instance.statistical_model.prior_params
+            instance.statistical_model.input_params
         )
         return instance
 

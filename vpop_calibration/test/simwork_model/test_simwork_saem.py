@@ -79,7 +79,7 @@ def test_simwork_saem(sample_nlme_params, obs_data, simwork_model):
     nlme_model = NlmeModel(
         structural_model=simwork_model,
         df=obs_data,
-        prior_params=sample_nlme_params,
+        input_params=sample_nlme_params,
         config=config,
     )
     nlme_model.optimizer.run()

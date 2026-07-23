@@ -73,7 +73,7 @@ def test_gp_saem(np_rng, obs_data, sample_nlme_params):
     nlme_model = NlmeModel(
         structural_model=struct_model,
         df=obs_data,
-        prior_params=sample_nlme_params,
+        input_params=sample_nlme_params,
     )
     nlme_model.optimizer.run()
 
@@ -101,6 +101,6 @@ def test_gp_diagnostics(np_rng, obs_data, sample_nlme_params):
     nlme_model = NlmeModel(
         structural_model=struct_model,
         df=obs_data,
-        prior_params=sample_nlme_params,
+        input_params=sample_nlme_params,
     )
     nlme_model.plot.check_surrogate_validity_gp()

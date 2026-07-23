@@ -3,7 +3,7 @@ import pandas as pd
 from torch.testing import assert_close
 
 from vpop_calibration.structural_model.analytical import StructuralAnalytical
-from vpop_calibration.pynlme.indexing import ObservationIndex, IndexedValues
+from vpop_calibration.pynlme.indexing import DataIndex, TensorIndexing
 
 
 def test_analytical_no_protocol():
@@ -142,17 +142,17 @@ def test_analytical_two_arms_two_overrides():
     assert_close(
         struct_model.protocol_overrides_tensor, torch.tensor([[1.05, 1.1], [1.2, 1.25]])
     )
-    patient_index = IndexedValues(
+    patient_index = TensorIndexing(
         index_values=torch.tensor([0, 0, 0, 1, 1, 1]),
         ref_values=["p1", "p2"],
         raw_values=pd.Series(["p1", "p1", "p1", "p2", "p2", "p2"]),
     )
-    timestep_index = IndexedValues(
+    timestep_index = TensorIndexing(
         index_values=torch.tensor([0, 1, 2, 0, 1, 2]),
         ref_values=[0, 1, 2],
         raw_values=pd.Series([0, 1, 2, 0, 1, 2]),
     )
-    output_index = IndexedValues(
+    output_index = TensorIndexing(
         index_values=torch.tensor([0, 0, 0, 0, 0, 0]),
         ref_values=["circumference"],
         raw_values=pd.Series(
@@ -166,14 +166,14 @@ def test_analytical_two_arms_two_overrides():
             ]
         ),
     )
-    protocol_index = IndexedValues(
+    protocol_index = TensorIndexing(
         index_values=torch.tensor([0, 0, 0, 1, 1, 1]),
         ref_values=["Italy", "Morocco"],
         raw_values=pd.Series(
             ["Italy", "Italy", "Italy", "Morocco", "Morocco", "Morocco"]
         ),
     )
-    task_index = IndexedValues(
+    task_index = TensorIndexing(
         index_values=torch.tensor([0, 0, 0, 1, 1, 1]),
         ref_values=["circumference_Italy", "circumference_Morocco"],
         raw_values=pd.Series(
@@ -188,7 +188,7 @@ def test_analytical_two_arms_two_overrides():
         ),
     )
 
-    obs_index = ObservationIndex(
+    obs_index = DataIndex(
         id=patient_index,
         time=timestep_index,
         output_name=output_index,

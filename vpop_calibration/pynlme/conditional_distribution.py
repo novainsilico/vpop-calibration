@@ -76,7 +76,9 @@ class ConditionalDistributionSampler:
             complete_likelihood=init_predictions.predictions.sum(dim=0),
         )
         init_physical = self.model.convert_gaussian_to_physical(
-            psi=self.current_state.gaussian_params, log_mi=self.model.log_mi
+            psi=self.current_state.gaussian_params,
+            log_mi=self.model.log_mi,
+            surv_coeffs=self.model.surv_coeffs,
         )
         init_samples = ConditionalDistribSamples(
             eta_samples=init_etas,
@@ -151,7 +153,9 @@ class ConditionalDistributionSampler:
                 self.model, previous_state=self.current_state, learning_rate=0.0
             )
             new_physical = self.model.convert_gaussian_to_physical(
-                psi=self.current_state.gaussian_params, log_mi=self.model.log_mi
+                psi=self.current_state.gaussian_params,
+                log_mi=self.model.log_mi,
+                surv_coeffs=self.model.surv_coeffs,
             )
             new_samples = ConditionalDistribSamples(
                 eta_samples=self.current_state.etas,

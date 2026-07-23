@@ -4,7 +4,7 @@ import pandera.pandas as pa
 import torch
 
 from vpop_calibration.structural_model.base import StructuralModel
-from vpop_calibration.pynlme.indexing import ObservationIndex
+from vpop_calibration.pynlme.indexing import DataIndex
 from vpop_calibration.utils import extend_schema
 from vpop_calibration.config import device, default_dtype
 
@@ -96,7 +96,7 @@ class StructuralAnalytical(StructuralModel):
     def simulate(
         self,
         X: torch.Tensor,
-        prediction_index: ObservationIndex,
+        prediction_index: DataIndex,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         num_chains, nb_patients, nb_timesteps, nb_params = X.shape
         map_patient_to_protocol = {

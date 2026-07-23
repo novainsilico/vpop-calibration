@@ -160,7 +160,9 @@ class ModelDiagnostics:
         mc_etas = self.model.sample_etas(nb_samples)
         mc_gaussian = self.model.convert_etas_to_gaussian_all_patients(mc_etas)
         mc_physical = self.model.convert_gaussian_to_physical(
-            psi=mc_gaussian, log_mi=self.model.log_mi
+            psi=mc_gaussian,
+            log_mi=self.model.log_mi,
+            surv_coeffs=self.model.surv_coeffs,
         )
         mc_thetas = self.model.convert_physical_to_thetas_all_patients(
             physical_params=mc_physical
@@ -228,7 +230,9 @@ class ModelDiagnostics:
         mc_etas = self.model.sample_etas(nb_samples)
         mc_gaussian = self.model.convert_etas_to_gaussian_all_patients(mc_etas)
         mc_physical = self.model.convert_gaussian_to_physical(
-            psi=mc_gaussian, log_mi=self.model.log_mi
+            psi=mc_gaussian,
+            log_mi=self.model.log_mi,
+            surv_coeffs=self.model.surv_coeffs,
         )
         mc_thetas = self.model.convert_physical_to_thetas_all_patients(mc_physical)
         inputs = self.model.convert_thetas_to_model_parameters_all_patients(mc_thetas)
@@ -284,7 +288,7 @@ class ModelDiagnostics:
         eta = torch.zeros((1, self.model.nb_patients, self.model.nb_pdu))
         gaussian = self.model.convert_etas_to_gaussian_all_patients(eta)
         physical = self.model.convert_gaussian_to_physical(
-            psi=gaussian, log_mi=self.model.log_mi
+            psi=gaussian, log_mi=self.model.log_mi, surv_coeffs=self.model.surv_coeffs
         )
         theta = self.model.convert_physical_to_thetas_all_patients(
             physical_params=physical
@@ -323,7 +327,7 @@ class ModelDiagnostics:
         all_vpc_records = []
         quantiles_arr = np.asarray(quantiles)
 
-        for output_name in self.model.output_names:
+        for output_name in self.model.input_params.continuous_output_names:
             df_output = df[df["output_name"] == output_name]
             bin_labels, bin_edges = pd.cut(
                 df_output["time"].astype("float"),

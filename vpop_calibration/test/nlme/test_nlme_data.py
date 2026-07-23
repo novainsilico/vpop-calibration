@@ -33,3 +33,7 @@ def test_incomplete_data(obs_data, np_rng):
     df = obs_data
     df_boot = df.sample(frac=0.5, random_state=np_rng)
     _ds = ObsData(df_boot)
+
+
+def test_no_protocol_arm(obs_data):
+    _ds = ObsData(obs_data.drop(columns="protocol_arm"))

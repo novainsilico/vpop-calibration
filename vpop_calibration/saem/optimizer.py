@@ -267,25 +267,35 @@ class PySaem:
             self.model.update_omega(new_omega)
 
             # 3. Update fixed effects MIs
-            if self.model.nb_mi > 0:
+            if self.model.nb_mi + self.model.nb_surv_coeffs > 0:
                 objective_fun = self.build_mi_objective_function(
                     self.mh_state.gaussian_params.mean(dim=0, keepdim=True)
                 )
-                psi0 = self.model.log_mi
-                target_log_MI, fixed_effects_loss = optimize_fixed_effects(
+                psi0 = torch.cat([self.model.log_mi, self.model.surv_coeffs])
+                target_fixed_effects, fixed_effects_loss = optimize_fixed_effects(
                     loss_fn=objective_fun,
                     psi0=psi0,
                     lr=self.config.fixed_effects_lr,
                     nb_iter=self.config.fixed_effects_nb_iter,
                     eps_grad=self.config.fixed_effects_grad_scale,
                 )
-                new_log_MI = stochastic_approximation(
+                target_log_mi = target_fixed_effects[: self.model.nb_mi]
+                new_log_mi = stochastic_approximation(
                     previous=self.model.log_mi,
-                    new=target_log_MI,
+                    new=target_log_mi,
                     learning_rate=self.scheduler.stochastic_approximation_rate,
                 )
 
-                self.model.update_log_mi(new_log_MI)
+                self.model.update_log_mi(new_log_mi)
+
+                target_surv_coeffs = target_fixed_effects[self.model.nb_mi :]
+                new_surv_coeffs = stochastic_approximation(
+                    previous=self.model.surv_coeffs,
+                    new=target_surv_coeffs,
+                    learning_rate=self.scheduler.stochastic_approximation_rate,
+                )
+
+                self.model.update_surv_coeffs(new_surv_coeffs)
 
         new_ebe = stochastic_approximation(
             previous=self.pop_estimates.ebe,
@@ -312,7 +322,7 @@ class PySaem:
             pdu_names=self.model.pdu_names,
             covariate_coeff_names=self.model.covariate_coeff_names,
             mi_names=self.model.mi_names,
-            output_names=self.model.output_names,
+            output_names=self.model.input_params.continuous_output_names,
         )
         return summary
 
@@ -323,10 +333,12 @@ class PySaem:
             "Ensure to average the gaussian parameters before building the fixed effects objective function"
         )
 
-        def mi_objective_function(log_MI: torch.Tensor):
+        def mi_objective_function(fixed_effects: torch.Tensor):
             # Assemble the patient parameters
+            log_mi = fixed_effects[..., : self.model.nb_mi]
+            surv_coeffs = fixed_effects[..., self.model.nb_mi :]
             new_physical_params = self.model.convert_gaussian_to_physical(
-                gaussian_params, log_MI
+                psi=gaussian_params, log_mi=log_mi, surv_coeffs=surv_coeffs
             )
             new_thetas = self.model.convert_physical_to_thetas_all_patients(
                 new_physical_params
