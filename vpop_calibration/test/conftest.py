@@ -1,13 +1,18 @@
 import pytest
 import numpy as np
 import matplotlib.pyplot as plt
+import pytest_golden.yaml
 import torch
 
+pytest_golden.yaml.add_representer(
+    np.float64, lambda dumper, data: dumper.represent_float(float(data))
+)
 
-@pytest.fixture(scope="session")
+
+@pytest.fixture(scope="function")
 def np_rng():
     # Initialize the seeds for all random operators used in the tests
-    rng = np.random.default_rng(42)
+    rng = np.random.default_rng(0)
     return rng
 
 
@@ -23,5 +28,6 @@ def clean_matplotlib_figures():
 
 
 @pytest.fixture(autouse=True)
-def torch_seed():
-    torch.manual_seed(0)
+def deterministic_threads():
+    torch.set_num_threads(1)
+    yield

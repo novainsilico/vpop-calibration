@@ -12,7 +12,7 @@ import torch
 from pandera.typing import DataFrame
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def sample_nlme_model(np_rng) -> StatisticalModel:
     input = {
         "model_intrinsic": {"mi_1": {"prior": 10.0}},

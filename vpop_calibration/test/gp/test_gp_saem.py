@@ -5,7 +5,6 @@ import numpy as np
 from vpop_calibration.interface import NlmeModel
 from vpop_calibration.structural_model.gp import StructuralGp
 from vpop_calibration.model.gp import GP
-from vpop_calibration.pynlme.plot import PlottingUtility
 
 
 @pytest.fixture
@@ -34,7 +33,7 @@ def sample_nlme_params() -> dict:
     return input
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def obs_data(np_rng) -> pd.DataFrame:
     protocol_arms = ["arm-A", "arm-B"]
     patients = {

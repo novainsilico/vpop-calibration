@@ -21,7 +21,6 @@ from vpop_calibration.config import device
 from vpop_calibration.pynlme.residuals import log_likelihood_observation
 from vpop_calibration.saem.plot import OptimizerPlot
 from vpop_calibration.config import smoke_test
-from vpop_calibration.utils import seed_everything
 
 
 class PySaem:
@@ -143,11 +142,8 @@ class PySaem:
             )
         return instance
 
-    def run(self, seed: int | None = None):
-        if seed is not None:
-            self.config = self.config._replace(seed=seed)
+    def run(self):
         if self.scheduler.iteration == 0:
-            seed_everything(self.config.seed)
             # Inititate the SAEM state with current estimates and Metropolis Hastings state
             self.init_state()
         else:

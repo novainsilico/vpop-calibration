@@ -1,5 +1,4 @@
 import pandera.pandas as pa
-import pandas as pd
 
 
 class ObsDataSchema(pa.DataFrameModel):

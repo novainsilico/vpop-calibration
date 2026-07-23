@@ -8,7 +8,6 @@ from vpop_calibration.pynlme.schemas import ObsDataSchema
 import torch
 import pytest
 import pandas as pd
-import pandera.pandas as pa
 
 
 @pytest.fixture

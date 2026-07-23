@@ -8,7 +8,7 @@ import itertools
 from vpop_calibration.model import GP
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def training_data(np_rng):
     # Use this fixture for testing GP training
     patients = {"id": ["p1", "p2"], "k1": [1.0, 2.0]}
@@ -24,7 +24,7 @@ def training_data(np_rng):
     return df, params
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def training_data_bootstrapped(training_data, np_rng):
     # Same as training data, but incomplete data set
     df, params = training_data

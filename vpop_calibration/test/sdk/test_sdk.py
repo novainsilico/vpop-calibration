@@ -13,7 +13,7 @@ import pandas as pd
 import numpy as np
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def obs_data(np_rng) -> pd.DataFrame:
     protocol_arms = ["dose-1", "dose-10"]
     patients = {

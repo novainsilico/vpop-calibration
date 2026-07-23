@@ -40,7 +40,7 @@ def sample_nlme_params() -> MixedEffectParameters:
     return MixedEffectParameters.model_validate(input)
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def obs_data(np_rng) -> ObsData:
     protocol_arms = ["arm-A", "arm-B"]
     patients = {
