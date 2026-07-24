@@ -62,27 +62,31 @@ class SimworkModelBinding:
         path_to_solving_options: str,
         inputs: list[str],
         outputs: list[str],
+        path_to_executable: str | None = None,
     ):
         self.model_path = path_to_model
         self.solving_options = path_to_solving_options
         self.inputs = inputs
         self.outputs = outputs
         if not smoke_test:
-            build_result = subprocess.run(
-                [
-                    "nix",
-                    "build",
-                    ".#simwork.legacyPackages.x86_64-linux.perf.scripts.run-model-simple",
-                    "--print-out-paths",
-                ],
-                capture_output=True,
-            )
-            if build_result.returncode != 0:
-                raise RuntimeError(build_result.stderr)
-            self.executable = (
-                build_result.stdout.decode().strip("\n")
-                + "/bin/scripts.run-model-simple"
-            )
+            if not path_to_executable:
+                build_result = subprocess.run(
+                    [
+                        "nix",
+                        "build",
+                        ".#simwork.legacyPackages.x86_64-linux.perf.scripts.run-model-simple",
+                        "--print-out-paths",
+                    ],
+                    capture_output=True,
+                )
+                if build_result.returncode != 0:
+                    raise RuntimeError(build_result.stderr)
+                self.executable = (
+                    build_result.stdout.decode().strip("\n")
+                    + "/bin/scripts.run-model-simple"
+                )
+            else:
+                self.executable = path_to_executable
         else:
             self.executable = os.environ["SIMWORK_EXE"]
 

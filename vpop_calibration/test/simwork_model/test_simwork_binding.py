@@ -1,4 +1,5 @@
 from numpy import inf
+import os
 
 from vpop_calibration.structural_model.simwork import (
     SimworkModelBinding,
@@ -68,3 +69,18 @@ def test_handle_payload(dummy_simwork_model):
         parsed_output, expected_output, check_dtype=False, check_names=False
     )
     # We don't check the `names` attributes, as the index has a different name here, but the actual column names are actually validated
+
+
+def test_simwork_model_explicit_path():
+    model = SimworkModelBinding(
+        path_to_model="vpop_calibration/test/simwork_model/assets/model.json",
+        path_to_solving_options="vpop_calibration/test/simwork_model/assets/options.json",
+        inputs=["k_12", "k_21"],
+        outputs=["A0", "A1", "A2"],
+        path_to_executable=os.environ["SIMWORK_EXE"],
+    )
+
+    vpop = pd.DataFrame({"id": ["p1", "p2"], "k_12": [0, 0], "k_21": [1, 0]})
+
+    time: list[float] = [0, 1, 2]
+    out = model.run(vpop=vpop, time=time)
