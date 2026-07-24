@@ -1,11 +1,16 @@
 from vpop_calibration.pynlme.params import (
     PatientDescriptorUnknown,
     ModelIntrinsicParam,
+    Constraint,
+    TransformFunction,
 )
 from vpop_calibration.config import device
 
 import torch
 from typing import Callable
+from scipy.special import expit
+from typing import get_args
+import numpy as np
 
 
 def init_transform_tensors(
@@ -71,3 +76,14 @@ def init_transform_function(
         return new_params_shifted
 
     return transform
+
+
+def inverse_transform_param(phi: np.ndarray, const: Constraint) -> np.ndarray:
+    if const.transform == "log":
+        return np.exp(phi) + const.shift
+    elif const.transform == "logit":
+        return expit(phi) * const.scale + const.shift
+    else:
+        raise NotImplementedError(
+            f"The following transforms are currently supported: {get_args(TransformFunction)}"
+        )

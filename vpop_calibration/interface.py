@@ -10,6 +10,7 @@ from vpop_calibration.pynlme.data import ObsData
 from vpop_calibration.pynlme.params import MixedEffectParameters
 from vpop_calibration.pynlme.diagnostics import ModelDiagnostics
 from vpop_calibration.pynlme.plot import PlottingUtility
+from vpop_calibration.pynlme.initial_estimates import PriorVisualizer
 from vpop_calibration.pynlme.config import NlmeConfigDict
 from vpop_calibration.saem.optimizer import PySaem
 from vpop_calibration.saem.config import SaemConfigDict
@@ -47,6 +48,7 @@ class NlmeModel:
         else:
             raise NotImplemented
         self.diagnostics = ModelDiagnostics(self.statistical_model)
+        self.initial_estimates = PriorVisualizer(nlme_params)
         self.plot = PlottingUtility(self.diagnostics)
 
     def get_state_dict(self) -> dict[str, Any]:
@@ -78,6 +80,9 @@ class NlmeModel:
             state_dict["diagnostics"], instance.statistical_model
         )
         instance.plot = PlottingUtility(instance.diagnostics)
+        instance.initial_estimates = PriorVisualizer(
+            instance.statistical_model.prior_params
+        )
         return instance
 
     def save(self, f: str | bytes | os.PathLike):
