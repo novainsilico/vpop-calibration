@@ -122,17 +122,22 @@ pbpk <- function(){
 fit <- nlmixr2(
   pbpk,
   dat,
-  options <- saemControl(
-    print = 100,
-    nBurn = 100,
-    nEm = 100,
-    nmc = 1,
-    nu = c(1, 1, 1),
-    logLik = F
-  ),
   est = "saem",
-  control = list(print = 0),
-  table = list(cwres = FALSE, npde = FALSE)
+  control = saemControl(
+    print  = 100,
+    nBurn  = 100,
+    nEm    = 100,
+    nmc    = 1,
+    nu     = c(1, 1, 1),
+    logLik = FALSE,
+    rxControl = rxControl(
+      method = "liblsoda",
+      atol   = 1e-6,
+      rtol   = 1e-6,
+      hini   = 1e-6
+    )
+  ),
+  table = tableControl(cwres = FALSE, npde = FALSE)
 )
 
 ebe <- fit %>%

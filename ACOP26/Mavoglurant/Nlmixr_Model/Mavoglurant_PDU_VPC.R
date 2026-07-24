@@ -119,7 +119,23 @@ pbpk <- function(){
   })
 }
 
-fit.addProp.S <- nlmixr(pbpk, dat, est = "saem", control = list(print = 0),
+fit.addProp.S <- nlmixr(pbpk,
+                        dat,
+                        est = "saem",
+                        control = saemControl(
+                          print  = 100,
+                          nBurn  = 100,
+                          nEm    = 100,
+                          nmc    = 1,
+                          nu     = c(1, 1, 1),
+                          logLik = FALSE,
+                          rxControl = rxControl(
+                            method = "liblsoda",
+                            atol   = 1e-6,
+                            rtol   = 1e-6,
+                            hini   = 1e-6
+                          )
+                        ),
                         table = list(cwres = TRUE, npde = TRUE))
 
 quantiles  <- c(0.05, 0.50, 0.95)

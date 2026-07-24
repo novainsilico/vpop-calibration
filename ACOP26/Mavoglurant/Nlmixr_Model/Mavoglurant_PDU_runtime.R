@@ -7,6 +7,7 @@ library(microbenchmark)
 library(dplyr)
 library(stringr)
 
+
 pbpk <- function(){
   ini({
     ##theta=exp(c(1.1, .3, 2, 7.6, .003, .3))
@@ -112,22 +113,27 @@ pbpk <- function(){
 fit_nlmixr <- function() {
 
   dat <- read.csv(
-    "~/git/vpop-calibration/examples/benchmarking/Mavoglurant/Mavoglurant_Benchmark_Dataset.csv"
+    "~/git/vpop-calibration/examples/benchmarking/Mavoglurant/Mavoglurant_Dataset.csv"
   )
 
   fit <- nlmixr2(
     pbpk,
     dat,
-    options <- saemControl(
-      print = 100,
-      nBurn = 100,
-      nEm = 100,
-      nmc = 1,
-      nu = c(1, 1, 1),
-      logLik = F
-    ),
     est = "saem",
-    control = list(print = 0),
+    control = saemControl(
+      print  = 100,
+      nBurn  = 100,
+      nEm    = 100,
+      nmc    = 1,
+      nu     = c(1, 1, 1),
+      logLik = FALSE,
+      rxControl = rxControl(
+        method = "liblsoda",
+        atol   = 1e-6,
+        rtol   = 1e-6,
+        hini   = 1e-6
+      )
+    ),
     table = list(cwres = FALSE, npde = FALSE)
   )
 
