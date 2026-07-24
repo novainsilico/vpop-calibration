@@ -96,6 +96,8 @@ class PySaem:
             nb_pdu=self.model.nb_pdu,
         )
 
+        self.ebe_estimates = output.gaussian_params.mean(dim=0).clone()
+
     def get_state_dict(self) -> dict[str, Any]:
         state_dict = {
             "config": self.config.get_state_dict(),
@@ -203,6 +205,14 @@ class PySaem:
 
         # If in learning or smoothing phase, go through the rest of the iteration
         if self.scheduler.phase != "burnin":
+            # Compute EBE:
+            current_phi_sample = self.mh_state.gaussian_params.mean(dim=0)
+
+            self.ebe_estimates = stochastic_approximation(
+                previous=self.ebe_estimates,
+                new=current_phi_sample,
+                learning_rate=self.scheduler.stochastic_approximation_rate,
+            )
             # M-step:
             # Compute the sum of squared residuals
             sum_sq_res_full = sum_sq_residuals(

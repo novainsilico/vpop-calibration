@@ -80,15 +80,15 @@ class ConditionalDistributionSampler:
             log_prob=self.current_state.log_prob,
         )
         self.samples: list[ConditionalDistribSamples] = [init_samples]
-        self.ebe: ConditionalDistribSamples = init_samples
+        self.map: ConditionalDistribSamples = init_samples
         self.nb_improved_history: list[float] = [0]
         self.indiv_log_prob: np.ndarray = init_samples.log_prob.cpu().numpy()
 
     def get_state_dict(self) -> dict[str, Any]:
-        if hasattr(self, "ebe"):
+        if hasattr(self, "MAP"):
             state_dict = {
                 "current_state": self.current_state.get_state_dict(),
-                "ebe": self.ebe.get_state_dict(),
+                "map": self.map.get_state_dict(),
                 "last_sample": self.samples[-1].get_state_dict(),
                 "has_run": True,
             }
@@ -109,8 +109,8 @@ class ConditionalDistributionSampler:
                 state_dict=state_dict["last_sample"]
             )
             instance.samples = [init_samples]
-            instance.ebe = ConditionalDistribSamples.from_state_dict(
-                state_dict=state_dict["ebe"]
+            instance.map = ConditionalDistribSamples.from_state_dict(
+                state_dict=state_dict["map"]
             )
             instance.nb_improved_history = [0]
             instance.indiv_log_prob = init_samples.log_prob.cpu().numpy()
@@ -118,7 +118,7 @@ class ConditionalDistributionSampler:
         return instance
 
     def run_sampler(self, nb_samples: int = 100):
-        if not hasattr(self, "ebe"):
+        if not hasattr(self, "map"):
             self.init_samples()
         else:
             print(f"Sampling already started, adding {nb_samples} new samples.")
@@ -156,30 +156,30 @@ class ConditionalDistributionSampler:
             )
             self.samples.append(new_samples)
             # Clip the list of samples to keep only the last max_samples values
-            self.update_ebe(new_samples)
+            self.update_map(new_samples)
             self.clip_samples()
             yield i
 
-    def update_ebe(self, new_samples: ConditionalDistribSamples):
-        # Assemble as mask to accept or reject new EBEs
-        accept_mask = self.ebe.log_prob < new_samples.log_prob
+    def update_map(self, new_samples: ConditionalDistribSamples):
+        # Assemble as mask to accept or reject new MAPs
+        accept_mask = self.map.log_prob < new_samples.log_prob
         # size (nb_patients)
         new_eta = torch.where(
-            accept_mask.view(-1, 1), new_samples.eta_samples, self.ebe.eta_samples
+            accept_mask.view(-1, 1), new_samples.eta_samples, self.map.eta_samples
         )
         new_physical = torch.where(
             accept_mask.view(-1, 1),
             new_samples.physical_params_samples,
-            self.ebe.physical_params_samples,
+            self.map.physical_params_samples,
         )
         accept_mask_predictions = accept_mask.index_select(
             1, self.model.data.full_obs.obs_index.id.index_values
         )
         new_pred = torch.where(
-            accept_mask_predictions, new_samples.predictions, self.ebe.predictions
+            accept_mask_predictions, new_samples.predictions, self.map.predictions
         )
-        new_log_prob = torch.where(accept_mask, new_samples.log_prob, self.ebe.log_prob)
-        self.ebe = ConditionalDistribSamples(
+        new_log_prob = torch.where(accept_mask, new_samples.log_prob, self.map.log_prob)
+        self.map = ConditionalDistribSamples(
             eta_samples=new_eta,
             physical_params_samples=new_physical,
             predictions=new_pred,
@@ -203,7 +203,7 @@ class ConditionalDistributionSampler:
         for ax in self.axes:
             ax.grid(True)
 
-        self.axes[0].set_title("EBE convergence")
+        self.axes[0].set_title("MAP convergence")
         self.axes[0].set_ylabel("Patients improved")
 
         self.axes[1].set_ylabel("Individual LL")
@@ -252,16 +252,16 @@ class ConditionalDistributionSampler:
                     self.handle.update(self.fig)
 
     @property
-    def ebe_parameters_df(self) -> pd.DataFrame:
+    def map_parameters_df(self) -> pd.DataFrame:
         theta = self.model.convert_physical_to_thetas_all_patients(
-            self.ebe.physical_params_samples
+            self.map.physical_params_samples
         )
         df = self.add_unique_id(self.model.convert_theta_to_dataframe(theta))
         return df
 
     @property
-    def ebe_predictions_df(self) -> pd.DataFrame:
-        df = self.model.data.full_obs.to_pandas(prediction=self.ebe.predictions)
+    def map_predictions_df(self) -> pd.DataFrame:
+        df = self.model.data.full_obs.to_pandas(prediction=self.map.predictions)
         return df
 
     @property

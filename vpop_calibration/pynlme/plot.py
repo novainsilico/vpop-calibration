@@ -649,7 +649,7 @@ class PlottingUtility:
         self,
         n_patients_to_plot: int = 3,
     ):
-        if not hasattr(self.model_diag.sampler, "ebe"):
+        if not hasattr(self.model_diag.sampler, "map"):
             self.model_diag.sample_conditional_distribution()
         sample_physical = self.model_diag.sampler.total_samples.physical_params_samples
         if n_patients_to_plot > self.model_diag.model.nb_patients:
@@ -660,10 +660,10 @@ class PlottingUtility:
         )
 
         # Get EBE estimates for descriptors
-        ebe_theta = self.model_diag.model.convert_physical_to_thetas_all_patients(
-            self.model_diag.sampler.ebe.physical_params_samples
+        map_theta = self.model_diag.model.convert_physical_to_thetas_all_patients(
+            self.model_diag.sampler.map.physical_params_samples
         )
-        assert ebe_theta is not None
+        assert map_theta is not None
 
         for k in range(n_patients_to_plot):
             patient_samples = (
@@ -693,7 +693,7 @@ class PlottingUtility:
                             label="PDF (KDE)",
                         )
 
-                    map_val = ebe_theta[0][ind_to_plot[k]][i]
+                    map_val = map_theta[0][ind_to_plot[k]][i]
 
                     ax.axvline(
                         map_val,
@@ -844,10 +844,10 @@ class PlottingUtility:
         pdus = self.model_diag.model.pdu_names
         sampler = self.model_diag.sampler
 
-        if not hasattr(sampler, "ebe"):
+        if not hasattr(sampler, "map"):
             self.model_diag.sample_conditional_distribution()
 
-        map_data = self.model_diag.sampler.ebe_parameters_df
+        map_data = self.model_diag.sampler.map_parameters_df
         cond_data = self.model_diag.sampler.total_samples_parameters_df
 
         n_plots = len(pdus)
