@@ -11,6 +11,7 @@
     "odeSolverAbsoluteTolerance": 1.0e-6,
     "odeSolverInitialStep": 1.0e-6,
     "odeSolverRelativeTolerance": 1.0e-6,
+    "odeSolverMaximumStep": 500,
     "outputCompartments": {
         "Some": []
     },
