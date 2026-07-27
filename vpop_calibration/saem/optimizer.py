@@ -59,6 +59,7 @@ class PySaem:
             patience=config.patience,
         )
         self.history = pd.DataFrame()
+        self.ebe_count = 0
 
     def init_state(self):
         """Initiate the optimizer state with first estimates. Ensure this function is called before the optimization starts."""
@@ -95,8 +96,7 @@ class PySaem:
             nb_patients=self.model.nb_patients,
             nb_pdu=self.model.nb_pdu,
         )
-
-        self.ebe_estimates = output.gaussian_params.mean(dim=0).clone()
+        self.ebe_count = 0
 
     def get_state_dict(self) -> dict[str, Any]:
         state_dict = {
@@ -111,6 +111,7 @@ class PySaem:
                     "mh_state": self.mh_state.get_state_dict(),
                     "pop_estimates": self.pop_estimates.get_state_dict(),
                     "sufficient_statistics": self.sufficient_statistics.get_state_dict(),
+                    "ebe_count": self.ebe_count,
                     "has_run": True,
                 }
             )
@@ -142,6 +143,7 @@ class PySaem:
             instance.sufficient_statistics = MStepState.from_state_dict(
                 state_dict=state_dict["sufficient_statistics"]
             )
+            instance.ebe_count = state_dict.get("ebe_count", 0)
         return instance
 
     def run(self):
@@ -203,16 +205,20 @@ class PySaem:
         # Update the optimizer
         self.mh_state = current_mh_state
 
+        if self.scheduler.phase == "smoothing":
+            current_phi_sample = self.mh_state.gaussian_params.mean(dim=0).detach()
+            self.ebe_count += 1
+            if self.ebe_count == 1 or self.model.ebe_estimates is None:
+                new_ebe = current_phi_sample.clone()
+            else:
+                new_ebe = (
+                    self.model.ebe_estimates
+                    + (current_phi_sample - self.model.ebe_estimates) / self.ebe_count
+                )
+            self.model.update_ebe(new_ebe)
+
         # If in learning or smoothing phase, go through the rest of the iteration
         if self.scheduler.phase != "burnin":
-            # Compute EBE:
-            current_phi_sample = self.mh_state.gaussian_params.mean(dim=0)
-
-            self.ebe_estimates = stochastic_approximation(
-                previous=self.ebe_estimates,
-                new=current_phi_sample,
-                learning_rate=self.scheduler.stochastic_approximation_rate,
-            )
             # M-step:
             # Compute the sum of squared residuals
             sum_sq_res_full = sum_sq_residuals(
