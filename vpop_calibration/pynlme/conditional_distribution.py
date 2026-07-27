@@ -85,7 +85,7 @@ class ConditionalDistributionSampler:
         self.indiv_log_prob: np.ndarray = init_samples.log_prob.cpu().numpy()
 
     def get_state_dict(self) -> dict[str, Any]:
-        if hasattr(self, "MAP"):
+        if hasattr(self, "map"):
             state_dict = {
                 "current_state": self.current_state.get_state_dict(),
                 "map": self.map.get_state_dict(),
