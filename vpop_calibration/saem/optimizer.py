@@ -268,10 +268,10 @@ class PySaem:
 
             # 3. Update fixed effects MIs
             if self.model.nb_mi + self.model.nb_surv_coeffs > 0:
-                objective_fun = self.build_mi_objective_function(
+                objective_fun = self.build_fixed_effects_objective_function(
                     self.mh_state.gaussian_params.mean(dim=0, keepdim=True)
                 )
-                psi0 = torch.cat([self.model.log_mi, self.model.surv_coeffs])
+                psi0 = torch.cat([self.model.log_mi, self.model.surv_coeffs], dim=-1)
                 target_fixed_effects, fixed_effects_loss = optimize_fixed_effects(
                     loss_fn=objective_fun,
                     psi0=psi0,
@@ -326,14 +326,16 @@ class PySaem:
         )
         return summary
 
-    def build_mi_objective_function(self, gaussian_params: torch.Tensor) -> Callable:
+    def build_fixed_effects_objective_function(
+        self, gaussian_params: torch.Tensor
+    ) -> Callable:
         """Build the objective function to be optimized for model intrinsic parameters estimation."""
 
         assert gaussian_params.shape[0] == 1, (
             "Ensure to average the gaussian parameters before building the fixed effects objective function"
         )
 
-        def mi_objective_function(fixed_effects: torch.Tensor):
+        def fixed_effects_objective_function(fixed_effects: torch.Tensor):
             # Assemble the patient parameters
             log_mi = fixed_effects[..., : self.model.nb_mi]
             surv_coeffs = fixed_effects[..., self.model.nb_mi :]
@@ -361,7 +363,7 @@ class PySaem:
 
             return -total_log_lik
 
-        return mi_objective_function
+        return fixed_effects_objective_function
 
     def update_pop_estimates_convergence_check(
         self, new_estimates: PopEstimates
