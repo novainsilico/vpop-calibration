@@ -1,0 +1,654 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sbml xmlns="http://www.sbml.org/sbml/level3/version2/core" level="3" version="2">
+  <model id="unnamedModel" name="unnamedModel" timeUnits="second" extentUnits="mole">
+    <listOfUnitDefinitions>
+      <unitDefinition id="Day">
+        <listOfUnits>
+          <unit kind="second" exponent="1" scale="0" multiplier="86400"/>
+        </listOfUnits>
+      </unitDefinition>
+      <unitDefinition id="Day0_DOT_20PerSecond_000000450_DOT_20">
+        <listOfUnits>
+          <unit kind="second" exponent="0.2" scale="0" multiplier="86400"/>
+          <unit kind="second" exponent="-0.2" scale="0" multiplier="1"/>
+        </listOfUnits>
+      </unitDefinition>
+      <unitDefinition id="DayPerSecond">
+        <listOfUnits>
+          <unit kind="second" exponent="1" scale="0" multiplier="86400"/>
+          <unit kind="second" exponent="-1" scale="0" multiplier="1"/>
+        </listOfUnits>
+      </unitDefinition>
+      <unitDefinition id="MicroSubstance__countPerMilliLiter">
+        <listOfUnits>
+          <unit kind="litre" exponent="-1" scale="-3" multiplier="1"/>
+          <unit kind="item" exponent="1" scale="-6" multiplier="1"/>
+        </listOfUnits>
+      </unitDefinition>
+      <unitDefinition id="MicroSubstance__countPerSubstance__count">
+        <listOfUnits>
+          <unit kind="item" exponent="-1" scale="0" multiplier="1"/>
+          <unit kind="item" exponent="1" scale="-6" multiplier="1"/>
+        </listOfUnits>
+      </unitDefinition>
+      <unitDefinition id="MilliLiterPerSubstance__count">
+        <listOfUnits>
+          <unit kind="litre" exponent="1" scale="-3" multiplier="1"/>
+          <unit kind="item" exponent="-1" scale="0" multiplier="1"/>
+        </listOfUnits>
+      </unitDefinition>
+      <unitDefinition id="NanoGramPerDay">
+        <listOfUnits>
+          <unit kind="second" exponent="-1" scale="0" multiplier="86400"/>
+          <unit kind="gram" exponent="1" scale="-9" multiplier="1"/>
+        </listOfUnits>
+      </unitDefinition>
+      <unitDefinition id="NanoGramPerMilliLiter">
+        <listOfUnits>
+          <unit kind="gram" exponent="1" scale="-9" multiplier="1"/>
+          <unit kind="litre" exponent="-1" scale="-3" multiplier="1"/>
+        </listOfUnits>
+      </unitDefinition>
+      <unitDefinition id="PerDay">
+        <listOfUnits>
+          <unit kind="second" exponent="-1" scale="0" multiplier="86400"/>
+        </listOfUnits>
+      </unitDefinition>
+      <unitDefinition id="SecondPerDay">
+        <listOfUnits>
+          <unit kind="second" exponent="-1" scale="0" multiplier="86400"/>
+          <unit kind="second" exponent="1" scale="0" multiplier="1"/>
+        </listOfUnits>
+      </unitDefinition>
+      <unitDefinition id="Substance__count">
+        <listOfUnits>
+          <unit kind="item" exponent="1" scale="0" multiplier="1"/>
+        </listOfUnits>
+      </unitDefinition>
+      <unitDefinition id="Substance__countPerMicroSubstance__count">
+        <listOfUnits>
+          <unit kind="item" exponent="1" scale="0" multiplier="1"/>
+          <unit kind="item" exponent="-1" scale="-6" multiplier="1"/>
+        </listOfUnits>
+      </unitDefinition>
+      <unitDefinition id="Substance__countPerMilliLiter">
+        <listOfUnits>
+          <unit kind="litre" exponent="-1" scale="-3" multiplier="1"/>
+          <unit kind="item" exponent="1" scale="0" multiplier="1"/>
+        </listOfUnits>
+      </unitDefinition>
+    </listOfUnitDefinitions>
+    <listOfParameters>
+      <parameter id="Day0_DOT_20PerSecond_000000450_DOT_20P" value="0.102966808427902" units="Day0_DOT_20PerSecond_000000450_DOT_20" constant="true">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>An auxiliary parameter to handle unit conversions</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="DayPerSecondP" value="1.15740740740741e-05" units="DayPerSecond" constant="true">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>An auxiliary parameter to handle unit conversions</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="MicroSubstance__countPerSubstance__countP" value="1000000" units="MicroSubstance__countPerSubstance__count" constant="true">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>An auxiliary parameter to handle unit conversions</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="Nmax" value="100" units="Substance__countPerMilliLiter" constant="false"/>
+      <parameter id="OneDay" value="1" units="Day" constant="true">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>An auxiliary parameter to handle unit conversions</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="OneMilliLiterPerSubstance__count" value="1" units="MilliLiterPerSubstance__count" constant="true">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>An auxiliary parameter to handle unit conversions</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="OneNanoGramPerMilliLiter" value="1" units="NanoGramPerMilliLiter" constant="true">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>An auxiliary parameter to handle unit conversions</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="OneSubstance__count" value="1" units="Substance__count" constant="true">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>An auxiliary parameter to handle unit conversions</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="PSA" units="NanoGramPerMilliLiter" constant="false"/>
+      <parameter id="PSA__baseline" value="10" units="NanoGramPerMilliLiter" constant="false"/>
+      <parameter metaid="parameter_R" id="R" units="MicroSubstance__countPerMilliLiter" constant="false">
+        <annotation>
+          <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:vCard="http://www.w3.org/2001/vcard-rdf/3.0#" xmlns:vCard4="http://www.w3.org/2006/vcard/ns#" xmlns:bqbiol="http://biomodels.net/biology-qualifiers/" xmlns:bqmodel="http://biomodels.net/model-qualifiers/">
+            <rdf:Description rdf:about="#parameter_R">
+              <bqbiol:isVersionOf>
+                <rdf:Bag>
+                  <rdf:li rdf:resource="https://doi.org/10.1111/biom.12537"/>
+                </rdf:Bag>
+              </bqbiol:isVersionOf>
+            </rdf:Description>
+          </rdf:RDF>
+        </annotation>
+      </parameter>
+      <parameter id="R__E" value="0.5" units="dimensionless" constant="false"/>
+      <parameter metaid="parameter_S" id="S" units="Substance__countPerMilliLiter" constant="false">
+        <annotation>
+          <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:vCard="http://www.w3.org/2001/vcard-rdf/3.0#" xmlns:vCard4="http://www.w3.org/2006/vcard/ns#" xmlns:bqbiol="http://biomodels.net/biology-qualifiers/" xmlns:bqmodel="http://biomodels.net/model-qualifiers/">
+            <rdf:Description rdf:about="#parameter_S">
+              <bqbiol:isVersionOf>
+                <rdf:Bag>
+                  <rdf:li rdf:resource="https://doi.org/10.1111/biom.12537"/>
+                </rdf:Bag>
+              </bqbiol:isVersionOf>
+            </rdf:Description>
+          </rdf:RDF>
+        </annotation>
+      </parameter>
+      <parameter id="SecondPerDayP" value="86400" units="SecondPerDay" constant="true">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>An auxiliary parameter to handle unit conversions</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="Substance__countPerMicroSubstance__countP" value="1e-06" units="Substance__countPerMicroSubstance__count" constant="true">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>An auxiliary parameter to handle unit conversions</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="alpha" value="0.5" units="PerDay" constant="false"/>
+      <parameter id="baseline__hazard" units="PerDay" constant="false"/>
+      <parameter id="baseline__log__ratio__S__R" value="5" units="dimensionless" constant="false"/>
+      <parameter id="baseline__ratio__S__R" units="dimensionless" constant="false"/>
+      <parameter id="baseline__total__cells" units="Substance__countPerMilliLiter" constant="false"/>
+      <parameter id="beta1__survival" value="0" units="dimensionless" constant="false"/>
+      <parameter id="beta2__survival" value="0" units="dimensionless" constant="false"/>
+      <parameter id="cumulative__hazard" value="0" units="dimensionless" constant="false"/>
+      <parameter metaid="parameter_d" id="d" units="PerDay" constant="false">
+        <annotation>
+          <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:vCard="http://www.w3.org/2001/vcard-rdf/3.0#" xmlns:vCard4="http://www.w3.org/2006/vcard/ns#" xmlns:bqbiol="http://biomodels.net/biology-qualifiers/" xmlns:bqmodel="http://biomodels.net/model-qualifiers/">
+            <rdf:Description rdf:about="#parameter_d">
+              <bqbiol:isVersionOf>
+                <rdf:Bag>
+                  <rdf:li rdf:resource="https://doi.org/10.1111/biom.12537"/>
+                </rdf:Bag>
+              </bqbiol:isVersionOf>
+            </rdf:Description>
+          </rdf:RDF>
+        </annotation>
+      </parameter>
+      <parameter metaid="parameter_delta" id="delta" value="0.23" units="PerDay" constant="false">
+        <annotation>
+          <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:vCard="http://www.w3.org/2001/vcard-rdf/3.0#" xmlns:vCard4="http://www.w3.org/2006/vcard/ns#" xmlns:bqbiol="http://biomodels.net/biology-qualifiers/" xmlns:bqmodel="http://biomodels.net/model-qualifiers/">
+            <rdf:Description rdf:about="#parameter_delta">
+              <bqbiol:isVersionOf>
+                <rdf:Bag>
+                  <rdf:li rdf:resource="https://doi.org/10.1111/biom.12537"/>
+                </rdf:Bag>
+              </bqbiol:isVersionOf>
+            </rdf:Description>
+          </rdf:RDF>
+        </annotation>
+      </parameter>
+      <parameter id="epsilon" value="0.5" units="dimensionless" constant="false"/>
+      <parameter metaid="parameter_g" id="g" value="1e-07" units="PerDay" constant="false">
+        <annotation>
+          <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:vCard="http://www.w3.org/2001/vcard-rdf/3.0#" xmlns:vCard4="http://www.w3.org/2006/vcard/ns#" xmlns:bqbiol="http://biomodels.net/biology-qualifiers/" xmlns:bqmodel="http://biomodels.net/model-qualifiers/">
+            <rdf:Description rdf:about="#parameter_g">
+              <bqbiol:isVersionOf>
+                <rdf:Bag>
+                  <rdf:li rdf:resource="https://doi.org/10.1111/biom.12537"/>
+                </rdf:Bag>
+              </bqbiol:isVersionOf>
+            </rdf:Description>
+          </rdf:RDF>
+        </annotation>
+      </parameter>
+      <parameter id="instantaneous__hazard" units="PerDay" constant="false"/>
+      <parameter id="k__weibull" value="1.2" units="dimensionless" constant="false"/>
+      <parameter id="lambda__weibull" value="800" units="Day" constant="false"/>
+      <parameter id="log__hazard" units="dimensionless" constant="false"/>
+      <parameter id="log__psa" units="dimensionless" constant="false"/>
+      <parameter metaid="parameter_p" id="p" value="20" units="NanoGramPerDay" constant="false">
+        <annotation>
+          <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:vCard="http://www.w3.org/2001/vcard-rdf/3.0#" xmlns:vCard4="http://www.w3.org/2006/vcard/ns#" xmlns:bqbiol="http://biomodels.net/biology-qualifiers/" xmlns:bqmodel="http://biomodels.net/model-qualifiers/">
+            <rdf:Description rdf:about="#parameter_p">
+              <bqbiol:isVersionOf>
+                <rdf:Bag>
+                  <rdf:li rdf:resource="https://doi.org/10.1111/biom.12537"/>
+                </rdf:Bag>
+              </bqbiol:isVersionOf>
+            </rdf:Description>
+          </rdf:RDF>
+        </annotation>
+      </parameter>
+      <parameter id="treatment__effect" units="dimensionless" constant="false"/>
+      <parameter id="treatment__end" value="50" units="Day" constant="false"/>
+      <parameter id="treatment__start" value="10" units="Day" constant="false"/>
+    </listOfParameters>
+    <listOfInitialAssignments>
+      <initialAssignment symbol="PSA">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <ci> PSA__baseline </ci>
+        </math>
+      </initialAssignment>
+      <initialAssignment symbol="R">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <apply>
+              <divide/>
+              <ci> baseline__total__cells </ci>
+              <apply>
+                <plus/>
+                <cn> 1 </cn>
+                <ci> baseline__ratio__S__R </ci>
+              </apply>
+            </apply>
+            <ci> MicroSubstance__countPerSubstance__countP </ci>
+          </apply>
+        </math>
+      </initialAssignment>
+      <initialAssignment symbol="S">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <divide/>
+            <apply>
+              <times/>
+              <ci> baseline__total__cells </ci>
+              <ci> baseline__ratio__S__R </ci>
+            </apply>
+            <apply>
+              <plus/>
+              <cn> 1 </cn>
+              <ci> baseline__ratio__S__R </ci>
+            </apply>
+          </apply>
+        </math>
+      </initialAssignment>
+    </listOfInitialAssignments>
+    <listOfRules>
+      <assignmentRule variable="baseline__hazard">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <apply>
+              <divide/>
+              <ci> k__weibull </ci>
+              <ci> lambda__weibull </ci>
+            </apply>
+            <apply>
+              <power/>
+              <apply>
+                <divide/>
+                <csymbol encoding="text" definitionURL="http://www.sbml.org/sbml/symbols/time"/>
+                <ci> lambda__weibull </ci>
+              </apply>
+              <apply>
+                <minus/>
+                <ci> k__weibull </ci>
+                <cn> 1 </cn>
+              </apply>
+            </apply>
+            <ci> Day0_DOT_20PerSecond_000000450_DOT_20P </ci>
+          </apply>
+        </math>
+      </assignmentRule>
+      <assignmentRule variable="baseline__ratio__S__R">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <exp/>
+            <ci> baseline__log__ratio__S__R </ci>
+          </apply>
+        </math>
+      </assignmentRule>
+      <assignmentRule variable="baseline__total__cells">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <apply>
+              <divide/>
+              <ci> delta </ci>
+              <ci> p </ci>
+            </apply>
+            <ci> PSA__baseline </ci>
+            <ci> OneSubstance__count </ci>
+          </apply>
+        </math>
+      </assignmentRule>
+      <assignmentRule variable="d">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <ci> R__E </ci>
+            <ci> alpha </ci>
+          </apply>
+        </math>
+      </assignmentRule>
+      <assignmentRule variable="instantaneous__hazard">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <ci> baseline__hazard </ci>
+            <apply>
+              <exp/>
+              <apply>
+                <plus/>
+                <apply>
+                  <times/>
+                  <ci> beta1__survival </ci>
+                  <apply>
+                    <ln/>
+                    <apply>
+                      <times/>
+                      <ci> S </ci>
+                      <ci> OneMilliLiterPerSubstance__count </ci>
+                    </apply>
+                  </apply>
+                </apply>
+                <apply>
+                  <times/>
+                  <ci> beta2__survival </ci>
+                  <apply>
+                    <ln/>
+                    <apply>
+                      <times/>
+                      <ci> R </ci>
+                      <ci> OneMilliLiterPerSubstance__count </ci>
+                      <ci> Substance__countPerMicroSubstance__countP </ci>
+                    </apply>
+                  </apply>
+                </apply>
+              </apply>
+            </apply>
+          </apply>
+        </math>
+      </assignmentRule>
+      <assignmentRule variable="log__hazard">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <ln/>
+            <apply>
+              <times/>
+              <ci> instantaneous__hazard </ci>
+              <ci> OneDay </ci>
+            </apply>
+          </apply>
+        </math>
+      </assignmentRule>
+      <assignmentRule variable="log__psa">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <ln/>
+            <apply>
+              <plus/>
+              <apply>
+                <divide/>
+                <ci> PSA </ci>
+                <ci> OneNanoGramPerMilliLiter </ci>
+              </apply>
+              <cn> 1 </cn>
+            </apply>
+          </apply>
+        </math>
+      </assignmentRule>
+      <assignmentRule variable="treatment__effect">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <piecewise>
+            <piece>
+              <piecewise>
+                <piece>
+                  <ci> epsilon </ci>
+                  <apply>
+                    <lt/>
+                    <csymbol encoding="text" definitionURL="http://www.sbml.org/sbml/symbols/time"/>
+                    <apply>
+                      <times/>
+                      <ci> treatment__end </ci>
+                      <ci> SecondPerDayP </ci>
+                    </apply>
+                  </apply>
+                </piece>
+                <otherwise>
+                  <cn> 0 </cn>
+                </otherwise>
+              </piecewise>
+              <apply>
+                <geq/>
+                <csymbol encoding="text" definitionURL="http://www.sbml.org/sbml/symbols/time"/>
+                <apply>
+                  <times/>
+                  <ci> treatment__start </ci>
+                  <ci> SecondPerDayP </ci>
+                </apply>
+              </apply>
+            </piece>
+            <otherwise>
+              <cn> 0 </cn>
+            </otherwise>
+          </piecewise>
+        </math>
+      </assignmentRule>
+      <rateRule metaid="rate_PSA" variable="PSA">
+        <annotation>
+          <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:vCard="http://www.w3.org/2001/vcard-rdf/3.0#" xmlns:vCard4="http://www.w3.org/2006/vcard/ns#" xmlns:bqbiol="http://biomodels.net/biology-qualifiers/" xmlns:bqmodel="http://biomodels.net/model-qualifiers/">
+            <rdf:Description rdf:about="#rate_PSA">
+              <bqbiol:isVersionOf>
+                <rdf:Bag>
+                  <rdf:li rdf:resource="https://doi.org/10.1111/biom.12537"/>
+                </rdf:Bag>
+              </bqbiol:isVersionOf>
+            </rdf:Description>
+          </rdf:RDF>
+        </annotation>
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <apply>
+              <minus/>
+              <apply>
+                <divide/>
+                <apply>
+                  <times/>
+                  <ci> p </ci>
+                  <apply>
+                    <plus/>
+                    <ci> S </ci>
+                    <apply>
+                      <times/>
+                      <ci> R </ci>
+                      <ci> Substance__countPerMicroSubstance__countP </ci>
+                    </apply>
+                  </apply>
+                </apply>
+                <ci> OneSubstance__count </ci>
+              </apply>
+              <apply>
+                <times/>
+                <ci> delta </ci>
+                <ci> PSA </ci>
+              </apply>
+            </apply>
+            <ci> DayPerSecondP </ci>
+          </apply>
+        </math>
+      </rateRule>
+      <rateRule metaid="rate_R" variable="R">
+        <annotation>
+          <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:vCard="http://www.w3.org/2001/vcard-rdf/3.0#" xmlns:vCard4="http://www.w3.org/2006/vcard/ns#" xmlns:bqbiol="http://biomodels.net/biology-qualifiers/" xmlns:bqmodel="http://biomodels.net/model-qualifiers/">
+            <rdf:Description rdf:about="#rate_R">
+              <bqbiol:isVersionOf>
+                <rdf:Bag>
+                  <rdf:li rdf:resource="https://doi.org/10.1111/biom.12537"/>
+                </rdf:Bag>
+              </bqbiol:isVersionOf>
+            </rdf:Description>
+          </rdf:RDF>
+        </annotation>
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <apply>
+              <minus/>
+              <apply>
+                <plus/>
+                <apply>
+                  <times/>
+                  <ci> alpha </ci>
+                  <apply>
+                    <minus/>
+                    <cn> 1 </cn>
+                    <apply>
+                      <divide/>
+                      <apply>
+                        <plus/>
+                        <ci> S </ci>
+                        <apply>
+                          <times/>
+                          <ci> R </ci>
+                          <ci> Substance__countPerMicroSubstance__countP </ci>
+                        </apply>
+                      </apply>
+                      <ci> Nmax </ci>
+                    </apply>
+                  </apply>
+                  <ci> R </ci>
+                </apply>
+                <apply>
+                  <times/>
+                  <ci> g </ci>
+                  <apply>
+                    <minus/>
+                    <ci> S </ci>
+                    <apply>
+                      <times/>
+                      <ci> R </ci>
+                      <ci> Substance__countPerMicroSubstance__countP </ci>
+                    </apply>
+                  </apply>
+                  <ci> MicroSubstance__countPerSubstance__countP </ci>
+                </apply>
+              </apply>
+              <apply>
+                <times/>
+                <ci> d </ci>
+                <ci> R </ci>
+              </apply>
+            </apply>
+            <ci> DayPerSecondP </ci>
+          </apply>
+        </math>
+      </rateRule>
+      <rateRule metaid="rate_S" variable="S">
+        <annotation>
+          <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:vCard="http://www.w3.org/2001/vcard-rdf/3.0#" xmlns:vCard4="http://www.w3.org/2006/vcard/ns#" xmlns:bqbiol="http://biomodels.net/biology-qualifiers/" xmlns:bqmodel="http://biomodels.net/model-qualifiers/">
+            <rdf:Description rdf:about="#rate_S">
+              <bqbiol:isVersionOf>
+                <rdf:Bag>
+                  <rdf:li rdf:resource="https://doi.org/10.1111/biom.12537"/>
+                </rdf:Bag>
+              </bqbiol:isVersionOf>
+            </rdf:Description>
+          </rdf:RDF>
+        </annotation>
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <apply>
+              <minus/>
+              <apply>
+                <plus/>
+                <apply>
+                  <times/>
+                  <ci> alpha </ci>
+                  <ci> treatment__effect </ci>
+                  <apply>
+                    <minus/>
+                    <cn> 1 </cn>
+                    <apply>
+                      <divide/>
+                      <apply>
+                        <plus/>
+                        <ci> S </ci>
+                        <apply>
+                          <times/>
+                          <ci> R </ci>
+                          <ci> Substance__countPerMicroSubstance__countP </ci>
+                        </apply>
+                      </apply>
+                      <ci> Nmax </ci>
+                    </apply>
+                  </apply>
+                  <ci> S </ci>
+                </apply>
+                <apply>
+                  <times/>
+                  <ci> g </ci>
+                  <apply>
+                    <minus/>
+                    <ci> R </ci>
+                    <apply>
+                      <times/>
+                      <ci> S </ci>
+                      <ci> MicroSubstance__countPerSubstance__countP </ci>
+                    </apply>
+                  </apply>
+                  <ci> Substance__countPerMicroSubstance__countP </ci>
+                </apply>
+              </apply>
+              <apply>
+                <times/>
+                <ci> d </ci>
+                <ci> S </ci>
+              </apply>
+            </apply>
+            <ci> DayPerSecondP </ci>
+          </apply>
+        </math>
+      </rateRule>
+      <rateRule variable="cumulative__hazard">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <ci> instantaneous__hazard </ci>
+            <ci> DayPerSecondP </ci>
+          </apply>
+        </math>
+      </rateRule>
+    </listOfRules>
+  </model>
+</sbml>
