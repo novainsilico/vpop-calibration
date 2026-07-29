@@ -175,8 +175,6 @@ class StatisticalModel:
 
         self.set_current_parameters(pop_params=init_params)
 
-        self.ebe_estimates: torch.Tensor | None = None
-
         # Create design matrices
         self.init_all_design_matrices()
 
@@ -198,10 +196,6 @@ class StatisticalModel:
             "config": self.config.get_state_dict(),
             "current_params": self.current_params.get_state_dict(),
         }
-        if self.ebe_estimates is not None:
-            state_dict["ebe_estimates"] = (
-                self.ebe_estimates.detach().cpu().numpy().tolist()
-            )
         return state_dict
 
     @classmethod
@@ -223,12 +217,6 @@ class StatisticalModel:
             state_dict=state_dict["current_params"]
         )
         instance.set_current_parameters(pop_params=pop_params)
-        if "ebe_estimates" in state_dict:
-            instance.update_ebe(
-                torch.as_tensor(
-                    state_dict["ebe_estimates"], device=device, dtype=default_dtype
-                )
-            )
         return instance
 
     def init_design_matrix(self, patient_covariates: dict) -> torch.Tensor:
@@ -335,16 +323,6 @@ class StatisticalModel:
         ), f"Wrong shape in model intrinsic parameters update: {log_mi.shape}, expected: {expected_shape}"
 
         self.log_mi = log_mi
-
-    def update_ebe(self, ebe: torch.Tensor) -> None:
-        if self.ebe_estimates is not None:
-            expected_shape = self.ebe_estimates.shape
-        else:
-            expected_shape = (self.nb_patients, self.nb_pdu)
-        assert (
-            ebe.shape == expected_shape
-        ), f"Wrong shape in EBE update: {ebe.shape}, expected: {expected_shape}"
-        self.ebe_estimates = ebe.detach()
 
     def set_current_parameters(self, pop_params: NlmeModelState):
         """Update or initialize the current population parameter values
