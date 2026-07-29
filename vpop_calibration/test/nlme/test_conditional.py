@@ -103,5 +103,5 @@ def test_state_dict(sample_nlme_params, obs_data, struct_model):
     new_sampler = ConditionalDistributionSampler.from_state_dict(
         state_dict=state_dict, model=nlme_model
     )
-    assert sampler.ebe == new_sampler.ebe
+    assert sampler.map == new_sampler.map
     assert sampler.samples[-1] == new_sampler.samples[0]

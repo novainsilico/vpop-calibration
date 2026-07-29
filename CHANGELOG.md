@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.4.7] - 2026-07-29
+
+### Modified
+
+- Separate EBE and MAP
+  - Maximum a posteriori (MAP) estimates: these parameter estimates correspond to the mode of the conditional distribution for each patient. They are estimated in post-processing, by sampling from the conditional distribution.
+  - Empirical Bayesian Estimators (EBE): these parameter estimates correspond to the mean of the conditional distribution for each patient. They are estimated throughout the iterations, by averaging over the physical parameter estimates and using stochastic approximation for smoothing.
+
 ## [4.4.6] - 2026-07-29
 
 ### Modified
