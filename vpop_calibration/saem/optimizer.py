@@ -7,7 +7,7 @@ import pandas as pd
 
 from vpop_calibration.pynlme.model import StatisticalModel
 from vpop_calibration.saem.scheduler import SaemScheduler
-from vpop_calibration.saem.estimates import PopEstimates, IterSummary
+from vpop_calibration.saem.estimates import PopEstimates, IterSummary, check_convergence
 from vpop_calibration.saem.config import SaemConfigDict
 from vpop_calibration.metropolis_hastings import MetropolisHastingsState, mh_step
 from vpop_calibration.saem.m_step import MStepState
@@ -59,7 +59,6 @@ class PySaem:
             patience=config.patience,
         )
         self.history = pd.DataFrame()
-        self.ebe_count = 0
 
     def init_state(self):
         """Initiate the optimizer state with first estimates. Ensure this function is called before the optimization starts."""
@@ -84,7 +83,7 @@ class PySaem:
         self.pop_estimates = PopEstimates(
             beta=self.model.population_betas,
             omega=self.model.omega_pop,
-            psi=output.gaussian_params,
+            ebe=output.gaussian_params.mean(dim=0),
             sigma=self.model.residual_var,
             complete_likelihood=init_likelihood,
             model_intrinsic=self.model.log_mi,
@@ -96,7 +95,6 @@ class PySaem:
             nb_patients=self.model.nb_patients,
             nb_pdu=self.model.nb_pdu,
         )
-        self.ebe_count = 0
 
     def get_state_dict(self) -> dict[str, Any]:
         state_dict = {
@@ -111,7 +109,6 @@ class PySaem:
                     "mh_state": self.mh_state.get_state_dict(),
                     "pop_estimates": self.pop_estimates.get_state_dict(),
                     "sufficient_statistics": self.sufficient_statistics.get_state_dict(),
-                    "ebe_count": self.ebe_count,
                     "has_run": True,
                 }
             )
@@ -143,7 +140,6 @@ class PySaem:
             instance.sufficient_statistics = MStepState.from_state_dict(
                 state_dict=state_dict["sufficient_statistics"]
             )
-            instance.ebe_count = state_dict.get("ebe_count", 0)
         return instance
 
     def run(self):
@@ -204,18 +200,6 @@ class PySaem:
             )
         # Update the optimizer
         self.mh_state = current_mh_state
-
-        if self.scheduler.phase == "smoothing":
-            current_phi_sample = self.mh_state.gaussian_params.mean(dim=0).detach()
-            self.ebe_count += 1
-            if self.ebe_count == 1 or self.model.ebe_estimates is None:
-                new_ebe = current_phi_sample.clone()
-            else:
-                new_ebe = (
-                    self.model.ebe_estimates
-                    + (current_phi_sample - self.model.ebe_estimates) / self.ebe_count
-                )
-            self.model.update_ebe(new_ebe)
 
         # If in learning or smoothing phase, go through the rest of the iteration
         if self.scheduler.phase != "burnin":
@@ -292,11 +276,17 @@ class PySaem:
 
                 self.model.update_log_mi(new_log_MI)
 
+        new_ebe = stochastic_approximation(
+            previous=self.pop_estimates.ebe,
+            new=self.mh_state.gaussian_params.mean(dim=0),
+            learning_rate=self.scheduler.stochastic_approximation_rate,
+        )
+
         # Update population estimates and check for early convergence
         new_estimates = PopEstimates(
             beta=self.model.population_betas,
             omega=self.model.omega_pop,
-            psi=self.mh_state.gaussian_params,
+            ebe=new_ebe,
             sigma=self.model.residual_var,
             model_intrinsic=self.model.log_mi,
             complete_likelihood=self.mh_state.complete_likelihood,
@@ -346,21 +336,6 @@ class PySaem:
 
         return mi_objective_function
 
-    def check_convergence(self, prev_est: PopEstimates, current_est: PopEstimates):
-        """Checks for convergence based on the relative change in parameters."""
-        all_converged = True
-        variables_to_check = ["beta", "omega", "psi", "sigma"]
-        for name in variables_to_check:
-            current_val = current_est._asdict()[name]
-            prev_val = prev_est._asdict()[name]
-            abs_diff = torch.abs(current_val - prev_val)
-            abs_sum = torch.abs(current_val) + torch.abs(prev_val) + 1e-9
-            relative_change = abs_diff / abs_sum
-            if torch.any(relative_change > self.config.convergence_threshold):
-                all_converged = False
-                break
-        return all_converged
-
     def update_pop_estimates_convergence_check(
         self, new_estimates: PopEstimates
     ) -> None:
@@ -373,9 +348,10 @@ class PySaem:
         else:
             self.previous_estimates = self.pop_estimates
             self.pop_estimates = new_estimates
-            converged = self.check_convergence(
-                self.previous_estimates,
-                self.pop_estimates,
+            converged = check_convergence(
+                prev_est=self.previous_estimates,
+                current_est=self.pop_estimates,
+                threshold=self.config.convergence_threshold,
             )
 
         if converged:

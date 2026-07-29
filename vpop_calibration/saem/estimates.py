@@ -8,7 +8,7 @@ from vpop_calibration.config import device, default_dtype
 class PopEstimates(NamedTuple):
     beta: torch.Tensor
     omega: torch.Tensor
-    psi: torch.Tensor
+    ebe: torch.Tensor
     sigma: torch.Tensor
     model_intrinsic: torch.Tensor
     complete_likelihood: torch.Tensor
@@ -29,7 +29,7 @@ class PopEstimates(NamedTuple):
         compared_attributes = [
             "beta",
             "omega",
-            "psi",
+            "ebe",
             "sigma",
             "model_intrinsic",
             "complete_likelihood",
@@ -47,7 +47,7 @@ def check_convergence(
 ):
     """Checks for convergence based on the relative change in parameters."""
     all_converged = True
-    variables_to_check = ["beta", "omega", "psi", "sigma", "model_intrinsic"]
+    variables_to_check = ["beta", "omega", "ebe", "sigma", "model_intrinsic"]
     for name in variables_to_check:
         current_val = current_est._asdict()[name]
         prev_val = prev_est._asdict()[name]
