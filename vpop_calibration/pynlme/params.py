@@ -150,13 +150,13 @@ class MixedEffectParameters(BaseModel):
         This effectively checks that the supplied columns contain the necessary covariates, and the output names are consistent.
         """
         descriptors_known_params = set(self.pdk + self.covariate_names)
-        assert set(data.descriptors_known) == set(
-            descriptors_known_params
-        ), f"Discrepancy between descriptor set and data set columns. The data set informs \n{data.descriptors_known}\n The input parameters inform\n{descriptors_known_params}"
+        assert set(data.descriptors_known) == set(descriptors_known_params), (
+            f"Discrepancy between descriptor set and data set columns. The data set informs \n{data.descriptors_known}\n The input parameters inform\n{descriptors_known_params}"
+        )
 
-        assert set(self.output_names) == set(
-            data.observed_output_names
-        ), f"Discrepancy in output names. The data set contains \n{data.observed_output_names}\n The input parameters contain \n{self.output_names}"
+        assert set(self.output_names) == set(data.observed_output_names), (
+            f"Discrepancy in output names. The data set contains \n{data.observed_output_names}\n The input parameters contain \n{self.output_names}"
+        )
 
     def get_state_dict(self) -> dict[str, Any]:
         return self.model_dump(exclude_computed_fields=True, exclude_defaults=True)

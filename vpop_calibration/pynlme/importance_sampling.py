@@ -53,9 +53,9 @@ class ImportanceSampler:
         etas = conditional_samples.eta_samples
 
         nb_samples, nb_patients, nb_pdu = etas.shape
-        assert (
-            nb_samples > 1
-        ), "Need more than one sample to estimate the student distribution."
+        assert nb_samples > 1, (
+            "Need more than one sample to estimate the student distribution."
+        )
 
         mu = torch.mean(etas, dim=0)
         sigma = torch.clamp(torch.var(etas, 0), 1e-6)
@@ -64,16 +64,16 @@ class ImportanceSampler:
 
     def _student_t_log_prob(self, student_samples: torch.Tensor) -> torch.Tensor:
         # Computes the log-density of a multivariate Student's t-distribution:
-        assert (
-            self.dist is not None
-        ), "Invalid call of `_student_t_log_prob` before `fit_student_t_proposal`"
+        assert self.dist is not None, (
+            "Invalid call of `_student_t_log_prob` before `fit_student_t_proposal`"
+        )
         log_prob = self.dist.log_prob(student_samples)
         return log_prob.sum(dim=-1)
 
     def _generate_student_samples(self, nb_samples: int) -> torch.Tensor:
-        assert (
-            self.dist is not None
-        ), "Invalid call of `_generate_student_samples` before `fit_student_t_proposal`"
+        assert self.dist is not None, (
+            "Invalid call of `_generate_student_samples` before `fit_student_t_proposal`"
+        )
 
         samples = self.dist.rsample((nb_samples,))
         return samples

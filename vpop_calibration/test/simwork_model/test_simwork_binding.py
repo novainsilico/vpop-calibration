@@ -23,10 +23,10 @@ def dummy_simwork_model() -> SimworkModelBinding:
 
 def test_simwork_binding(dummy_simwork_model):
     vpop = pd.DataFrame({"id": ["p1", "p2"], "k_12": [0, 0], "k_21": [1, 0]})
-    json = dummy_simwork_model.df_to_json_vpop(vpop_df=vpop)
+    _json = dummy_simwork_model.df_to_json_vpop(vpop_df=vpop)
 
     time = [0, 1, 2]
-    out = dummy_simwork_model.run(vpop=vpop, time=time)
+    _out = dummy_simwork_model.run(vpop=vpop, time=time)
 
 
 def test_handle_payload(dummy_simwork_model):
@@ -83,4 +83,4 @@ def test_simwork_model_explicit_path():
     vpop = pd.DataFrame({"id": ["p1", "p2"], "k_12": [0, 0], "k_21": [1, 0]})
 
     time: list[float] = [0, 1, 2]
-    out = model.run(vpop=vpop, time=time)
+    _out = model.run(vpop=vpop, time=time)

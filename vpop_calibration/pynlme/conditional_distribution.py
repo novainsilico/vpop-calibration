@@ -5,8 +5,6 @@ from typing import NamedTuple, Any
 import numpy as np
 import matplotlib.pyplot as plt
 from IPython.display import display
-import numpy as np
-import uuid
 
 
 from vpop_calibration.pynlme.model import StatisticalModel

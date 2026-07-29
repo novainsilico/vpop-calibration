@@ -4,7 +4,6 @@ import roadrunner
 import pandera.pandas as pa
 import torch
 import uuid
-from functools import partial
 
 from vpop_calibration.structural_model.base import StructuralModel
 from vpop_calibration.utils import extend_schema

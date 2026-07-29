@@ -80,9 +80,9 @@ class ObsData:
         Args:
             pdk_names (list[str]): The name of the known parameters which are to be assembled as pdk. Must appear in the data set columns.
         """
-        assert set(pdk_names) <= set(
-            self.descriptors_known
-        ), f"Unknown PDK: {set(pdk_names) - set(self.descriptors_known)}"
+        assert set(pdk_names) <= set(self.descriptors_known), (
+            f"Unknown PDK: {set(pdk_names) - set(self.descriptors_known)}"
+        )
         self.pdk_names = pdk_names
         self.nb_pdk = len(pdk_names)
         self.patients_pdk = {}

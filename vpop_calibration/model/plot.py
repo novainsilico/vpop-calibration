@@ -1,9 +1,8 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.figure import Figure
 from typing import Optional
-from IPython.display import display, DisplayHandle
+from IPython.display import display
 
 from ..config import smoke_test
 
@@ -98,18 +97,6 @@ def plot_individual_solution(
         figsize=(fig_scaling[0] * nrows, fig_scaling[1] * ncols),
         squeeze=False,
     )
-
-    patient_params = obs_vs_pred.drop(
-        columns=[
-            "id",
-            "output_name",
-            "protocol_arm",
-            "value",
-            "pred_mean",
-            "pred_low",
-            "pred_high",
-        ]
-    ).drop_duplicates()
 
     for output_index, output_name in enumerate(outputs):
         for protocol_index, protocol_arm in enumerate(protocol_arms):

@@ -31,9 +31,9 @@ class PlottingUtility:
     ) -> tuple[dict, dict]:
         pdus = self.model_diag.model.descriptors
         gp_model_struct = self.model_diag.model.structural_model
-        assert isinstance(
-            gp_model_struct, StructuralGp
-        ), "Posterior surrogate validity check only implemented for GP structural model."
+        assert isinstance(gp_model_struct, StructuralGp), (
+            "Posterior surrogate validity check only implemented for GP structural model."
+        )
 
         if not hasattr(self.model_diag.sampler, "map"):
             self.model_diag.sample_conditional_distribution()
@@ -302,7 +302,7 @@ class PlottingUtility:
         # Raise an error if too many patients for the grid
         if n_patients_to_plot > n_rows * n_cols:
             raise ValueError(
-                f"{n_patients_to_plot} patients cannot be plotted in a {n_rows}x{n_cols} grid. Enter a n_patients_to_plot value under {n_rows*n_cols} or use a larger grid."
+                f"{n_patients_to_plot} patients cannot be plotted in a {n_rows}x{n_cols} grid. Enter a n_patients_to_plot value under {n_rows * n_cols} or use a larger grid."
             )
 
         if randomize:
@@ -390,10 +390,9 @@ class PlottingUtility:
             1, num_plots, figsize=(facet_width * num_plots, facet_height), squeeze=False
         )
 
-        fig.suptitle(f"Observed vs. simulated plot")
+        fig.suptitle("Observed vs. simulated plot")
 
         for output_index, output_name in enumerate(self.model_diag.model.output_names):
-
             ax = axes[0, output_index]
             gof_df = obs_vs_simulated.loc[
                 (obs_vs_simulated["output_name"] == output_name)
@@ -743,7 +742,7 @@ class PlottingUtility:
     ):
 
         if self.model_diag.vpc is None:
-            print(f"Calculating VPC for all outputs")
+            print("Calculating VPC for all outputs")
             self.model_diag.compute_vpc(
                 nb_bins=nb_bins,
                 quantiles=quantiles,
@@ -770,7 +769,6 @@ class PlottingUtility:
             ax.set_facecolor("#fdfdfd")
 
             for q in quantiles:
-
                 df_q = df_output[df_output["quantile"] == q].sort_values("bin_center")
 
                 x = df_q["bin_center"].to_numpy()

@@ -54,7 +54,7 @@ def test_gp_init(training_data, subtests):
             training_proportion,
         ) = params_subtest
         with subtests.test(i=i, msg=f"Testing GP init with {params_subtest}"):
-            gp = GP(
+            _gp = GP(
                 df,
                 params,
                 var_strat=var_strat,

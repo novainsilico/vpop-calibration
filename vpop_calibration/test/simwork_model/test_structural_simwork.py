@@ -39,7 +39,7 @@ def test_analytical_simwork_no_protocol_override(dummy_simwork_model):
             ]
         ]
     )
-    out = struct_model.simulate(X=X, prediction_index=obs_index)
+    _out = struct_model.simulate(X=X, prediction_index=obs_index)
 
 
 def test_analytical_simwork_two_chains(dummy_simwork_model):
@@ -65,7 +65,7 @@ def test_analytical_simwork_two_chains(dummy_simwork_model):
             ],
         ]
     )
-    out = struct_model.simulate(X=X, prediction_index=obs_index)
+    _out = struct_model.simulate(X=X, prediction_index=obs_index)
 
 
 def test_analytical_simwork_one_protocol_override(dummy_simwork_model):
@@ -91,7 +91,7 @@ def test_analytical_simwork_one_protocol_override(dummy_simwork_model):
         # k_12 time
         [[[[0, 0], [0, 1], [0, 2]], [[1, 0], [1, 1], [1, 2]]]]
     )
-    out = struct_model.simulate(X=X, prediction_index=obs_index)
+    _out = struct_model.simulate(X=X, prediction_index=obs_index)
 
 
 def test_categorical_override(dummy_simwork_model):

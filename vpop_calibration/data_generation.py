@@ -39,7 +39,6 @@ def sample_descriptors_sobol_sequences(
     params_to_explore = list(param_ranges.keys())
     nb_parameters = len(params_to_explore)
     if nb_parameters != 0:
-
         # Create a sobol sampler to generate parameter values
         sobol_engine = Sobol(d=nb_parameters, scramble=True)
         sobol_sequence = sobol_engine.random_base2(log_nb_individuals)
@@ -70,7 +69,7 @@ def sample_protocol_arms(
     np_rng: np.random.Generator | None = None,
 ) -> pd.DataFrame:
     """Given a set of patients and a set of protocol arms, associate each patient with a single arm randomly."""
-    if np_rng == None:
+    if np_rng is None:
         rng = np.random.default_rng()
     else:
         rng = np_rng

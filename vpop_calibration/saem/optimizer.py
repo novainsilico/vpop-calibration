@@ -212,9 +212,9 @@ class PySaem:
             )
             # Average the sum of squared residuals over samples (MCMC chains)
             sum_sq_res = sum_sq_res_full.mean(dim=0)
-            assert sum_sq_res.shape == (
-                self.model.nb_outputs,
-            ), f"Unexpected residual shape: {sum_sq_res.shape}"
+            assert sum_sq_res.shape == (self.model.nb_outputs,), (
+                f"Unexpected residual shape: {sum_sq_res.shape}"
+            )
 
             # Update the residual error variance
             target_res_var: torch.Tensor = (

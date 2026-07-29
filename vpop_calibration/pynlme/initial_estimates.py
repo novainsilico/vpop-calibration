@@ -38,7 +38,6 @@ def theoretical_pdf(
 
 
 class PriorVisualizer:
-
     def __init__(self, initial_estimates: MixedEffectParameters):
         self.params = initial_estimates
 

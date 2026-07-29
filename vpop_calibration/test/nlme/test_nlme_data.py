@@ -32,4 +32,4 @@ def test_data_container(obs_data):
 def test_incomplete_data(obs_data, np_rng):
     df = obs_data
     df_boot = df.sample(frac=0.5, random_state=np_rng)
-    ds = ObsData(df_boot)
+    _ds = ObsData(df_boot)

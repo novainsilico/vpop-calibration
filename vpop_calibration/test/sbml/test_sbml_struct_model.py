@@ -10,8 +10,7 @@ def test_sbml_model_wrong_inputs():
     file = "vpop_calibration/test/sbml/assets/model.xml"
 
     with pytest.raises(Exception):
-
-        model = StructuralSbml(
+        _model = StructuralSbml(
             model_path=file, inputs=["incorrect_input"], outputs=["A0"]
         )
 
@@ -19,7 +18,9 @@ def test_sbml_model_wrong_inputs():
 def test_sbml_model_wrong_outputs():
     file = "vpop_calibration/test/sbml/assets/model.xml"
     with pytest.raises(Exception):
-        model = StructuralSbml(model_path=file, inputs=[], outputs=["incorrect_output"])
+        _model = StructuralSbml(
+            model_path=file, inputs=[], outputs=["incorrect_output"]
+        )
 
 
 def test_sbml_model():
@@ -61,4 +62,4 @@ def test_sbml_model():
         vpop, expected_vpop, check_like=True, check_dtype=False
     )
 
-    out = struct_model.simulate(X=X, prediction_index=obs_index)
+    _out = struct_model.simulate(X=X, prediction_index=obs_index)

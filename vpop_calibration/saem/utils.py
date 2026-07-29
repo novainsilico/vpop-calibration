@@ -13,9 +13,9 @@ def stochastic_approximation(
     Returns:
         torch.Tensor: (1 - learning_rate) * previous + learning_rate * new
     """
-    assert (
-        previous.shape == new.shape
-    ), f"Wrong shape in stochastic approximation: {previous.shape}, {new.shape}"
+    assert previous.shape == new.shape, (
+        f"Wrong shape in stochastic approximation: {previous.shape}, {new.shape}"
+    )
 
     stochastic_approx = (1 - learning_rate) * previous + learning_rate * new
     return stochastic_approx
@@ -50,9 +50,9 @@ def cov_to_corr(covariance: torch.Tensor, eps: float = 1e-8) -> torch.Tensor:
 def covariance_matrix_simulated_annealing(
     current_omega: torch.Tensor, target_omega: torch.Tensor, factor: float
 ):
-    assert (
-        current_omega.shape == target_omega.shape
-    ), "Inconsistent shapes in covariance matrix simulated annealing"
+    assert current_omega.shape == target_omega.shape, (
+        "Inconsistent shapes in covariance matrix simulated annealing"
+    )
 
     current_omega_diagonal = torch.diag(current_omega)
     target_omega_diagonal = torch.diag(target_omega)
