@@ -1,6 +1,13 @@
 stages:
+  - lint
   - test
   - deploy
+
+ruff:
+  stage: lint
+  tags: [ nix ]
+  script:
+    - nix develop . --command ruff check
 
 pytest:
   stage: test
