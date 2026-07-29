@@ -256,7 +256,6 @@ class ModelDiagnostics:
         for i, patient_id in enumerate(
             self.model.data.full_obs.obs_index.id.ref_values
         ):
-
             this_patient_rows = self.model.data.full_obs.obs_index.id.index_values == i
             this_patient_data = npde[this_patient_rows]
             this_patient_time = self.model.data.individual_observations[
@@ -321,7 +320,6 @@ class ModelDiagnostics:
         quantiles_arr = np.asarray(quantiles)
 
         for output_name in self.model.output_names:
-
             df_output = df[df["output_name"] == output_name]
             bin_labels, bin_edges = pd.cut(
                 df_output["time"].astype("float"),

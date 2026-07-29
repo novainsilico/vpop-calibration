@@ -14,8 +14,6 @@ from vpop_calibration.pynlme.initial_estimates import PriorVisualizer
 from vpop_calibration.pynlme.config import NlmeConfigDict
 from vpop_calibration.saem.optimizer import PySaem
 from vpop_calibration.saem.config import SaemConfigDict
-from vpop_calibration.pynlme.plot import PlottingUtility
-from vpop_calibration.pynlme.config import NlmeConfigDict
 from vpop_calibration.utils import seed_everything
 
 
@@ -46,7 +44,7 @@ class NlmeModel:
         if optim == "saem":
             self.optimizer = PySaem(model=self.statistical_model, config=config.saem)
         else:
-            raise NotImplemented
+            raise NotImplementedError
         self.diagnostics = ModelDiagnostics(self.statistical_model)
         self.initial_estimates = PriorVisualizer(nlme_params)
         self.plot = PlottingUtility(self.diagnostics)

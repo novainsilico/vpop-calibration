@@ -16,9 +16,9 @@ class IndexedValues(NamedTuple):
 def remap_single_index(
     input_index: torch.Tensor, mapping: dict[int, int]
 ) -> torch.Tensor:
-    assert (
-        input_index.dim() == 1
-    ), f"Unexpected indexing tensor dimension {input_index.dim()}"
+    assert input_index.dim() == 1, (
+        f"Unexpected indexing tensor dimension {input_index.dim()}"
+    )
     return input_index.apply_(mapping.get)
 
 
@@ -29,9 +29,9 @@ def remap_indexed_values(
     if dest_ref_values is None:
         return source_index
 
-    assert set(source_index.ref_values) <= set(
-        dest_ref_values
-    ), f"Incompatible indexing lists provided:\nSource: {source_index.ref_values}\nDestination: {dest_ref_values}"
+    assert set(source_index.ref_values) <= set(dest_ref_values), (
+        f"Incompatible indexing lists provided:\nSource: {source_index.ref_values}\nDestination: {dest_ref_values}"
+    )
     mapping = {
         i: dest_ref_values.index(val) for i, val in enumerate(source_index.ref_values)
     }
@@ -109,15 +109,15 @@ class IndexedObservations(BaseModel):
     ) -> pd.DataFrame:
         nb_obs = self.obs_values.shape[0]
         if prediction is not None:
-            assert (
-                prediction.dim() == 2
-            ), "Don't squeeze predictions before turning them into a dataframe."
-            assert (
-                prediction.shape[0] == 1
-            ), "Cannot convert batched predictions to dataframe."
-            assert (
-                prediction.shape[1] == nb_obs
-            ), f"Incompatible number of self ({nb_obs}) and predictions ({prediction.shape[1]})"
+            assert prediction.dim() == 2, (
+                "Don't squeeze predictions before turning them into a dataframe."
+            )
+            assert prediction.shape[0] == 1, (
+                "Cannot convert batched predictions to dataframe."
+            )
+            assert prediction.shape[1] == nb_obs, (
+                f"Incompatible number of self ({nb_obs}) and predictions ({prediction.shape[1]})"
+            )
 
         id_col = self.obs_index.id.raw_values
         output_name_col = self.obs_index.output_name.raw_values

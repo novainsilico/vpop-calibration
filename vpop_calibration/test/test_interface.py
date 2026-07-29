@@ -62,24 +62,24 @@ def sample_inputs(np_rng) -> tuple[dict, pd.DataFrame, StructuralModel]:
 
 def test_nlme_interface(sample_inputs):
     priors, df, struct_model = sample_inputs
-    nlme_model = NlmeModel(df=df, prior_params=priors, structural_model=struct_model)
+    _nlme_model = NlmeModel(df=df, prior_params=priors, structural_model=struct_model)
 
 
 def test_state_dict(sample_inputs):
     priors, df, struct_model = sample_inputs
     nlme_model = NlmeModel(df=df, prior_params=priors, structural_model=struct_model)
     state_dict = nlme_model.get_state_dict()
-    new_nlme_model = NlmeModel.from_state_dict(
+    _new_nlme_model = NlmeModel.from_state_dict(
         state_dict=state_dict, df=df, structural_model=struct_model
     )
     nlme_model.optimizer.run()
     state_dict = nlme_model.get_state_dict()
-    new_nlme_model = NlmeModel.from_state_dict(
+    _new_nlme_model = NlmeModel.from_state_dict(
         state_dict=state_dict, df=df, structural_model=struct_model
     )
     nlme_model.diagnostics.sample_conditional_distribution()
     state_dict = nlme_model.get_state_dict()
-    new_nlme_model = NlmeModel.from_state_dict(
+    _new_nlme_model = NlmeModel.from_state_dict(
         state_dict=state_dict, df=df, structural_model=struct_model
     )
 

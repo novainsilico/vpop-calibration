@@ -81,17 +81,17 @@ def test_sdk(obs_data, sample_nlme_params):
     )
 
     # 2. Run optimizer
-    history = run_saem(model)
+    _history = run_saem(model)
 
     # 3. Run diagnostics
     diag_config = DiagnosticsConfig()
-    out = run_diagnostics(model=model, config=diag_config)
+    _out = run_diagnostics(model=model, config=diag_config)
 
     # 4. Export the model
     payload = export_nlme_model(model)
 
     # 5 Reload it
-    new_model = load_nlme_model(
+    _new_model = load_nlme_model(
         payload=payload,
         data_table=obs_data,
         model_path=path_to_model,

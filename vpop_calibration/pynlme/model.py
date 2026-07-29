@@ -104,9 +104,9 @@ class StatisticalModel:
         # Validate observed data against the user-specified parameters
         self.prior_params.validate_data(self.data)
         # Validate the structural model against user-specified parameters
-        assert set(self.descriptors) == set(
-            self.structural_model.parameter_names
-        ), f"Inconsistent parameter set between patient data and structural model:\nIn the data: {set(self.descriptors)}\nIn the structural model: {set(self.structural_model.parameter_names)}"
+        assert set(self.descriptors) == set(self.structural_model.parameter_names), (
+            f"Inconsistent parameter set between patient data and structural model:\nIn the data: {set(self.descriptors)}\nIn the structural model: {set(self.structural_model.parameter_names)}"
+        )
 
         # -- Mapping
         # Map structural model inputs with NLME parameters
@@ -244,9 +244,9 @@ class StatisticalModel:
         self.design_matrices = {}
         if self.nb_covariates == 0:
             # No covariates: all design matrices are the identity matrix
-            assert (
-                self.nb_betas == self.nb_pdu
-            ), "No covariates are identified, yet the number of PDUs and the number of betas differ."
+            assert self.nb_betas == self.nb_pdu, (
+                "No covariates are identified, yet the number of PDUs and the number of betas differ."
+            )
             ind_design_matrix = torch.diag(torch.ones((self.nb_pdu), device=device))
             for ind_id in self.patients:
                 self.design_matrices[ind_id] = ind_design_matrix
@@ -274,9 +274,9 @@ class StatisticalModel:
             expected_shape = self.omega_pop.shape
         else:
             expected_shape = (self.nb_pdu, self.nb_pdu)
-        assert (
-            omega.shape == expected_shape
-        ), f"Wrong shape in omega update: {omega.shape}, expected: {expected_shape}"
+        assert omega.shape == expected_shape, (
+            f"Wrong shape in omega update: {omega.shape}, expected: {expected_shape}"
+        )
 
         self.omega_pop = omega
         self.omega_pop_lower_chol = torch.linalg.cholesky(self.omega_pop).to(device)
@@ -292,9 +292,9 @@ class StatisticalModel:
             expected_shape = self.residual_var.shape
         else:
             expected_shape = (self.nb_outputs,)
-        assert (
-            residual_var.shape == expected_shape
-        ), f"Wrong shape in residual variance update: {residual_var.shape}, expected: {expected_shape}"
+        assert residual_var.shape == expected_shape, (
+            f"Wrong shape in residual variance update: {residual_var.shape}, expected: {expected_shape}"
+        )
 
         self.residual_var = residual_var.clamp(min=1e-6)
 
@@ -305,9 +305,9 @@ class StatisticalModel:
             expected_shape = self.population_betas.shape
         else:
             expected_shape = (self.nb_betas,)
-        assert (
-            betas.shape == expected_shape
-        ), f"Wrong shape in Betas update: {betas.shape}, expected: {expected_shape}"
+        assert betas.shape == expected_shape, (
+            f"Wrong shape in Betas update: {betas.shape}, expected: {expected_shape}"
+        )
 
         self.population_betas = betas
 
@@ -318,9 +318,9 @@ class StatisticalModel:
             expected_shape = self.log_mi.shape
         else:
             expected_shape = (self.nb_mi,)
-        assert (
-            log_mi.shape == expected_shape
-        ), f"Wrong shape in model intrinsic parameters update: {log_mi.shape}, expected: {expected_shape}"
+        assert log_mi.shape == expected_shape, (
+            f"Wrong shape in model intrinsic parameters update: {log_mi.shape}, expected: {expected_shape}"
+        )
 
         self.log_mi = log_mi
 
@@ -362,7 +362,6 @@ class StatisticalModel:
             log P(eta) = -0.5 * (k * log(2pi) + log|Omega| + eta.T * omega.inv * eta)
 
         """
-        nb_samples = etas.shape[0]
         nb_patients = etas.shape[1]
         assert etas.shape[2] == self.nb_pdu
 
@@ -394,9 +393,9 @@ class StatisticalModel:
             torch.Tensor: The individual parameters in gaussian (unconstrained) space. Size: (nb_chains, nb_patients, nb_pdu)
         """
         nb_samples = etas.shape[0]
-        assert etas.shape == torch.Size(
-            [nb_samples, self.nb_patients, self.nb_pdu]
-        ), f"Wrong shape of etas passed to `transform_etas_to_gaussian`: {etas.shape}"
+        assert etas.shape == torch.Size([nb_samples, self.nb_patients, self.nb_pdu]), (
+            f"Wrong shape of etas passed to `transform_etas_to_gaussian`: {etas.shape}"
+        )
 
         gaussian_params = self._etas_to_gaussian(
             etas=etas, design_matrix=self.full_design_matrix
@@ -439,7 +438,9 @@ class StatisticalModel:
         assert pdk.shape == (
             nb_patients_local,
             self.nb_pdk,
-        ), f"Inconsistent shapes provided in _combine_physical_pdk:\n{physical_params.shape=}\n{pdk.shape=}"
+        ), (
+            f"Inconsistent shapes provided in _combine_physical_pdk:\n{physical_params.shape=}\n{pdk.shape=}"
+        )
 
         pdk_expanded = pdk.expand(nb_samples, -1, -1)
         theta = torch.cat((pdk_expanded, physical_params), dim=-1)

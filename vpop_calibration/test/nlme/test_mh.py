@@ -94,7 +94,7 @@ def test_mh_step(sample_nlme_params, obs_data, struct_model):
         prediction=predictions.predictions,
     )
 
-    new_state = mh_step(
+    _new_state = mh_step(
         nlme_model=nlme_model, previous_state=init_state, learning_rate=0.1
     )
 

@@ -47,11 +47,11 @@ class TrainingDataSet:
 
         declared_columns = self.full_df_raw.columns.to_list()
         # Input validation
-        if not ("id" in declared_columns):
+        if "id" not in declared_columns:
             raise ValueError("Training data should contain an `id` column.")
-        if not ("output_name" in declared_columns):
+        if "output_name" not in declared_columns:
             raise ValueError("Training data should contain an `output_name` column.")
-        if not ("value" in declared_columns):
+        if "value" not in declared_columns:
             raise ValueError("Training data should contain a `value` column.")
         if not set(descriptors) <= set(declared_columns):
             raise ValueError(
@@ -62,7 +62,7 @@ class TrainingDataSet:
         self.training_proportion = training_proportion
         self.nb_parameters = len(self.parameter_names)
         self.data_already_normalized = data_already_normalized
-        if not ("protocol_arm" in declared_columns):
+        if "protocol_arm" not in declared_columns:
             self.full_df_raw["protocol_arm"] = "identity"
         self.protocol_arms = self.full_df_raw["protocol_arm"].unique().tolist()
         self.nb_protocol_arms = len(self.protocol_arms)
@@ -126,7 +126,7 @@ class TrainingDataSet:
         self.full_df_reshaped = self.pivot_input_data(self.full_df_raw)
 
         # Normalize the inputs and the outputs (only if required)
-        if self.data_already_normalized == True:
+        if self.data_already_normalized:
             self.normalized_df = self.full_df_reshaped
         else:
             self.full_df_reshaped[self.log_inputs + self.log_tasks] = (
@@ -377,7 +377,7 @@ class TrainingDataSet:
 
         # Validate the content of the new data frame
         new_columns = new_data.columns.to_list()
-        if not "protocol_arm" in new_columns:
+        if "protocol_arm" not in new_columns:
             new_protocols = ["identity"]
         else:
             new_protocols = new_data["protocol_arm"].unique().tolist()
@@ -397,7 +397,7 @@ class TrainingDataSet:
 
         # Flag the case where no observed value was supplied
         remove_value = False
-        if not "value" in new_columns:
+        if "value" not in new_columns:
             remove_value = True
             # Add a dummy `value` column
             new_data["value"] = 1.0

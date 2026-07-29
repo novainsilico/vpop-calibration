@@ -323,7 +323,7 @@ class GP:
         with gpytorch.settings.observation_nan_policy("fill"):
             if mini_batching:
                 # set the mini_batch_size to a power of two of the total size -4
-                if mini_batch_size == None:
+                if mini_batch_size is None:
                     power = np.maximum(
                         math.floor(math.log2(self.data.X_training.shape[0])) - 4, 1
                     )
@@ -511,9 +511,7 @@ class GP:
         for i, err in enumerate(self.RMSE_training):
             print_task_rmse(i, err.item())
 
-        if not (self.data.X_validation is None) and not (
-            self.data.Y_validation is None
-        ):
+        if self.data.X_validation is not None and self.data.Y_validation is not None:
             (
                 self.Y_validation_predicted_mean,
                 _,

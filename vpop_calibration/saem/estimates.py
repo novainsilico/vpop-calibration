@@ -157,4 +157,4 @@ def dict_values_to_str(d: dict[str, float], width: int) -> str:
 
 
 def dict_keys_to_str(d: dict[str, float], width: int, prefix: str = "") -> str:
-    return ", ".join(f"{prefix+k:<{width}}" for k in d.keys())
+    return ", ".join(f"{prefix + k:<{width}}" for k in d.keys())

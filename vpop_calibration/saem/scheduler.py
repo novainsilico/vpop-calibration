@@ -52,7 +52,7 @@ class SaemScheduler:
         elif self.phase == "smoothing":
             return 0
         else:
-            raise NotImplemented
+            raise NotImplementedError
 
     @property
     def stochastic_approximation_rate(self) -> float:
@@ -67,7 +67,7 @@ class SaemScheduler:
                 ** self.learning_rate_power
             )
         else:
-            raise NotImplemented
+            raise NotImplementedError
 
     def get_state_dict(self) -> dict[str, Any]:
         return {

@@ -21,7 +21,7 @@ def test_mstep():
     )
 
     new_gaussian_params = torch.ones((nb_chains, nb_patients, nb_pdu)).double()
-    proposal = state.update(new_gaussian_params=new_gaussian_params, learning_rate=0.1)
+    _proposal = state.update(new_gaussian_params=new_gaussian_params, learning_rate=0.1)
 
 
 def test_state_dict():

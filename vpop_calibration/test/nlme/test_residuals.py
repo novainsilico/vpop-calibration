@@ -127,7 +127,7 @@ def test_residuals():
     )
     torch.testing.assert_close(log_lik, expected_log_lik)
 
-    noisy_prediction = add_predictive_error(
+    _noisy_prediction = add_predictive_error(
         observations=obs,
         predictions=pred,
         error_model_selector=error_model_selector,
@@ -244,7 +244,7 @@ def test_residuals_with_inf():
     )
     torch.testing.assert_close(log_lik, expected_log_lik)
 
-    noisy_prediction = add_predictive_error(
+    _noisy_prediction = add_predictive_error(
         observations=obs,
         predictions=pred,
         error_model_selector=error_model_selector,
