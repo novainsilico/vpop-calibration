@@ -1,6 +1,8 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
+from matplotlib.patches import Patch
 from sklearn.metrics import r2_score
 import random as rand
 import scipy.stats as stats
@@ -750,6 +752,10 @@ class PlottingUtility:
         vpc_df = self.model_diag.vpc
         assert vpc_df is not None
 
+        median_color = "#D389C9"
+        outer_color = "#5b9bd5"
+        outside_color = "#e60000"
+
         output_names = vpc_df["output_name"].unique()
         nb_outputs = len(output_names)
         fig, axes = plt.subplots(
@@ -763,54 +769,68 @@ class PlottingUtility:
             ax.grid(True, linestyle="--", alpha=0.3, which="both")
             ax.set_facecolor("#fdfdfd")
 
-            for j, q in enumerate(quantiles):
+            for q in quantiles:
 
-                df_q = df_output[df_output["quantile"] == q]
+                df_q = df_output[df_output["quantile"] == q].sort_values("bin_center")
 
-                bin_centers = df_q["bin_center"]
-                q_obs = df_q["q_obs"]
-                pred_median = df_q["pred_median"]
-                pred_lower = df_q["pred_lower"]
-                pred_upper = df_q["pred_upper"]
+                x = df_q["bin_center"].to_numpy()
+                q_obs = df_q["q_obs"].to_numpy()
+                pred_median = df_q["pred_median"].to_numpy()
+                pred_lower = df_q["pred_lower"].to_numpy()
+                pred_upper = df_q["pred_upper"].to_numpy()
 
-                label_obs = "Empirical quantiles" if j == 0 else None
-                label_ci = "95% CI for Prediction quantile" if j == 0 else None
-                label_median = "Prediction quantile" if j == 0 else None
+                is_median = np.isclose(q, 0.5)
+                color = median_color if is_median else outer_color
 
-                ax.plot(
-                    bin_centers,
-                    q_obs,
-                    color="#033a0d",
-                    linestyle="--",
-                    linewidth=1,
-                    label=label_obs,
-                )
-                ax.plot(
-                    bin_centers,
-                    pred_median,
-                    color="#FF1639",
-                    linestyle="-",
-                    linewidth=1,
-                    label=label_median,
-                )
+                ax.plot(x, q_obs, color="#033a0d", linestyle="--", linewidth=1)
+                ax.plot(x, pred_median, color=color, linestyle="-", linewidth=1)
 
+                ax.fill_between(x, pred_lower, pred_upper, color=color, alpha=0.15)
+
+                above = q_obs > pred_upper
+                below = q_obs < pred_lower
                 ax.fill_between(
-                    bin_centers,
-                    pred_lower,
+                    x,
                     pred_upper,
-                    color="#FF1639",
-                    alpha=0.15,
-                    label=label_ci,
+                    q_obs,
+                    where=above,
+                    color=outside_color,
+                    interpolate=True,
+                    alpha=0.5,
+                )
+                ax.fill_between(
+                    x,
+                    pred_lower,
+                    q_obs,
+                    where=below,
+                    color=outside_color,
+                    interpolate=True,
+                    alpha=0.5,
                 )
 
             ax.set_xlabel("Time")
             ax.set_ylabel("Observation")
             ax.set_title(f"VPC: {output_name}")
             if i == 0:
-                ax.legend(loc="upper right")
+                legend_handles = [
+                    Line2D([0], [0], color=median_color, lw=1.5, label="Median"),
+                    Line2D(
+                        [0], [0], color=outer_color, lw=1.5, label="Other quantiles"
+                    ),
+                    Line2D([0], [0], color="gray", lw=1.2, ls="--", label="Empirical"),
+                    Line2D([0], [0], color="gray", lw=1.2, ls="-", label="Prediction"),
+                    Patch(
+                        facecolor=median_color, alpha=0.15, label="Prediction interval"
+                    ),
+                    Patch(
+                        facecolor=outside_color,
+                        alpha=0.5,
+                        label="Observed quantile out of CI",
+                    ),
+                ]
+                ax.legend(handles=legend_handles, loc="upper right", fontsize=8)
         if not smoke_test:
             plt.tight_layout()
-        if not smoke_test:
             plt.show()
         plt.close(fig)
 
