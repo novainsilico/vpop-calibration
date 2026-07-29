@@ -796,6 +796,7 @@ class PlottingUtility:
                     where=above,
                     color=outside_color,
                     interpolate=True,
+                    alpha=0.5,
                 )
                 ax.fill_between(
                     x,
@@ -804,6 +805,7 @@ class PlottingUtility:
                     where=below,
                     color=outside_color,
                     interpolate=True,
+                    alpha=0.5,
                 )
 
             ax.set_xlabel("Time")
@@ -819,6 +821,11 @@ class PlottingUtility:
                     Line2D([0], [0], color="gray", lw=1.2, ls="-", label="Prediction"),
                     Patch(
                         facecolor=median_color, alpha=0.15, label="Prediction interval"
+                    ),
+                    Patch(
+                        facecolor=outside_color,
+                        alpha=0.5,
+                        label="Observed quantile out of CI",
                     ),
                 ]
                 ax.legend(handles=legend_handles, loc="upper right", fontsize=8)
