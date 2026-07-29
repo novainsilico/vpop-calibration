@@ -80,21 +80,21 @@ class ModelDiagnostics:
         Returns:
             dict: IWRES with patientId as key, with IWRES and timesteps for each patient
         """
-        if not hasattr(self.sampler, "ebe"):
-            print("No EBEs available, computing them...")
+        if not hasattr(self.sampler, "map"):
+            print("No MAPs available, computing them...")
             self.sample_conditional_distribution()
-        assert hasattr(self.sampler, "ebe")
+        assert hasattr(self.sampler, "map")
 
-        ebe_physical_params = self.sampler.ebe.physical_params_samples
-        assert ebe_physical_params.shape == (
+        map_physical_params = self.sampler.map.physical_params_samples
+        assert map_physical_params.shape == (
             1,
             self.model.nb_patients,
             self.model.nb_pdu + self.model.nb_mi,
-        ), f"{ebe_physical_params.shape}"
+        ), f"{map_physical_params.shape}"
 
         # Assemble the thetas by adding the PDKs
         theta = self.model.convert_physical_to_thetas_all_patients(
-            physical_params=ebe_physical_params
+            physical_params=map_physical_params
         )
         model_inputs = self.model.convert_thetas_to_model_parameters_all_patients(
             theta=theta
@@ -293,13 +293,13 @@ class ModelDiagnostics:
 
     def compute_shrinkage(self, nb_samples: int = 50) -> None:
 
-        if not hasattr(self.sampler, "ebe"):
+        if not hasattr(self.sampler, "map"):
             self.sampler.run_sampler(nb_samples=nb_samples)
-        assert self.sampler.ebe is not None
+        assert self.sampler.map is not None
 
-        ebe_etas = self.sampler.ebe.eta_samples.squeeze(0)
+        map_etas = self.sampler.map.eta_samples.squeeze(0)
 
-        eta_sd = torch.std(ebe_etas, dim=0, unbiased=True)
+        eta_sd = torch.std(map_etas, dim=0, unbiased=True)
         omega_sd = torch.sqrt(torch.diag(self.model.omega_pop))
 
         shrinkage = 1 - eta_sd / omega_sd

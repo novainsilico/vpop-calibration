@@ -10,7 +10,7 @@ def test_check_convergence():
     prev_estimates = PopEstimates(
         beta=tensor_1,
         omega=tensor_1,
-        psi=tensor_1,
+        ebe=tensor_1,
         sigma=tensor_1,
         complete_likelihood=tensor_1,
         model_intrinsic=tensor_1,
@@ -18,7 +18,7 @@ def test_check_convergence():
     current_estimates = PopEstimates(
         beta=tensor_1,
         omega=tensor_1,
-        psi=tensor_2,
+        ebe=tensor_2,
         sigma=tensor_1,
         complete_likelihood=tensor_1,
         model_intrinsic=tensor_2,
@@ -51,7 +51,7 @@ def test_iter_summary():
         omega=omega,
         model_intrinsic=mi,
         sigma=sigma,
-        psi=torch.tensor([0.0]),
+        ebe=torch.tensor([0.0]),
         complete_likelihood=torch.tensor([0.0]),
     )
 
@@ -82,7 +82,7 @@ def test_state_dict():
         omega=omega,
         model_intrinsic=mi,
         sigma=sigma,
-        psi=torch.tensor([0.0]),
+        ebe=torch.tensor([0.0]),
         complete_likelihood=torch.tensor([0.0]),
     )
 

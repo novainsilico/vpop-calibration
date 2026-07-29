@@ -35,12 +35,12 @@ class PlottingUtility:
             gp_model_struct, StructuralGp
         ), "Posterior surrogate validity check only implemented for GP structural model."
 
-        if not hasattr(self.model_diag.sampler, "ebe"):
+        if not hasattr(self.model_diag.sampler, "map"):
             self.model_diag.sample_conditional_distribution()
         gp_model: GP = gp_model_struct.gp_model
         train_data = gp_model.data.full_df_raw[pdus].drop_duplicates()
 
-        map_data = self.model_diag.sampler.ebe_parameters_df
+        map_data = self.model_diag.sampler.map_parameters_df
         patients = self.model_diag.model.patients
 
         n_plots = len(pdus)
@@ -129,9 +129,9 @@ class PlottingUtility:
         facet_width: float = 5.0,
         facet_height: float = 4.0,
     ) -> None:
-        if not hasattr(self.model_diag.sampler, "ebe"):
+        if not hasattr(self.model_diag.sampler, "map"):
             self.model_diag.sample_conditional_distribution()
-        obs_vs_simulated = self.model_diag.sampler.ebe_predictions_df
+        obs_vs_simulated = self.model_diag.sampler.map_predictions_df
 
         n_cols = self.model_diag.model.nb_outputs
         n_rows = self.model_diag.model.nb_protocols
@@ -203,17 +203,17 @@ class PlottingUtility:
             total_patient_num = self.model_diag.model.nb_patients
             patient_num = rand.randrange(total_patient_num)
 
-        if not hasattr(self.model_diag.sampler, "ebe"):
+        if not hasattr(self.model_diag.sampler, "map"):
             self.model_diag.sample_conditional_distribution()
         # Filter datasets for the selected patient
-        obs_vs_simulated = self.model_diag.sampler.ebe_predictions_df
+        obs_vs_simulated = self.model_diag.sampler.map_predictions_df
 
         patient_ind = self.model_diag.model.patients[patient_num]
         patient_data = obs_vs_simulated.loc[obs_vs_simulated["id"] == patient_ind]
 
         # Print patient parameters if verbose selected
         if verbose:
-            patient_params = self.model_diag.sampler.ebe_parameters_df
+            patient_params = self.model_diag.sampler.map_parameters_df
             print(patient_params.loc[patient_params["id"] == patient_ind])
 
         # Initialize subplots
@@ -284,9 +284,9 @@ class PlottingUtility:
         randomize: bool = False,
     ) -> None:
 
-        if not hasattr(self.model_diag.sampler, "ebe"):
+        if not hasattr(self.model_diag.sampler, "map"):
             self.model_diag.sample_conditional_distribution()
-        obs_vs_simulated = self.model_diag.sampler.ebe_predictions_df
+        obs_vs_simulated = self.model_diag.sampler.map_predictions_df
 
         # Plot all patients by default
         if (
@@ -381,9 +381,9 @@ class PlottingUtility:
         tolerance_pct: int = 50,
     ) -> None:
 
-        if not hasattr(self.model_diag.sampler, "ebe"):
+        if not hasattr(self.model_diag.sampler, "map"):
             self.model_diag.sample_conditional_distribution()
-        obs_vs_simulated = self.model_diag.sampler.ebe_predictions_df
+        obs_vs_simulated = self.model_diag.sampler.map_predictions_df
 
         num_plots = self.model_diag.model.nb_outputs
         fig, axes = plt.subplots(
@@ -522,9 +522,9 @@ class PlottingUtility:
             assert self.model_diag.population_parameters_predictions_df is not None
             comparison_df = self.model_diag.population_parameters_predictions_df
         else:
-            if not hasattr(self.model_diag.sampler, "ebe"):
+            if not hasattr(self.model_diag.sampler, "map"):
                 self.model_diag.sample_conditional_distribution()
-            comparison_df = self.model_diag.sampler.ebe_predictions_df
+            comparison_df = self.model_diag.sampler.map_predictions_df
         self.residual_values(
             res_df=wres_results,
             comparison=comparison_df,
@@ -649,7 +649,7 @@ class PlottingUtility:
         self,
         n_patients_to_plot: int = 3,
     ):
-        if not hasattr(self.model_diag.sampler, "ebe"):
+        if not hasattr(self.model_diag.sampler, "map"):
             self.model_diag.sample_conditional_distribution()
         sample_physical = self.model_diag.sampler.total_samples.physical_params_samples
         if n_patients_to_plot > self.model_diag.model.nb_patients:
@@ -659,11 +659,11 @@ class PlottingUtility:
             range(self.model_diag.model.nb_patients), n_patients_to_plot
         )
 
-        # Get EBE estimates for descriptors
-        ebe_theta = self.model_diag.model.convert_physical_to_thetas_all_patients(
-            self.model_diag.sampler.ebe.physical_params_samples
+        # Get MAP estimates for descriptors
+        map_theta = self.model_diag.model.convert_physical_to_thetas_all_patients(
+            self.model_diag.sampler.map.physical_params_samples
         )
-        assert ebe_theta is not None
+        assert map_theta is not None
 
         for k in range(n_patients_to_plot):
             patient_samples = (
@@ -693,7 +693,7 @@ class PlottingUtility:
                             label="PDF (KDE)",
                         )
 
-                    map_val = ebe_theta[0][ind_to_plot[k]][i]
+                    map_val = map_theta[0][ind_to_plot[k]][i]
 
                     ax.axvline(
                         map_val,
@@ -844,10 +844,10 @@ class PlottingUtility:
         pdus = self.model_diag.model.pdu_names
         sampler = self.model_diag.sampler
 
-        if not hasattr(sampler, "ebe"):
+        if not hasattr(sampler, "map"):
             self.model_diag.sample_conditional_distribution()
 
-        map_data = self.model_diag.sampler.ebe_parameters_df
+        map_data = self.model_diag.sampler.map_parameters_df
         cond_data = self.model_diag.sampler.total_samples_parameters_df
 
         n_plots = len(pdus)
