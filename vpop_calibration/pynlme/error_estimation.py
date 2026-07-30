@@ -1,5 +1,5 @@
 import torch
-
+from torch.optim import LBFGS
 from vpop_calibration.pynlme.indexing import IndexedObservations
 from vpop_calibration.pynlme.params import ErrorType
 from vpop_calibration.pynlme.residuals import (
@@ -18,9 +18,7 @@ def _solve_combined_output(
     log_variances = (
         warm_start.clamp_min(min_variance).log().detach().clone().requires_grad_(True)
     )
-    optimizer = torch.optim.LBFGS(
-        [log_variances], max_iter=max_iter, line_search_fn="strong_wolfe"
-    )
+    optimizer = LBFGS([log_variances], max_iter=max_iter, line_search_fn="strong_wolfe")
 
     def closure() -> torch.Tensor:
         optimizer.zero_grad()
@@ -68,11 +66,9 @@ def estimate_error_params(
             keep = keep & (predictions != 0)
         sq_residuals = residuals[keep].detach() ** 2
         sq_predictions = predictions[keep].detach() ** 2
-        assert sq_residuals.numel() >= 2, (
-            f"Output {output} ({error_type}) has too few usable observations "
-            f"to estimate its residual variance"
+        assert sq_residuals.numel() > 0, (
+            f"Output {output} ({error_type}) has no usable observation"
         )
-
         if error_type == "additive":
             estimates[output, 0] = sq_residuals.mean()
         elif error_type == "proportional":

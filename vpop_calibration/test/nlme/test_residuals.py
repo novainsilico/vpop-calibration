@@ -12,7 +12,6 @@ from vpop_calibration.pynlme.indexing import (
     IndexedObservations,
 )
 
-import pytest
 import torch
 import pandas as pd
 from math import log, pi, inf
@@ -223,13 +222,13 @@ def test_residuals_with_inf():
     expected_variance = torch.tensor([[1, 4, 1, 1]], dtype=torch.float32)
     torch.testing.assert_close(out_variance, expected_variance)
 
-    with pytest.raises(AssertionError, match="too few usable observations"):
-        estimate_error_params(
-            observations=obs,
-            predictions=pred,
-            error_model_selector=error_model_selector,
-            sigma=sigma,
-        )
+    error_params = estimate_error_params(
+        observations=obs,
+        predictions=pred,
+        error_model_selector=error_model_selector,
+        sigma=sigma,
+    )
+    torch.testing.assert_close(error_params, sigma)
 
     log_lik = log_likelihood_observation(
         observations=obs,

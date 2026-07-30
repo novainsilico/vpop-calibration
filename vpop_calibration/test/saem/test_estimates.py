@@ -43,7 +43,7 @@ def test_iter_summary():
     mi = torch.tensor([0.0])
     mi_names = ["mi_1"]
     cov_coeff_names = ["cov_1"]
-    sigma = torch.tensor([1.0, 1.0])
+    sigma = torch.tensor([[1.0, 0.0], [0.0, 1.0]])
     output_names = ["out_1", "out_2"]
 
     pop_estimates = PopEstimates(
@@ -63,6 +63,7 @@ def test_iter_summary():
         covariate_coeff_names=cov_coeff_names,
         mi_names=mi_names,
         output_names=output_names,
+        error_model_selector={"additive": [0], "proportional": [1], "combined": []},
     )
 
 
@@ -70,7 +71,7 @@ def test_state_dict():
     beta = torch.tensor([0.0, 0.0, 0.0])
     omega = torch.tensor([[0.0, 0.0], [0.0, 0.0]])
     mi = torch.tensor([0.0])
-    sigma = torch.tensor([1.0, 1.0])
+    sigma = torch.tensor([[1.0, 0.0], [0.0, 1.0]])
 
     pop_estimates = PopEstimates(
         beta=beta,
