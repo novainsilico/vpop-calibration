@@ -209,7 +209,7 @@ def test_residuals_with_inf():
         "proportional": [1],
     }
 
-    res = calculate_residuals(obs, pred, error_model_selector)
+    res = calculate_residuals(obs, pred)
     expected_res = torch.tensor([[-1, -1, -inf, -inf]], dtype=torch.float32)
     torch.testing.assert_close(res, expected_res)
 
@@ -222,13 +222,16 @@ def test_residuals_with_inf():
     expected_variance = torch.tensor([[1, 4, 1, 1]], dtype=torch.float32)
     torch.testing.assert_close(out_variance, expected_variance)
 
+    expected_error_params = torch.tensor(
+        [[1.0, 0.0], [0.0, 1 / 4]], dtype=torch.float32
+    )
     error_params = estimate_error_params(
         observations=obs,
         predictions=pred,
         error_model_selector=error_model_selector,
         sigma=sigma,
     )
-    torch.testing.assert_close(error_params, sigma)
+    torch.testing.assert_close(error_params, expected_error_params)
 
     log_lik = log_likelihood_observation(
         observations=obs,

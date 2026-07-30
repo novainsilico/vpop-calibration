@@ -66,9 +66,9 @@ def estimate_error_params(
             keep = keep & (predictions != 0)
         sq_residuals = residuals[keep].detach() ** 2
         sq_predictions = predictions[keep].detach() ** 2
-        assert sq_residuals.numel() > 0, (
-            f"Output {output} ({error_type}) has no usable observation"
-        )
+        if sq_residuals.numel() == 0:
+            estimates[output] = sigma[output]
+            continue
         if error_type == "additive":
             estimates[output, 0] = sq_residuals.mean()
         elif error_type == "proportional":
