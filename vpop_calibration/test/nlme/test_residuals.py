@@ -1,10 +1,10 @@
 from vpop_calibration.pynlme.residuals import (
     calculate_residuals,
     compute_error_variance,
-    estimate_error_params,
     log_likelihood_observation,
     add_predictive_error,
 )
+from vpop_calibration.pynlme.error_estimation import estimate_error_params
 from vpop_calibration.pynlme.params import ErrorType
 from vpop_calibration.pynlme.indexing import (
     ObservationIndex,
