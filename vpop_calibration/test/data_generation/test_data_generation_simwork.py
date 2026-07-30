@@ -52,9 +52,9 @@ def param_distribs() -> dict:
             "k_21": {"prior": 0.01, "prior_omega": 0.1},
         },
         "error_model": {
-            "A0": {"error_type": "additive", "sigma": 0.5},
-            "A1": {"error_type": "additive", "sigma": 0.5},
-            "A2": {"error_type": "additive", "sigma": 0.5},
+            "A0": {"error_type": "additive", "sigma_add": 0.5},
+            "A1": {"error_type": "additive", "sigma_add": 0.5},
+            "A2": {"error_type": "additive", "sigma_add": 0.5},
         },
     }
     return params

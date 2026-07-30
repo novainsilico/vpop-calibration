@@ -1,16 +1,16 @@
 import torch
-from typing import get_args
 
 from vpop_calibration.pynlme.indexing import IndexedObservations
 from vpop_calibration.pynlme.params import ErrorType
 from vpop_calibration.config import device
+
+RESIDUAL_MIN_VARIANCE = 1e-6
 
 
 # @torch.compile
 def calculate_residuals(
     observed_data: IndexedObservations,
     predictions: torch.Tensor,
-    error_model_selector: dict[ErrorType, list[int]],
 ) -> torch.Tensor:
     """Calculates residuals based on the error model for each output
 
@@ -26,97 +26,40 @@ def calculate_residuals(
     )
     batch_size = predictions.shape[0]
     obs_vals = observed_data.obs_values.expand(batch_size, -1)
-    output_indices = observed_data.obs_index.output_name.index_values.expand(
-        batch_size, -1
-    )
     assert predictions.shape == obs_vals.shape, (
         f"Non-matching shapes in `calculate_residuals`: {predictions.shape=}, {obs_vals.shape=}"
     )
 
-    residuals = torch.zeros_like(predictions, device=device)
+    residuals = obs_vals - predictions
     nan_or_inf_mask = torch.logical_not(torch.isfinite(predictions))
-    for error_type in get_args(ErrorType):
-        mask = torch.as_tensor(
-            sum(output_indices == i for i in error_model_selector[error_type]),
-            dtype=torch.bool,
-            device=device,
-        )
-        if error_type == "additive":
-            residuals[mask] = obs_vals[mask] - predictions[mask]
-        elif error_type == "proportional":
-            residuals[mask] = (obs_vals[mask] - predictions[mask]) / predictions[mask]
-        else:
-            raise NotImplementedError(f"Unknown error model type {error_type}")
-    # when the error type is proportional, a infinite predicted value will result in a NaN residual
-    # so here we special case infinite (and NaN) and force the residual to be -Inf as if it were an additive error type
     residuals[nan_or_inf_mask] = -torch.inf
     return residuals
-
-
-# @torch.compile
-def sum_sq_residuals(
-    observations: IndexedObservations,
-    prediction: torch.Tensor,
-    error_model_selector: dict[ErrorType, list[int]],
-) -> torch.Tensor:
-    """Compute the sum of squared residuals for a given prediction tensor"""
-
-    nb_samples = prediction.shape[0]
-    nb_outputs = len(observations.obs_index.output_name.ref_values)
-    sq_residuals = torch.square(
-        calculate_residuals(
-            observed_data=observations,
-            predictions=prediction,
-            error_model_selector=error_model_selector,
-        )
-    )
-    sum_residuals_per_sample = torch.zeros(
-        nb_samples, nb_outputs, device=device, dtype=sq_residuals.dtype
-    )
-    output_index = observations.obs_index.output_name.index_values
-    output_index_expanded = output_index.expand(nb_samples, -1)
-    sum_residuals_per_sample.scatter_add_(1, output_index_expanded, sq_residuals)
-    return sum_residuals_per_sample
 
 
 # @torch.compile
 def compute_error_variance(
     observations: IndexedObservations,
     predictions: torch.Tensor,
-    error_model_selector: dict[ErrorType, list[int]],
     sigma: torch.Tensor,
 ) -> torch.Tensor:
 
     nb_samples = predictions.shape[0]
     output_index = observations.obs_index.output_name.index_values
-    output_index_expanded = output_index.expand(nb_samples, -1)
-    sigma_expanded = sigma.expand(nb_samples, -1).index_select(1, output_index)
+    sigma_add = sigma[:, 0].index_select(0, output_index).expand(nb_samples, -1)
+    sigma_prop = sigma[:, 1].index_select(0, output_index).expand(nb_samples, -1)
 
-    out_variance = torch.zeros_like(predictions, device=device)
     nan_or_inf_mask = torch.logical_not(torch.isfinite(predictions))
-    for error_type in get_args(ErrorType):
-        mask = torch.as_tensor(
-            sum(output_index_expanded == i for i in error_model_selector[error_type]),
-            dtype=torch.bool,
-            device=device,
-        )
-        if error_type == "additive":
-            out_variance[mask] = sigma_expanded[mask]
-        elif error_type == "proportional":
-            out_variance[mask] = sigma_expanded[mask] * torch.square(predictions[mask])
-        else:
-            raise NotImplementedError(f"Unknown error model type {error_type}")
-    # if one of the predictions is Inf or NaN, the patient will be discarded but we do not want it to pollute
-    # the overall variance. In such a case, we do not multiply sigma by the predicted value when the error type is proportional
-    out_variance[nan_or_inf_mask] = sigma_expanded[nan_or_inf_mask]
-    return out_variance
+    sq_predictions = torch.where(
+        nan_or_inf_mask, torch.ones_like(predictions), predictions**2
+    )
+
+    return (sigma_add + sigma_prop * sq_predictions).clamp_min(RESIDUAL_MIN_VARIANCE)
 
 
 # @torch.compile
 def log_likelihood_observation(
     observations: IndexedObservations,
     predictions: torch.Tensor,
-    error_model_selector: dict[ErrorType, list[int]],
     sigma: torch.Tensor,
 ) -> torch.Tensor:
     """Compute log-likelihood of predictions given corresponding observations.
@@ -129,14 +72,12 @@ def log_likelihood_observation(
     residuals = calculate_residuals(
         observed_data=observations,
         predictions=predictions,
-        error_model_selector=error_model_selector,
     )
 
     # Log-likelihood of normal distribution
     variance = compute_error_variance(
         observations=observations,
         predictions=predictions,
-        error_model_selector=error_model_selector,
         sigma=sigma,
     )
     # Normal likelihood function
@@ -161,13 +102,11 @@ def log_likelihood_observation(
 def add_predictive_error(
     observations: IndexedObservations,
     predictions: torch.Tensor,
-    error_model_selector: dict[ErrorType, list[int]],
     sigma: torch.Tensor,
 ) -> torch.Tensor:
     out_variance = compute_error_variance(
         observations=observations,
         predictions=predictions,
-        error_model_selector=error_model_selector,
         sigma=sigma,
     )
     noisy_predictions = torch.distributions.Normal(
@@ -175,3 +114,88 @@ def add_predictive_error(
     ).sample()
 
     return noisy_predictions
+
+
+def _solve_combined_output(
+    sq_residuals: torch.Tensor,
+    sq_predictions: torch.Tensor,
+    max_iter: int,
+    warm_start: torch.Tensor,
+    min_variance: float,
+) -> torch.Tensor:
+    log_variances = (
+        warm_start.clamp_min(min_variance).log().detach().clone().requires_grad_(True)
+    )
+    optimizer = torch.optim.LBFGS(
+        [log_variances], max_iter=max_iter, line_search_fn="strong_wolfe"
+    )
+
+    def closure() -> torch.Tensor:
+        optimizer.zero_grad()
+        a2, b2 = log_variances.exp()
+        variance = (a2 + b2 * sq_predictions).clamp_min(min_variance)
+        loss = 0.5 * (variance.log() + sq_residuals / variance).sum()
+        loss.backward()
+        return loss
+
+    optimizer.step(closure)
+    return log_variances.detach().exp()
+
+
+# @torch.compile
+def estimate_error_params(
+    observations: IndexedObservations,
+    predictions: torch.Tensor,
+    error_model_selector: dict[ErrorType, list[int]],
+    sigma: torch.Tensor,
+    max_iter: int = 20,
+    min_variance: float = RESIDUAL_MIN_VARIANCE,
+) -> torch.Tensor:
+
+    nb_outputs = sigma.shape[0]
+    error_type_per_output: dict[int, ErrorType] = {
+        output: error_type
+        for error_type, outputs in error_model_selector.items()
+        for output in outputs
+    }
+    assert sorted(error_type_per_output) == list(range(nb_outputs)), (
+        f"`error_model_selector` must assign exactly one error type to each of "
+        f"the {nb_outputs} outputs, got {error_model_selector}"
+    )
+
+    residuals = calculate_residuals(observed_data=observations, predictions=predictions)
+    output_index = observations.obs_index.output_name.index_values
+    finite = torch.isfinite(predictions)
+    estimates = torch.zeros_like(sigma)
+
+    for output in range(nb_outputs):
+        error_type = error_type_per_output[output]
+
+        keep = (output_index == output).unsqueeze(0) & finite
+        if error_type == "proportional":
+            keep = keep & (predictions != 0)
+        sq_residuals = residuals[keep].detach() ** 2
+        sq_predictions = predictions[keep].detach() ** 2
+        assert sq_residuals.numel() >= 2, (
+            f"Output {output} ({error_type}) has too few usable observations "
+            f"to estimate its residual variance"
+        )
+
+        if error_type == "additive":
+            estimates[output, 0] = sq_residuals.mean()
+        elif error_type == "proportional":
+            estimates[output, 1] = (sq_residuals / sq_predictions).mean()
+        elif error_type == "combined":
+            estimates[output] = _solve_combined_output(
+                sq_residuals=sq_residuals,
+                sq_predictions=sq_predictions,
+                max_iter=max_iter,
+                warm_start=sigma[output],
+                min_variance=min_variance,
+            )
+        else:
+            raise NotImplementedError(
+                f"No variance estimator implemented for error_type={error_type!r}"
+            )
+
+    return estimates

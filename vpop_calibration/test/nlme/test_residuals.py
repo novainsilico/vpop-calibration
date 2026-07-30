@@ -1,7 +1,7 @@
 from vpop_calibration.pynlme.residuals import (
     calculate_residuals,
     compute_error_variance,
-    sum_sq_residuals,
+    estimate_error_params,
     log_likelihood_observation,
     add_predictive_error,
 )
@@ -12,6 +12,7 @@ from vpop_calibration.pynlme.indexing import (
     IndexedObservations,
 )
 
+import pytest
 import torch
 import pandas as pd
 from math import log, pi, inf
@@ -88,39 +89,43 @@ def test_residuals():
         "proportional": [1],
     }
 
-    res = calculate_residuals(obs, pred, error_model_selector)
-    expected_res = torch.tensor([[-1, -1 / 2, -1, -1 / 2]], dtype=torch.float32)
+    res = calculate_residuals(obs, pred)
+    expected_res = torch.tensor([[-1, -1, -1, -1]], dtype=torch.float32)
     torch.testing.assert_close(res, expected_res)
 
-    sigma = torch.tensor([1, 1], dtype=torch.float32)
+    sigma = torch.tensor([[1.0, 0.0], [0.0, 1.0]], dtype=torch.float32)
     out_variance = compute_error_variance(
         observations=obs,
         predictions=pred,
-        error_model_selector=error_model_selector,
         sigma=sigma,
     )
     expected_variance = torch.tensor([[1, 4, 1, 4]], dtype=torch.float32)
     torch.testing.assert_close(out_variance, expected_variance)
 
-    sum_sq_res = sum_sq_residuals(
-        observations=obs, prediction=pred, error_model_selector=error_model_selector
+    error_params = estimate_error_params(
+        observations=obs,
+        predictions=pred,
+        error_model_selector=error_model_selector,
+        sigma=sigma,
     )
-    expected_sum_sq_res = torch.tensor([[2, 1 / 2]], dtype=torch.float32)
-    torch.testing.assert_close(sum_sq_res, expected_sum_sq_res)
+
+    expected_error_params = torch.tensor(
+        [[1.0, 0.0], [0.0, 1 / 4]], dtype=torch.float32
+    )
+    torch.testing.assert_close(error_params, expected_error_params)
 
     log_lik = log_likelihood_observation(
         observations=obs,
         predictions=pred,
-        error_model_selector=error_model_selector,
         sigma=sigma,
     )
     expected_log_lik = torch.tensor(
         [
             [
                 -0.5 * (log(2 * pi * 1) + ((-1) ** 2 / 1))
-                - 0.5 * (log(2 * pi * 4) + ((-1 / 2) ** 2 / 4)),
+                - 0.5 * (log(2 * pi * 4) + ((-1) ** 2 / 4)),
                 -0.5 * (log(2 * pi * 1) + ((-1) ** 2 / 1))
-                - 0.5 * (log(2 * pi * 4) + ((-1 / 2) ** 2 / 4)),
+                - 0.5 * (log(2 * pi * 4) + ((-1) ** 2 / 4)),
             ]
         ],
         dtype=torch.float32,
@@ -130,7 +135,6 @@ def test_residuals():
     _noisy_prediction = add_predictive_error(
         observations=obs,
         predictions=pred,
-        error_model_selector=error_model_selector,
         sigma=sigma,
     )
 
@@ -207,36 +211,36 @@ def test_residuals_with_inf():
     }
 
     res = calculate_residuals(obs, pred, error_model_selector)
-    expected_res = torch.tensor([[-1, -1 / 2, -inf, -inf]], dtype=torch.float32)
+    expected_res = torch.tensor([[-1, -1, -inf, -inf]], dtype=torch.float32)
     torch.testing.assert_close(res, expected_res)
 
-    sigma = torch.tensor([1, 1], dtype=torch.float32)
+    sigma = torch.tensor([[1.0, 0.0], [0.0, 1.0]], dtype=torch.float32)
     out_variance = compute_error_variance(
         observations=obs,
         predictions=pred,
-        error_model_selector=error_model_selector,
         sigma=sigma,
     )
     expected_variance = torch.tensor([[1, 4, 1, 1]], dtype=torch.float32)
     torch.testing.assert_close(out_variance, expected_variance)
 
-    sum_sq_res = sum_sq_residuals(
-        observations=obs, prediction=pred, error_model_selector=error_model_selector
-    )
-    expected_sum_sq_res = torch.tensor([[inf, inf]], dtype=torch.float32)
-    torch.testing.assert_close(sum_sq_res, expected_sum_sq_res)
+    with pytest.raises(AssertionError, match="too few usable observations"):
+        estimate_error_params(
+            observations=obs,
+            predictions=pred,
+            error_model_selector=error_model_selector,
+            sigma=sigma,
+        )
 
     log_lik = log_likelihood_observation(
         observations=obs,
         predictions=pred,
-        error_model_selector=error_model_selector,
         sigma=sigma,
     )
     expected_log_lik = torch.tensor(
         [
             [
                 -0.5 * (log(2 * pi * 1) + ((-1) ** 2 / 1))
-                - 0.5 * (log(2 * pi * 4) + ((-1 / 2) ** 2 / 4)),
+                - 0.5 * (log(2 * pi * 4) + ((-1) ** 2 / 4)),
                 -inf,
             ]
         ],
@@ -247,6 +251,5 @@ def test_residuals_with_inf():
     _noisy_prediction = add_predictive_error(
         observations=obs,
         predictions=pred,
-        error_model_selector=error_model_selector,
         sigma=sigma,
     )

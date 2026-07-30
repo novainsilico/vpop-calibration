@@ -31,8 +31,8 @@ def sample_nlme_params() -> MixedEffectParameters:
             },
         },
         "error_model": {
-            "out_1": {"error_type": "additive", "sigma": 0.1},
-            "out_2": {"error_type": "proportional", "sigma": 0.5},
+            "out_1": {"error_type": "additive", "sigma_add": 0.1},
+            "out_2": {"error_type": "proportional", "sigma_prop": 0.5},
         },
         "pdk": ["pdk_1"],
     }
@@ -102,8 +102,8 @@ def test_nlme_init(sample_nlme_params, obs_data, struct_model, tmp_path):
         nlme_model.residual_var,
         torch.as_tensor(
             [
-                sample_nlme_params.error_model["out_1"].sigma,
-                sample_nlme_params.error_model["out_2"].sigma,
+                [sample_nlme_params.error_model["out_1"].sigma_add, 0.0],
+                [0.0, sample_nlme_params.error_model["out_2"].sigma_prop],
             ]
         ),
     )

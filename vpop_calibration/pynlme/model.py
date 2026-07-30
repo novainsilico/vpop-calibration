@@ -164,11 +164,19 @@ class StatisticalModel:
             device=device,
             dtype=default_dtype,
         )
-        init_res_var = torch.as_tensor(
-            [self.prior_params.error_model[out].sigma for out in self.output_names],
-            device=device,
-            dtype=default_dtype,
+        init_res_var = torch.zeros(
+            (self.nb_outputs, 2), device=device, dtype=default_dtype
         )
+        self.variance_active_mask = torch.zeros(
+            (self.nb_outputs, 2), device=device, dtype=torch.bool
+        )
+        for i, out in enumerate(self.output_names):
+            em = self.prior_params.error_model[out]
+            for column, value in enumerate([em.sigma_add, em.sigma_prop]):
+                if value is not None:
+                    init_res_var[i, column] = value
+                    self.variance_active_mask[i, column] = True
+
         init_params = NlmeModelState(
             beta=init_beta, omega=init_omega, log_mi=init_mi, res_var=init_res_var
         )
@@ -288,15 +296,15 @@ class StatisticalModel:
     def update_res_var(self, residual_var: torch.Tensor) -> None:
         """Update the residual variance of the NLME model, while ensuring it remains positive."""
 
-        if hasattr(self, "residual_var"):
-            expected_shape = self.residual_var.shape
-        else:
-            expected_shape = (self.nb_outputs,)
+        expected_shape = (self.nb_outputs, 2)
         assert residual_var.shape == expected_shape, (
             f"Wrong shape in residual variance update: {residual_var.shape}, expected: {expected_shape}"
         )
-
-        self.residual_var = residual_var.clamp(min=1e-6)
+        self.residual_var = torch.where(
+            self.variance_active_mask,
+            residual_var.clamp(0.0),
+            torch.zeros_like(residual_var),
+        )
 
     def update_betas(self, betas: torch.Tensor) -> None:
         """Update the betas of the NLME model."""
@@ -577,7 +585,7 @@ class StatisticalModel:
         assert log_prior.shape == (nb_samples, self.nb_patients)
 
         log_likelihood_obs = log_likelihood_observation(
-            self.data.full_obs, pred, self.error_model_selector, self.residual_var
+            self.data.full_obs, pred, self.residual_var
         )
         assert log_likelihood_obs.shape == (nb_samples, self.nb_patients)
 
@@ -624,7 +632,6 @@ class StatisticalModel:
             log_likelihood_obs = log_likelihood_observation(
                 observations=observations,
                 predictions=pred,
-                error_model_selector=self.error_model_selector,
                 sigma=self.residual_var,
             )
             assert log_likelihood_obs.shape == (nb_samples, 1)

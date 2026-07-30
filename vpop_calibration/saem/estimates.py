@@ -90,6 +90,7 @@ class IterSummary(NamedTuple):
         covariate_coeff_names: list[str],
         mi_names: list[str],
         output_names: list[str],
+        error_model_selector: dict[str, list[int]],
     ) -> "IterSummary":
         mu_dict: dict[str, float] = {
             pdu: estimates.beta[beta_names.index(pdu)].item() for pdu in pdu_names
@@ -104,9 +105,17 @@ class IterSummary(NamedTuple):
             cov: estimates.beta[beta_names.index(cov)].item()
             for cov in covariate_coeff_names
         }
-        sigma_dict: dict[str, float] = {
-            output: estimates.sigma[i].item() for i, output in enumerate(output_names)
-        }
+        additive_outputs = set(error_model_selector["additive"])
+        combined_outputs = set(error_model_selector["combined"])
+        sigma_dict: dict[str, float] = {}
+        for i, output in enumerate(output_names):
+            if i in combined_outputs:
+                sigma_dict[f"{output}_add"] = estimates.sigma[i, 0].item()
+                sigma_dict[f"{output}_prop"] = estimates.sigma[i, 1].item()
+            elif i in additive_outputs:
+                sigma_dict[output] = estimates.sigma[i, 0].item()
+            else:
+                sigma_dict[output] = estimates.sigma[i, 1].item()
 
         return IterSummary(
             iteration=iteration,

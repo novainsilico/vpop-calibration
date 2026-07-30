@@ -105,13 +105,11 @@ class ModelDiagnostics:
         residuals = calculate_residuals(
             observed_data=self.model.data.full_obs,
             predictions=simulated_tensor,
-            error_model_selector=self.model.error_model_selector,
         )
 
         variance = compute_error_variance(
             observations=self.model.data.full_obs,
             predictions=simulated_tensor,
-            error_model_selector=self.model.error_model_selector,
             sigma=self.model.residual_var,
         )
 
@@ -387,7 +385,7 @@ class ModelDiagnostics:
             raise ValueError(
                 "The conditional distribution has not yet been sampled from. Use `sample_conditional_distribution` first."
             )
-        self.importance_sampler.fit_sudent_t_proposal(
+        self.importance_sampler.fit_student_t_proposal(
             conditional_samples=self.sampler.total_samples
         )
         self.importance_sampler.compute_likelihood(nb_samples=nb_proposal_samples)

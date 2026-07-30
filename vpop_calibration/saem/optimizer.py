@@ -11,14 +11,16 @@ from vpop_calibration.saem.estimates import PopEstimates, IterSummary, check_con
 from vpop_calibration.saem.config import SaemConfigDict
 from vpop_calibration.metropolis_hastings import MetropolisHastingsState, mh_step
 from vpop_calibration.saem.m_step import MStepState
-from vpop_calibration.pynlme.residuals import sum_sq_residuals
 from vpop_calibration.saem.utils import (
     simulated_annealing,
     stochastic_approximation,
     covariance_matrix_simulated_annealing,
 )
 from vpop_calibration.config import device
-from vpop_calibration.pynlme.residuals import log_likelihood_observation
+from vpop_calibration.pynlme.residuals import (
+    log_likelihood_observation,
+    estimate_error_params,
+)
 from vpop_calibration.saem.plot import OptimizerPlot
 from vpop_calibration.config import smoke_test
 
@@ -204,21 +206,12 @@ class PySaem:
         # If in learning or smoothing phase, go through the rest of the iteration
         if self.scheduler.phase != "burnin":
             # M-step:
-            # Compute the sum of squared residuals
-            sum_sq_res_full = sum_sq_residuals(
-                prediction=self.mh_state.prediction,
+            # maximum-likelihood target for the residual error variance
+            target_res_var = estimate_error_params(
                 observations=self.model.data.full_obs,
+                predictions=self.mh_state.prediction,
                 error_model_selector=self.model.error_model_selector,
-            )
-            # Average the sum of squared residuals over samples (MCMC chains)
-            sum_sq_res = sum_sq_res_full.mean(dim=0)
-            assert sum_sq_res.shape == (self.model.nb_outputs,), (
-                f"Unexpected residual shape: {sum_sq_res.shape}"
-            )
-
-            # Update the residual error variance
-            target_res_var: torch.Tensor = (
-                sum_sq_res / self.model.data.nb_tot_observations_per_output
+                sigma=self.model.residual_var,
             )
             current_res_var: torch.Tensor = self.model.residual_var
 
@@ -301,6 +294,7 @@ class PySaem:
             covariate_coeff_names=self.model.covariate_coeff_names,
             mi_names=self.model.mi_names,
             output_names=self.model.output_names,
+            error_model_selector=self.model.error_model_selector,
         )
         return summary
 
@@ -324,7 +318,6 @@ class PySaem:
                 log_likelihood_observation(
                     predictions=predictions,
                     observations=self.model.data.full_obs,
-                    error_model_selector=self.model.error_model_selector,
                     sigma=self.model.residual_var,
                 )
                 .cpu()

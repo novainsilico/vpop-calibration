@@ -47,7 +47,7 @@ class ImportanceSampler:
 
         return instance
 
-    def fit_sudent_t_proposal(
+    def fit_student_t_proposal(
         self, conditional_samples: ConditionalDistribSamples
     ) -> None:
         etas = conditional_samples.eta_samples
