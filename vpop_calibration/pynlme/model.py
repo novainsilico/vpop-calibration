@@ -7,7 +7,10 @@ from vpop_calibration.pynlme.data import ObsData
 from vpop_calibration.pynlme.indexing import ObservationIndex
 from vpop_calibration.pynlme.params import MixedEffectParameters, ErrorType
 from vpop_calibration.pynlme.utils import init_transform_function
-from vpop_calibration.pynlme.residuals import log_likelihood_observation
+from vpop_calibration.pynlme.residuals import (
+    log_likelihood_observation,
+    ResidualErrorEstimates,
+)
 from vpop_calibration.pynlme.config import NlmeConfigDict
 from vpop_calibration.config import device, smoke_test, default_dtype
 
@@ -22,21 +25,26 @@ class NlmeModelState(NamedTuple):
     beta: torch.Tensor
     omega: torch.Tensor
     log_mi: torch.Tensor
-    res_var: torch.Tensor
+    res_var: ResidualErrorEstimates
 
     def get_state_dict(self) -> dict[str, Any]:
-        return {
+        state_dict = {
             key: val.detach().cpu().numpy().tolist()
             for key, val in self._asdict().items()
+            if key != "res_var"
         }
+        state_dict["res_var"] = self.res_var.get_state_dict()
+        return state_dict
 
     @classmethod
     def from_state_dict(cls, state_dict: dict[str, Any]) -> "NlmeModelState":
         instance = cls(
+            res_var=ResidualErrorEstimates.from_state_dict(state_dict["res_var"]),
             **{
-                key: torch.as_tensor(val, device=device, dtype=default_dtype)
-                for key, val in state_dict.items()
-            }
+                k: torch.as_tensor(v, device=device, dtype=default_dtype)
+                for k, v in state_dict.items()
+                if k != "res_var"
+            },
         )
         return instance
 
@@ -164,19 +172,10 @@ class StatisticalModel:
             device=device,
             dtype=default_dtype,
         )
-        init_res_var = torch.zeros(
-            (self.nb_outputs, 2), device=device, dtype=default_dtype
+        init_res_var = ResidualErrorEstimates.from_priors(
+            error_model_priors=self.prior_params.error_model,
+            output_names=self.output_names,
         )
-        self.variance_active_mask = torch.zeros(
-            (self.nb_outputs, 2), device=device, dtype=torch.bool
-        )
-        for i, out in enumerate(self.output_names):
-            em = self.prior_params.error_model[out]
-            values = em.variance_components
-            for column, active in enumerate(em.active_components):
-                if active:
-                    init_res_var[i, column] = values[column]
-                    self.variance_active_mask[i, column] = True
 
         init_params = NlmeModelState(
             beta=init_beta, omega=init_omega, log_mi=init_mi, res_var=init_res_var
@@ -294,18 +293,14 @@ class StatisticalModel:
             covariance_matrix=self.omega_pop,
         )
 
-    def update_res_var(self, residual_var: torch.Tensor) -> None:
+    def update_res_var(self, residual_var: ResidualErrorEstimates) -> None:
         """Update the residual variance of the NLME model, while ensuring it remains positive."""
 
-        expected_shape = (self.nb_outputs, 2)
-        assert residual_var.shape == expected_shape, (
-            f"Wrong shape in residual variance update: {residual_var.shape}, expected: {expected_shape}"
+        assert residual_var.nb_outputs == self.nb_outputs, (
+            f"Wrong number of outputs in residual variance update: "
+            f"{residual_var.nb_outputs}, expected: {self.nb_outputs}"
         )
-        self.residual_var = torch.where(
-            self.variance_active_mask,
-            residual_var.clamp(0.0),
-            torch.zeros_like(residual_var),
-        )
+        self.residual_var: ResidualErrorEstimates = residual_var.sanitized()
 
     def update_betas(self, betas: torch.Tensor) -> None:
         """Update the betas of the NLME model."""
@@ -636,7 +631,7 @@ class StatisticalModel:
             log_likelihood_obs = log_likelihood_observation(
                 observations=observations,
                 predictions=pred,
-                sigma=self.residual_var,
+                residual_error=self.residual_var,
                 min_variance=self.config.residual_min_variance,
             )
             assert log_likelihood_obs.shape == (nb_samples, 1)

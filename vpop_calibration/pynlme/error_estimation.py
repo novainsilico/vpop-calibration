@@ -1,9 +1,9 @@
 import torch
 from torch.optim import LBFGS
 from vpop_calibration.pynlme.indexing import IndexedObservations
-from vpop_calibration.pynlme.params import ErrorType
 from vpop_calibration.pynlme.residuals import (
     calculate_residuals,
+    ResidualErrorEstimates,
 )
 
 
@@ -36,48 +36,40 @@ def estimate_error_params(
     observations: IndexedObservations,
     predictions: torch.Tensor,
     min_variance: float,
-    error_model_selector: dict[ErrorType, list[int]],
-    sigma: torch.Tensor,
+    residual_error: ResidualErrorEstimates,
     max_iter: int = 20,
-) -> torch.Tensor:
-
-    nb_outputs = sigma.shape[0]
-    error_type_per_output: dict[int, ErrorType] = {
-        output: error_type
-        for error_type, outputs in error_model_selector.items()
-        for output in outputs
-    }
-    assert sorted(error_type_per_output) == list(range(nb_outputs)), (
-        f"`error_model_selector` must assign exactly one error type to each of "
-        f"the {nb_outputs} outputs, got {error_model_selector}"
-    )
+) -> ResidualErrorEstimates:
 
     residuals = calculate_residuals(observed_data=observations, predictions=predictions)
     output_index = observations.obs_index.output_name.index_values
     finite = torch.isfinite(predictions)
-    estimates = torch.zeros_like(sigma)
 
-    for output in range(nb_outputs):
-        error_type = error_type_per_output[output]
+    # Outputs without usable observations simply keep their current estimate.
+    new_sigma_add = residual_error.sigma_add.clone()
+    new_sigma_prop = residual_error.sigma_prop.clone()
 
+    for output, error_type in enumerate(residual_error.error_types):
         keep = (output_index == output).unsqueeze(0) & finite
         if error_type == "proportional":
             keep = keep & (predictions != 0)
         sq_residuals = residuals[keep].detach() ** 2
         sq_predictions = predictions[keep].detach() ** 2
         if sq_residuals.numel() == 0:
-            estimates[output] = sigma[output]
             continue
+
         if error_type == "additive":
-            estimates[output, 0] = sq_residuals.mean()
+            new_sigma_add[output] = sq_residuals.mean()
         elif error_type == "proportional":
-            estimates[output, 1] = (sq_residuals / sq_predictions).mean()
+            new_sigma_prop[output] = (sq_residuals / sq_predictions).mean()
         elif error_type == "combined":
-            estimates[output] = _solve_combined_output(
+            warm_start = torch.stack(
+                (residual_error.sigma_add[output], residual_error.sigma_prop[output])
+            )
+            new_sigma_add[output], new_sigma_prop[output] = _solve_combined_output(
                 sq_residuals=sq_residuals,
                 sq_predictions=sq_predictions,
                 max_iter=max_iter,
-                warm_start=sigma[output],
+                warm_start=warm_start,
                 min_variance=min_variance,
             )
         else:
@@ -85,4 +77,4 @@ def estimate_error_params(
                 f"No variance estimator implemented for error_type={error_type!r}"
             )
 
-    return estimates
+    return residual_error._replace(sigma_add=new_sigma_add, sigma_prop=new_sigma_prop)
