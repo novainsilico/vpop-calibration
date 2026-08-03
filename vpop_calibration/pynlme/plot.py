@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
-from matplotlib.ticker import FuncFormatter
+import matplotlib.ticker as ticker
 from sklearn.metrics import r2_score
 import random as rand
 import scipy.stats as stats
@@ -836,13 +836,13 @@ class PlottingUtility:
     def conditional_codistributions(
         self,
         scaling_indiv_plot: float = 3.0,
-        scaling_2by2_plot: float = 2.0,
+        scaling_2by2_plot: float = 2.5,
         n_columns: int = 3,
     ) -> None:
-        def _value_formatter(v, pos):
-            return f"{10**v:g}"
+        def _value_formatter_log(v, pos):
+            return f"{10**v:.2f}"
 
-        format = FuncFormatter(_value_formatter)
+        format_log_values = ticker.FuncFormatter(_value_formatter_log)
         pdus = self.model_diag.model.pdu_names
         sampler = self.model_diag.sampler
 
@@ -871,7 +871,8 @@ class PlottingUtility:
             ax = axes1[i, j]
             ax.hist([cond_samples, map_samples], density=True)
             ax.set_title(f"{param}")
-            ax.xaxis.set_major_formatter(format)
+            ax.xaxis.set_major_formatter(format_log_values)
+            ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=3))
 
         fig2, axes2 = plt.subplots(
             n_plots,
@@ -900,6 +901,14 @@ class PlottingUtility:
                     ax.set_ylabel(param1)
                 if k1 == len(pdus) - 1:
                     ax.set_xlabel(param2)
+
+        formatter = ticker.ScalarFormatter()
+        formatter.set_scientific(False)
+        for ax in fig2.axes:
+            ax.xaxis.set_major_formatter(formatter)
+            ax.xaxis.set_minor_formatter(formatter)
+            ax.yaxis.set_major_formatter(formatter)
+            ax.yaxis.set_minor_formatter(formatter)
 
         if not smoke_test:
             plt.tight_layout()
