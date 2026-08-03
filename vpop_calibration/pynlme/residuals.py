@@ -3,8 +3,6 @@ import torch
 from vpop_calibration.pynlme.indexing import IndexedObservations
 from vpop_calibration.config import device
 
-RESIDUAL_MIN_VARIANCE = 1e-6
-
 
 # @torch.compile
 def calculate_residuals(
@@ -40,6 +38,7 @@ def compute_error_variance(
     observations: IndexedObservations,
     predictions: torch.Tensor,
     sigma: torch.Tensor,
+    min_variance: float,
 ) -> torch.Tensor:
 
     nb_samples = predictions.shape[0]
@@ -52,7 +51,7 @@ def compute_error_variance(
         nan_or_inf_mask, torch.ones_like(predictions), predictions**2
     )
 
-    return (sigma_add + sigma_prop * sq_predictions).clamp_min(RESIDUAL_MIN_VARIANCE)
+    return (sigma_add + sigma_prop * sq_predictions).clamp_min(min_variance)
 
 
 # @torch.compile
@@ -60,6 +59,7 @@ def log_likelihood_observation(
     observations: IndexedObservations,
     predictions: torch.Tensor,
     sigma: torch.Tensor,
+    min_variance: float,
 ) -> torch.Tensor:
     """Compute log-likelihood of predictions given corresponding observations.
 
@@ -78,6 +78,7 @@ def log_likelihood_observation(
         observations=observations,
         predictions=predictions,
         sigma=sigma,
+        min_variance=min_variance,
     )
     # Normal likelihood function
     log_lik_full = -0.5 * (
@@ -102,11 +103,13 @@ def add_predictive_error(
     observations: IndexedObservations,
     predictions: torch.Tensor,
     sigma: torch.Tensor,
+    min_variance: float,
 ) -> torch.Tensor:
     out_variance = compute_error_variance(
         observations=observations,
         predictions=predictions,
         sigma=sigma,
+        min_variance=min_variance,
     )
     noisy_predictions = torch.distributions.Normal(
         predictions, torch.sqrt(out_variance)

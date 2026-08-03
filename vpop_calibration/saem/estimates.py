@@ -3,6 +3,7 @@ import torch
 import pandas as pd
 
 from vpop_calibration.config import device, default_dtype
+from vpop_calibration.pynlme.params import ErrorType
 
 
 class PopEstimates(NamedTuple):
@@ -90,7 +91,7 @@ class IterSummary(NamedTuple):
         covariate_coeff_names: list[str],
         mi_names: list[str],
         output_names: list[str],
-        error_model_selector: dict[str, list[int]],
+        error_model_selector: dict[ErrorType, list[int]],
     ) -> "IterSummary":
         mu_dict: dict[str, float] = {
             pdu: estimates.beta[beta_names.index(pdu)].item() for pdu in pdu_names

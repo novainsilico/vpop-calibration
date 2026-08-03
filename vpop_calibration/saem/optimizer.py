@@ -210,6 +210,7 @@ class PySaem:
                 predictions=self.mh_state.prediction,
                 error_model_selector=self.model.error_model_selector,
                 sigma=self.model.residual_var,
+                min_variance=self.model.config.residual_min_variance,
             )
             current_res_var: torch.Tensor = self.model.residual_var
 
@@ -317,6 +318,7 @@ class PySaem:
                     predictions=predictions,
                     observations=self.model.data.full_obs,
                     sigma=self.model.residual_var,
+                    min_variance=self.model.config.residual_min_variance,
                 )
                 .cpu()
                 .sum()

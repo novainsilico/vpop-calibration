@@ -111,6 +111,7 @@ class ModelDiagnostics:
             observations=self.model.data.full_obs,
             predictions=simulated_tensor,
             sigma=self.model.residual_var,
+            min_variance=self.model.config.residual_min_variance,
         )
 
         iwres_full = residuals / torch.sqrt(variance)

@@ -3,7 +3,6 @@ from torch.optim import LBFGS
 from vpop_calibration.pynlme.indexing import IndexedObservations
 from vpop_calibration.pynlme.params import ErrorType
 from vpop_calibration.pynlme.residuals import (
-    RESIDUAL_MIN_VARIANCE,
     calculate_residuals,
 )
 
@@ -36,10 +35,10 @@ def _solve_combined_output(
 def estimate_error_params(
     observations: IndexedObservations,
     predictions: torch.Tensor,
+    min_variance: float,
     error_model_selector: dict[ErrorType, list[int]],
     sigma: torch.Tensor,
     max_iter: int = 20,
-    min_variance: float = RESIDUAL_MIN_VARIANCE,
 ) -> torch.Tensor:
 
     nb_outputs = sigma.shape[0]

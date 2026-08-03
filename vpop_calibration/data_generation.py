@@ -203,6 +203,7 @@ def generate_synthetic_data(
         observations=nlme_model.data.full_obs,
         predictions=outputs,
         sigma=nlme_model.residual_var,
+        min_variance=nlme_model.config.residual_min_variance,
     )
     # Convert back to pandas
     df = (
