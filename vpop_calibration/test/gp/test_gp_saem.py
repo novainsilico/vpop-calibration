@@ -25,8 +25,8 @@ def sample_nlme_params() -> dict:
             },
         },
         "error_model": {
-            "s1": {"error_type": "additive", "sigma_add": 0.1},
-            "s2": {"error_type": "proportional", "sigma_prop": 0.5},
+            "s1": {"error_type": "additive", "sigma": 0.1},
+            "s2": {"error_type": "proportional", "sigma": 0.5},
         },
         "pdk": [],
     }

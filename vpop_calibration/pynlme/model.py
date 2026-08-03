@@ -172,9 +172,10 @@ class StatisticalModel:
         )
         for i, out in enumerate(self.output_names):
             em = self.prior_params.error_model[out]
-            for column, value in enumerate([em.sigma_add, em.sigma_prop]):
-                if value is not None:
-                    init_res_var[i, column] = value
+            values = em.variance_components
+            for column, active in enumerate(em.active_components):
+                if active:
+                    init_res_var[i, column] = values[column]
                     self.variance_active_mask[i, column] = True
 
         init_params = NlmeModelState(
@@ -585,7 +586,10 @@ class StatisticalModel:
         assert log_prior.shape == (nb_samples, self.nb_patients)
 
         log_likelihood_obs = log_likelihood_observation(
-            self.data.full_obs, pred, self.residual_var
+            self.data.full_obs,
+            pred,
+            self.residual_var,
+            self.config.residual_min_variance,
         )
         assert log_likelihood_obs.shape == (nb_samples, self.nb_patients)
 
@@ -633,6 +637,7 @@ class StatisticalModel:
                 observations=observations,
                 predictions=pred,
                 sigma=self.residual_var,
+                min_variance=self.config.residual_min_variance,
             )
             assert log_likelihood_obs.shape == (nb_samples, 1)
 

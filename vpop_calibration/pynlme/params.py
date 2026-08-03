@@ -86,7 +86,7 @@ class PatientDescriptorUnknown(PopulationParameter):
 
 ErrorType = Literal["additive", "proportional", "combined"]
 
-ERROR_COMPONENTS: dict[ErrorType, tuple[bool, bool]] = {
+error_components: dict[ErrorType, tuple[bool, bool]] = {
     # (additive used, proportional used)
     "additive": (True, False),
     "proportional": (False, True),
@@ -97,22 +97,42 @@ ERROR_COMPONENTS: dict[ErrorType, tuple[bool, bool]] = {
 class ErrorModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
     error_type: ErrorType
+    sigma: float | None = Field(default=None, ge=0)
     sigma_add: float | None = Field(default=None, ge=0)
     sigma_prop: float | None = Field(default=None, ge=0)
 
     @property
     def active_components(self) -> tuple[bool, bool]:
-        return ERROR_COMPONENTS[self.error_type]
+        return error_components[self.error_type]
 
     @model_validator(mode="after")
     def check_error_components(self) -> Self:
-        for field, used in zip(("sigma_add", "sigma_prop"), self.active_components):
-            value = getattr(self, field)
-            if used and value is None:
-                raise ValueError(f"error_type='{self.error_type}' requires {field}")
-            if not used and value is not None:
-                raise ValueError(f"error_type='{self.error_type}' does not use {field}")
+        if self.error_type == "combined":
+            if self.sigma is not None:
+                raise ValueError(
+                    "error_type='combined' uses sigma_add and sigma_prop, not sigma"
+                )
+            if self.sigma_add is None or self.sigma_prop is None:
+                raise ValueError(
+                    "error_type='combined' requires both sigma_add and sigma_prop"
+                )
+        else:
+            if self.sigma_add is not None or self.sigma_prop is not None:
+                raise ValueError(
+                    f"error_type='{self.error_type}' uses sigma, "
+                    "not sigma_add/sigma_prop"
+                )
+            if self.sigma is None:
+                raise ValueError(f"error_type='{self.error_type}' requires sigma")
         return self
+
+    @property
+    def variance_components(self) -> tuple[float, float]:
+        return {
+            "additive": (self.sigma, 0.0),
+            "proportional": (0.0, self.sigma),
+            "combined": (self.sigma_add, self.sigma_prop),
+        }[self.error_type]
 
 
 class MixedEffectParameters(BaseModel):

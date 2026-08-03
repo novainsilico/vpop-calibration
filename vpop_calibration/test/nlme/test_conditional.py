@@ -32,8 +32,8 @@ def sample_nlme_params() -> MixedEffectParameters:
             },
         },
         "error_model": {
-            "out_1": {"error_type": "additive", "sigma_add": 0.1},
-            "out_2": {"error_type": "proportional", "sigma_prop": 0.5},
+            "out_1": {"error_type": "additive", "sigma": 0.1},
+            "out_2": {"error_type": "proportional", "sigma": 0.5},
         },
         "pdk": ["pdk_1"],
     }

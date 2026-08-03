@@ -72,7 +72,7 @@ def param_distribs() -> dict:
         },
         "model_intrinsic": {"ka": {"prior": 0.5}},
         "pdk": [],
-        "error_model": {"concentration": {"error_type": "additive", "sigma_add": 0.5}},
+        "error_model": {"concentration": {"error_type": "additive", "sigma": 0.5}},
     }
     return params
 
