@@ -84,7 +84,7 @@ def test_importance_sampling(sample_nlme_params, obs_data, struct_model):
     cond_sampler = ConditionalDistributionSampler(nlme_model)
     cond_sampler.run_sampler()
     sampler = ImportanceSampler(nlme_model)
-    sampler.fit_sudent_t_proposal(conditional_samples=cond_sampler.total_samples)
+    sampler.fit_student_t_proposal(conditional_samples=cond_sampler.total_samples)
     sampler.compute_likelihood()
 
 
@@ -102,7 +102,7 @@ def test_state_dict(sample_nlme_params, obs_data, struct_model):
     )
     assert new_sampler_empty.dist is None
 
-    sampler.fit_sudent_t_proposal(conditional_samples=cond_sampler.total_samples)
+    sampler.fit_student_t_proposal(conditional_samples=cond_sampler.total_samples)
     sampler.compute_likelihood()
     state_dict_not_empty = sampler.get_state_dict()
 

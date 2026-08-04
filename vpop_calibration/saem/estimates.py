@@ -3,26 +3,35 @@ import torch
 import pandas as pd
 
 from vpop_calibration.config import device, default_dtype
+from vpop_calibration.pynlme.residuals import ResidualErrorEstimates
 
 
 class PopEstimates(NamedTuple):
     beta: torch.Tensor
     omega: torch.Tensor
     ebe: torch.Tensor
-    sigma: torch.Tensor
+    sigma: ResidualErrorEstimates
     model_intrinsic: torch.Tensor
     complete_likelihood: torch.Tensor
 
     def get_state_dict(self) -> dict[str, Any]:
-        return {k: v.detach().cpu().numpy().tolist() for k, v in self._asdict().items()}
+        state_dict = {
+            k: v.detach().cpu().numpy().tolist()
+            for k, v in self._asdict().items()
+            if k != "sigma"
+        }
+        state_dict["sigma"] = self.sigma.get_state_dict()
+        return state_dict
 
     @classmethod
     def from_state_dict(cls, state_dict: dict[str, Any]) -> "PopEstimates":
         return cls(
+            sigma=ResidualErrorEstimates.from_state_dict(state_dict["sigma"]),
             **{
                 k: torch.as_tensor(v, device=device, dtype=default_dtype)
                 for k, v in state_dict.items()
-            }
+                if k != "sigma"
+            },
         )
 
     def __eq__(self, other) -> bool:
@@ -46,18 +55,23 @@ def check_convergence(
     prev_est: PopEstimates, current_est: PopEstimates, threshold: float
 ):
     """Checks for convergence based on the relative change in parameters."""
-    all_converged = True
-    variables_to_check = ["beta", "omega", "ebe", "sigma", "model_intrinsic"]
-    for name in variables_to_check:
-        current_val = current_est._asdict()[name]
-        prev_val = prev_est._asdict()[name]
+    variables_to_check = ["beta", "omega", "ebe", "model_intrinsic"]
+    compared_pairs = [
+        (current_est._asdict()[name], prev_est._asdict()[name])
+        for name in variables_to_check
+    ]
+    # The residual error model keeps its two variances in separate tensors
+    compared_pairs += [
+        (current_est.sigma.sigma_add, prev_est.sigma.sigma_add),
+        (current_est.sigma.sigma_prop, prev_est.sigma.sigma_prop),
+    ]
+    for current_val, prev_val in compared_pairs:
         abs_diff = torch.abs(current_val - prev_val)
         abs_sum = torch.abs(current_val) + torch.abs(prev_val) + 1e-9
         relative_change = abs_diff / abs_sum
         if torch.any(relative_change > threshold):
-            all_converged = False
-            break
-    return all_converged
+            return False
+    return True
 
 
 class IterSummary(NamedTuple):
@@ -104,9 +118,17 @@ class IterSummary(NamedTuple):
             cov: estimates.beta[beta_names.index(cov)].item()
             for cov in covariate_coeff_names
         }
-        sigma_dict: dict[str, float] = {
-            output: estimates.sigma[i].item() for i, output in enumerate(output_names)
-        }
+        sigma_dict: dict[str, float] = {}
+        for i, (output, error_type) in enumerate(
+            zip(output_names, estimates.sigma.error_types)
+        ):
+            if error_type == "combined":
+                sigma_dict[f"{output}_add"] = estimates.sigma.sigma_add[i].item()
+                sigma_dict[f"{output}_prop"] = estimates.sigma.sigma_prop[i].item()
+            elif error_type == "additive":
+                sigma_dict[output] = estimates.sigma.sigma_add[i].item()
+            else:
+                sigma_dict[output] = estimates.sigma.sigma_prop[i].item()
 
         return IterSummary(
             iteration=iteration,

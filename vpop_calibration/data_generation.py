@@ -202,8 +202,8 @@ def generate_synthetic_data(
     noisy_pred = add_predictive_error(
         observations=nlme_model.data.full_obs,
         predictions=outputs,
-        error_model_selector=nlme_model.error_model_selector,
-        sigma=nlme_model.residual_var,
+        residual_error=nlme_model.residual_var,
+        min_variance=nlme_model.config.residual_min_variance,
     )
     # Convert back to pandas
     df = (
