@@ -11,6 +11,7 @@ from vpop_calibration.pynlme.params import MixedEffectParameters
 from vpop_calibration.pynlme.model import StatisticalModel
 from vpop_calibration.structural_model.base import StructuralModel
 from vpop_calibration.structural_model.analytical import StructuralAnalytical
+from vpop_calibration.pynlme.residuals import ResidualErrorEstimates
 
 
 @pytest.fixture
@@ -100,11 +101,15 @@ def test_nlme_init(sample_nlme_params, obs_data, struct_model, tmp_path):
     # Ensure the residual error tensor is properly initialized
     torch.testing.assert_close(
         nlme_model.residual_var,
-        torch.as_tensor(
-            [
-                [sample_nlme_params.error_model["out_1"].sigma, 0.0],
-                [0.0, sample_nlme_params.error_model["out_2"].sigma],
-            ]
+        ResidualErrorEstimates(
+            sigma_add=torch.as_tensor(
+                [sample_nlme_params.error_model["out_1"].sigma, 0.0]
+            ),
+            sigma_prop=torch.as_tensor(
+                [0.0, sample_nlme_params.error_model["out_2"].sigma]
+            ),
+            additive_output=torch.as_tensor([True, False]),
+            proportional_output=torch.as_tensor([False, True]),
         ),
     )
 
