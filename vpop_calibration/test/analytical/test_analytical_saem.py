@@ -28,6 +28,7 @@ def sample_nlme_params() -> dict:
         "error_model": {
             "out_1": {"error_type": "additive", "sigma": 0.1},
             "out_2": {"error_type": "proportional", "sigma": 0.5},
+            "out_3": {"error_type": "combined", "sigma_add": 0.1, "sigma_prop": 0.5},
         },
         "pdk": ["pdk_1"],
     }
@@ -58,14 +59,14 @@ def obs_data(np_rng) -> pd.DataFrame:
 def struct_model() -> StructuralModel:
     def equations(mi_1, pdu_1, pdu_2, pdk_1, t, protocol_ovr_1):
         out = torch.zeros_like(t)
-        return torch.cat((out, out), dim=-1)
+        return torch.cat((out, out, out), dim=-1)
 
     protocol_design = pd.DataFrame(
         {"protocol_arm": ["arm-A", "arm-B"], "protocol_ovr_1": [1, 2]}
     )
     struct_model = StructuralAnalytical(
         equations=equations,
-        variable_names=["out_1", "out_2"],
+        variable_names=["out_1", "out_2", "out_3"],
         protocol_design=protocol_design,
     )
     return struct_model
