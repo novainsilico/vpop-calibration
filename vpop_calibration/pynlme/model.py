@@ -131,6 +131,7 @@ class StatisticalModel:
         # The ordering coming from the structural model takes precedence.
         self.output_names = self.structural_model.output_names
         self.nb_outputs = len(self.output_names)
+        self.residual_var = ResidualErrorEstimates.uninitialized(self.nb_outputs)
         self.protocol_arms = self.structural_model.protocol_arms
         self.nb_protocols = len(self.protocol_arms)
         self.task_names = self.structural_model.task_names
@@ -300,6 +301,7 @@ class StatisticalModel:
             f"Wrong number of outputs in residual variance update: "
             f"{residual_var.nb_outputs}, expected: {self.nb_outputs}"
         )
+        residual_var.assert_initialized()
         self.residual_var: ResidualErrorEstimates = residual_var.sanitized()
 
     def update_betas(self, betas: torch.Tensor) -> None:

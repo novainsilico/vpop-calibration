@@ -32,6 +32,29 @@ class ResidualErrorEstimates(NamedTuple):
             ),
         )
 
+    @classmethod
+    def uninitialized(cls, nb_outputs: int) -> "ResidualErrorEstimates":
+        return cls(
+            sigma_add=torch.full(
+                (nb_outputs,),
+                -1.0,
+                device=device,
+            ),
+            sigma_prop=torch.full(
+                (nb_outputs,),
+                -1.0,
+                device=device,
+            ),
+            additive_output=torch.ones(nb_outputs, device=device, dtype=torch.bool),
+            proportional_output=torch.ones(nb_outputs, device=device, dtype=torch.bool),
+        )
+
+    def assert_initialized(self) -> None:
+        if bool(((self.sigma_add < 0.0) | (self.sigma_prop < 0.0)).any()):
+            raise RuntimeError(
+                "The residual error model still holds its uninitialized value. `update_res_var` was never called"
+            )
+
     @property
     def nb_outputs(self) -> int:
         return self.sigma_add.shape[0]
