@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.6.0] - 2026-08-04
+
+### Modified
+
+- Fixed effects optimization: replace Nelder-Mead call with a fixed number of iterations of Adams, using forward finite differences to estimate the gradient. New diagnostic endpoint in the SAEM live plot: `fixed_effects_loss`
+
 ## [4.5.0] - 2026-08-04
 
 ### Modified
