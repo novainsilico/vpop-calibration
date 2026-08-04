@@ -30,10 +30,10 @@ output:
       error_model:
         out_1:
           error_type: additive
-          sigma_add: 0.1
+          sigma: 0.1
         out_2:
           error_type: proportional
-          sigma_prop: 0.5
+          sigma: 0.5
       beta_init:
       - 2.302585092994046
       - 0.5
@@ -55,6 +55,7 @@ output:
       plot_frequency: 5
       progress_bar: false
       max_samples: 10
+      residual_min_variance: 1e-06
       importance_sampling_df: 5.0
     current_params:
       beta:
@@ -70,10 +71,18 @@ output:
       log_mi:
       - 2.302585092994046
       res_var:
-      - - 0.1
+        sigma_add:
+        - 0.1
         - 0.0
-      - - 0.0
+        sigma_prop:
+        - 0.0
         - 0.5
+        additive_output:
+        - true
+        - false
+        proportional_output:
+        - false
+        - true
   optimizer:
     config:
       nb_iter_burnin: 1
@@ -175,14 +184,22 @@ output:
         - -2.6866275659634224
       - - 2.127636037324861
         - 0.9019703973592397
-      sigma:
-      - - 3046.981093782409
-        - 0.0
-      - - 0.0
-        - 3.505217367275447
       model_intrinsic:
       - 2.302585092994046
       complete_likelihood: 126.18770331532919
+      sigma:
+        sigma_add:
+        - 3046.981093782409
+        - 0.0
+        sigma_prop:
+        - 0.0
+        - 3.505217367275447
+        additive_output:
+        - true
+        - false
+        proportional_output:
+        - false
+        - true
     sufficient_statistics:
       design_matrix:
       - - - 1.0

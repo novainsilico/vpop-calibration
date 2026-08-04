@@ -102,8 +102,8 @@ def test_nlme_init(sample_nlme_params, obs_data, struct_model, tmp_path):
         nlme_model.residual_var,
         torch.as_tensor(
             [
-                [sample_nlme_params.error_model["out_1"].sigma_add, 0.0],
-                [0.0, sample_nlme_params.error_model["out_2"].sigma_prop],
+                [sample_nlme_params.error_model["out_1"].sigma, 0.0],
+                [0.0, sample_nlme_params.error_model["out_2"].sigma],
             ]
         ),
     )
