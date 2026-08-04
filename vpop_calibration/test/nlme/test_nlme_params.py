@@ -1,7 +1,8 @@
-from vpop_calibration.pynlme.params import MixedEffectParameters
+from vpop_calibration.pynlme.params import ErrorModel, MixedEffectParameters
 from vpop_calibration.pynlme.data import ObsData
 
 import pytest
+from pydantic import ValidationError
 import numpy as np
 import pandas as pd
 from pandera.typing import DataFrame
@@ -82,3 +83,50 @@ def test_state_dict(sample_nlme_params):
     state_dict = nlme_params.get_state_dict()
     new_params = MixedEffectParameters.from_state_dict(state_dict)
     assert nlme_params == new_params
+
+
+VALID_ERROR_MODELS = [
+    {"error_type": "additive", "sigma": 0.1},
+    {"error_type": "proportional", "sigma": 0.5},
+    {"error_type": "combined", "sigma_add": 0.1, "sigma_prop": 0.5},
+]
+
+INVALID_ERROR_MODELS = [
+    # An additive or proportional error model is parametrized by `sigma` alone
+    {"error_type": "additive"},
+    {"error_type": "additive", "sigma_add": 0.1},
+    {"error_type": "additive", "sigma": 0.1, "sigma_add": 0.1},
+    {"error_type": "proportional"},
+    {"error_type": "proportional", "sigma_prop": 0.5},
+    {"error_type": "proportional", "sigma": 0.5, "sigma_prop": 0.5},
+    # A combined error model needs both components, and no `sigma`
+    {"error_type": "combined"},
+    {"error_type": "combined", "sigma_add": 0.1},
+    {"error_type": "combined", "sigma_prop": 0.5},
+    {"error_type": "combined", "sigma": 0.1, "sigma_add": 0.1, "sigma_prop": 0.5},
+    # Variances are non-negative
+    {"error_type": "additive", "sigma": -0.1},
+    {"error_type": "combined", "sigma_add": -0.1, "sigma_prop": 0.5},
+    # Unknown error type, and unexpected field
+    {"error_type": "exponential", "sigma": 0.1},
+    {"error_type": "additive", "sigma": 0.1, "sigmaa": 0.1},
+]
+
+
+@pytest.mark.parametrize("params", VALID_ERROR_MODELS)
+def test_valid_error_model(params: dict):
+    error_model = ErrorModel.model_validate(params)
+
+    for variance, active in zip(
+        error_model.variance_components, error_model.active_components
+    ):
+        if active:
+            assert isinstance(variance, float) and variance >= 0.0
+        else:
+            assert variance == 0.0
+
+
+@pytest.mark.parametrize("params", INVALID_ERROR_MODELS)
+def test_invalid_error_model(params: dict):
+    with pytest.raises(ValidationError):
+        ErrorModel.model_validate(params)

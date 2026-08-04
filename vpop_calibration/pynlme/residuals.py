@@ -1,16 +1,128 @@
 import torch
-from typing import get_args
+
+from typing import Any, NamedTuple
 
 from vpop_calibration.pynlme.indexing import IndexedObservations
-from vpop_calibration.pynlme.params import ErrorType
+from vpop_calibration.pynlme.params import ErrorModel, ErrorType
 from vpop_calibration.config import device
+
+
+class ResidualErrorEstimates(NamedTuple):
+    sigma_add: torch.Tensor
+    sigma_prop: torch.Tensor
+    additive_output: torch.Tensor  # bool, size (nb_outputs,)
+    proportional_output: torch.Tensor  # bool, size (nb_outputs,)
+
+    @classmethod
+    def from_priors(
+        cls,
+        error_model_priors: dict[str, ErrorModel],
+        output_names: list[str],
+    ) -> "ResidualErrorEstimates":
+        """Build the initial estimates from the user-specified priors."""
+        priors = [error_model_priors[name] for name in output_names]
+        variances = [prior.variance_components for prior in priors]
+        active = [prior.active_components for prior in priors]
+        return cls(
+            sigma_add=torch.as_tensor([var[0] for var in variances], device=device),
+            sigma_prop=torch.as_tensor([var[1] for var in variances], device=device),
+            additive_output=torch.as_tensor([act[0] for act in active], device=device),
+            proportional_output=torch.as_tensor(
+                [act[1] for act in active], device=device
+            ),
+        )
+
+    @classmethod
+    def uninitialized(cls, nb_outputs: int) -> "ResidualErrorEstimates":
+        return cls(
+            sigma_add=torch.full(
+                (nb_outputs,),
+                -1.0,
+                device=device,
+            ),
+            sigma_prop=torch.full(
+                (nb_outputs,),
+                -1.0,
+                device=device,
+            ),
+            additive_output=torch.ones(nb_outputs, device=device, dtype=torch.bool),
+            proportional_output=torch.ones(nb_outputs, device=device, dtype=torch.bool),
+        )
+
+    def assert_initialized(self) -> None:
+        if bool(((self.sigma_add < 0.0) | (self.sigma_prop < 0.0)).any()):
+            raise RuntimeError(
+                "The residual error model still holds its uninitialized value. `update_res_var` was never called"
+            )
+
+    @property
+    def nb_outputs(self) -> int:
+        return self.sigma_add.shape[0]
+
+    @property
+    def error_types(self) -> list[ErrorType]:
+        """Error type of each output, recovered from the active components."""
+        return [
+            "combined"
+            if additive and proportional
+            else "additive"
+            if additive
+            else "proportional"
+            for additive, proportional in zip(
+                self.additive_output.tolist(), self.proportional_output.tolist()
+            )
+        ]
+
+    def sanitized(self) -> "ResidualErrorEstimates":
+        """Force inactive components to zero and active ones to stay non-negative."""
+        return self._replace(
+            sigma_add=torch.where(
+                self.additive_output,
+                self.sigma_add.clamp_min(0.0),
+                torch.zeros_like(self.sigma_add),
+            ),
+            sigma_prop=torch.where(
+                self.proportional_output,
+                self.sigma_prop.clamp_min(0.0),
+                torch.zeros_like(self.sigma_prop),
+            ),
+        )
+
+    def variance(
+        self,
+        predictions: torch.Tensor,
+        output_index: torch.Tensor,
+        min_variance: float,
+    ) -> torch.Tensor:
+        """Residual variance of each prediction."""
+        nb_samples = predictions.shape[0]
+        sigma_add = self.sigma_add.index_select(0, output_index).expand(nb_samples, -1)
+        sigma_prop = self.sigma_prop.index_select(0, output_index).expand(
+            nb_samples, -1
+        )
+        sq_predictions = torch.where(
+            torch.isfinite(predictions), predictions**2, torch.ones_like(predictions)
+        )
+        return (sigma_add + sigma_prop * sq_predictions).clamp_min(min_variance)
+
+    def get_state_dict(self) -> dict[str, Any]:
+        return {key: val.detach().cpu().tolist() for key, val in self._asdict().items()}
+
+    @classmethod
+    def from_state_dict(cls, state_dict: dict[str, Any]) -> "ResidualErrorEstimates":
+        dtypes = {"additive_output": torch.bool, "proportional_output": torch.bool}
+        return cls(
+            **{
+                key: torch.as_tensor(val, device=device, dtype=dtypes.get(key))
+                for key, val in state_dict.items()
+            }
+        )
 
 
 # @torch.compile
 def calculate_residuals(
     observed_data: IndexedObservations,
     predictions: torch.Tensor,
-    error_model_selector: dict[ErrorType, list[int]],
 ) -> torch.Tensor:
     """Calculates residuals based on the error model for each output
 
@@ -26,98 +138,37 @@ def calculate_residuals(
     )
     batch_size = predictions.shape[0]
     obs_vals = observed_data.obs_values.expand(batch_size, -1)
-    output_indices = observed_data.obs_index.output_name.index_values.expand(
-        batch_size, -1
-    )
     assert predictions.shape == obs_vals.shape, (
         f"Non-matching shapes in `calculate_residuals`: {predictions.shape=}, {obs_vals.shape=}"
     )
 
-    residuals = torch.zeros_like(predictions, device=device)
+    residuals = obs_vals - predictions
     nan_or_inf_mask = torch.logical_not(torch.isfinite(predictions))
-    for error_type in get_args(ErrorType):
-        mask = torch.as_tensor(
-            sum(output_indices == i for i in error_model_selector[error_type]),
-            dtype=torch.bool,
-            device=device,
-        )
-        if error_type == "additive":
-            residuals[mask] = obs_vals[mask] - predictions[mask]
-        elif error_type == "proportional":
-            residuals[mask] = (obs_vals[mask] - predictions[mask]) / predictions[mask]
-        else:
-            raise NotImplementedError(f"Unknown error model type {error_type}")
-    # when the error type is proportional, a infinite predicted value will result in a NaN residual
-    # so here we special case infinite (and NaN) and force the residual to be -Inf as if it were an additive error type
     residuals[nan_or_inf_mask] = -torch.inf
     return residuals
-
-
-# @torch.compile
-def sum_sq_residuals(
-    observations: IndexedObservations,
-    prediction: torch.Tensor,
-    error_model_selector: dict[ErrorType, list[int]],
-) -> torch.Tensor:
-    """Compute the sum of squared residuals for a given prediction tensor"""
-
-    nb_samples = prediction.shape[0]
-    nb_outputs = len(observations.obs_index.output_name.ref_values)
-    sq_residuals = torch.square(
-        calculate_residuals(
-            observed_data=observations,
-            predictions=prediction,
-            error_model_selector=error_model_selector,
-        )
-    )
-    sum_residuals_per_sample = torch.zeros(
-        nb_samples, nb_outputs, device=device, dtype=sq_residuals.dtype
-    )
-    output_index = observations.obs_index.output_name.index_values
-    output_index_expanded = output_index.expand(nb_samples, -1)
-    sum_residuals_per_sample.scatter_add_(1, output_index_expanded, sq_residuals)
-    return sum_residuals_per_sample
 
 
 # @torch.compile
 def compute_error_variance(
     observations: IndexedObservations,
     predictions: torch.Tensor,
-    error_model_selector: dict[ErrorType, list[int]],
-    sigma: torch.Tensor,
+    residual_error: ResidualErrorEstimates,
+    min_variance: float,
 ) -> torch.Tensor:
 
-    nb_samples = predictions.shape[0]
-    output_index = observations.obs_index.output_name.index_values
-    output_index_expanded = output_index.expand(nb_samples, -1)
-    sigma_expanded = sigma.expand(nb_samples, -1).index_select(1, output_index)
-
-    out_variance = torch.zeros_like(predictions, device=device)
-    nan_or_inf_mask = torch.logical_not(torch.isfinite(predictions))
-    for error_type in get_args(ErrorType):
-        mask = torch.as_tensor(
-            sum(output_index_expanded == i for i in error_model_selector[error_type]),
-            dtype=torch.bool,
-            device=device,
-        )
-        if error_type == "additive":
-            out_variance[mask] = sigma_expanded[mask]
-        elif error_type == "proportional":
-            out_variance[mask] = sigma_expanded[mask] * torch.square(predictions[mask])
-        else:
-            raise NotImplementedError(f"Unknown error model type {error_type}")
-    # if one of the predictions is Inf or NaN, the patient will be discarded but we do not want it to pollute
-    # the overall variance. In such a case, we do not multiply sigma by the predicted value when the error type is proportional
-    out_variance[nan_or_inf_mask] = sigma_expanded[nan_or_inf_mask]
-    return out_variance
+    return residual_error.variance(
+        predictions=predictions,
+        output_index=observations.obs_index.output_name.index_values,
+        min_variance=min_variance,
+    )
 
 
 # @torch.compile
 def log_likelihood_observation(
     observations: IndexedObservations,
     predictions: torch.Tensor,
-    error_model_selector: dict[ErrorType, list[int]],
-    sigma: torch.Tensor,
+    residual_error: ResidualErrorEstimates,
+    min_variance: float,
 ) -> torch.Tensor:
     """Compute log-likelihood of predictions given corresponding observations.
 
@@ -129,15 +180,14 @@ def log_likelihood_observation(
     residuals = calculate_residuals(
         observed_data=observations,
         predictions=predictions,
-        error_model_selector=error_model_selector,
     )
 
     # Log-likelihood of normal distribution
     variance = compute_error_variance(
         observations=observations,
         predictions=predictions,
-        error_model_selector=error_model_selector,
-        sigma=sigma,
+        residual_error=residual_error,
+        min_variance=min_variance,
     )
     # Normal likelihood function
     log_lik_full = -0.5 * (
@@ -161,14 +211,14 @@ def log_likelihood_observation(
 def add_predictive_error(
     observations: IndexedObservations,
     predictions: torch.Tensor,
-    error_model_selector: dict[ErrorType, list[int]],
-    sigma: torch.Tensor,
+    residual_error: ResidualErrorEstimates,
+    min_variance: float,
 ) -> torch.Tensor:
     out_variance = compute_error_variance(
         observations=observations,
         predictions=predictions,
-        error_model_selector=error_model_selector,
-        sigma=sigma,
+        residual_error=residual_error,
+        min_variance=min_variance,
     )
     noisy_predictions = torch.distributions.Normal(
         predictions, torch.sqrt(out_variance)

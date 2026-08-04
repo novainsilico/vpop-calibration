@@ -7,6 +7,7 @@ class NlmeConfigDict(NamedTuple):
     plot_frequency: int = 5
     progress_bar: bool = True
     max_samples: int = 1000
+    residual_min_variance: float = 1e-6
 
     importance_sampling_df: float = 5.0
 

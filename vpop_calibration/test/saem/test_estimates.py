@@ -1,4 +1,5 @@
 from vpop_calibration.saem.estimates import PopEstimates, check_convergence, IterSummary
+from vpop_calibration.pynlme.residuals import ResidualErrorEstimates
 
 import torch
 
@@ -6,12 +7,18 @@ import torch
 def test_check_convergence():
     tensor_1 = torch.tensor([0, 0])
     tensor_2 = torch.tensor([0, 0.2])
+    sigma = ResidualErrorEstimates(
+        sigma_add=torch.tensor([1.0, 0.0]),
+        sigma_prop=torch.tensor([0.0, 1.0]),
+        additive_output=torch.tensor([True, False]),
+        proportional_output=torch.tensor([False, True]),
+    )
 
     prev_estimates = PopEstimates(
         beta=tensor_1,
         omega=tensor_1,
         ebe=tensor_1,
-        sigma=tensor_1,
+        sigma=sigma,
         complete_likelihood=tensor_1,
         model_intrinsic=tensor_1,
     )
@@ -19,7 +26,7 @@ def test_check_convergence():
         beta=tensor_1,
         omega=tensor_1,
         ebe=tensor_2,
-        sigma=tensor_1,
+        sigma=sigma,
         complete_likelihood=tensor_1,
         model_intrinsic=tensor_2,
     )
@@ -43,7 +50,12 @@ def test_iter_summary():
     mi = torch.tensor([0.0])
     mi_names = ["mi_1"]
     cov_coeff_names = ["cov_1"]
-    sigma = torch.tensor([1.0, 1.0])
+    sigma = ResidualErrorEstimates(
+        sigma_add=torch.tensor([1.0, 0.0]),
+        sigma_prop=torch.tensor([0.0, 1.0]),
+        additive_output=torch.tensor([True, False]),
+        proportional_output=torch.tensor([False, True]),
+    )
     output_names = ["out_1", "out_2"]
 
     pop_estimates = PopEstimates(
@@ -70,7 +82,12 @@ def test_state_dict():
     beta = torch.tensor([0.0, 0.0, 0.0])
     omega = torch.tensor([[0.0, 0.0], [0.0, 0.0]])
     mi = torch.tensor([0.0])
-    sigma = torch.tensor([1.0, 1.0])
+    sigma = ResidualErrorEstimates(
+        sigma_add=torch.tensor([1.0, 0.0]),
+        sigma_prop=torch.tensor([0.0, 1.0]),
+        additive_output=torch.tensor([True, False]),
+        proportional_output=torch.tensor([False, True]),
+    )
 
     pop_estimates = PopEstimates(
         beta=beta,

@@ -11,14 +11,17 @@ from vpop_calibration.saem.estimates import PopEstimates, IterSummary, check_con
 from vpop_calibration.saem.config import SaemConfigDict
 from vpop_calibration.metropolis_hastings import MetropolisHastingsState, mh_step
 from vpop_calibration.saem.m_step import MStepState
-from vpop_calibration.pynlme.residuals import sum_sq_residuals
 from vpop_calibration.saem.utils import (
     simulated_annealing,
     stochastic_approximation,
     covariance_matrix_simulated_annealing,
 )
 from vpop_calibration.config import device
-from vpop_calibration.pynlme.residuals import log_likelihood_observation
+from vpop_calibration.pynlme.residuals import (
+    log_likelihood_observation,
+    ResidualErrorEstimates,
+)
+from vpop_calibration.pynlme.error_estimation import estimate_error_params
 from vpop_calibration.saem.plot import OptimizerPlot
 from vpop_calibration.config import smoke_test
 
@@ -204,36 +207,39 @@ class PySaem:
         # If in learning or smoothing phase, go through the rest of the iteration
         if self.scheduler.phase != "burnin":
             # M-step:
-            # Compute the sum of squared residuals
-            sum_sq_res_full = sum_sq_residuals(
-                prediction=self.mh_state.prediction,
+            # maximum-likelihood target for the residual error variance
+            current_res_var: ResidualErrorEstimates = self.model.residual_var
+            target_res_var = estimate_error_params(
                 observations=self.model.data.full_obs,
-                error_model_selector=self.model.error_model_selector,
+                predictions=self.mh_state.prediction,
+                residual_error=current_res_var,
+                min_variance=self.model.config.residual_min_variance,
             )
-            # Average the sum of squared residuals over samples (MCMC chains)
-            sum_sq_res = sum_sq_res_full.mean(dim=0)
-            assert sum_sq_res.shape == (self.model.nb_outputs,), (
-                f"Unexpected residual shape: {sum_sq_res.shape}"
-            )
-
-            # Update the residual error variance
-            target_res_var: torch.Tensor = (
-                sum_sq_res / self.model.data.nb_tot_observations_per_output
-            )
-            current_res_var: torch.Tensor = self.model.residual_var
-
             if self.scheduler.phase == "learning":
                 # Simulated annealing is only considered in learning phase
-                target_res_var = simulated_annealing(
-                    current=current_res_var,
-                    target=target_res_var,
-                    factor=self.config.annealing_factor,
+                target_res_var = target_res_var._replace(
+                    sigma_add=simulated_annealing(
+                        current=current_res_var.sigma_add,
+                        target=target_res_var.sigma_add,
+                        factor=self.config.annealing_factor,
+                    ),
+                    sigma_prop=simulated_annealing(
+                        current=current_res_var.sigma_prop,
+                        target=target_res_var.sigma_prop,
+                        factor=self.config.annealing_factor,
+                    ),
                 )
-
-            new_res_error_var = stochastic_approximation(
-                previous=current_res_var,
-                new=target_res_var,
-                learning_rate=self.scheduler.stochastic_approximation_rate,
+            new_res_error_var = current_res_var._replace(
+                sigma_add=stochastic_approximation(
+                    previous=current_res_var.sigma_add,
+                    new=target_res_var.sigma_add,
+                    learning_rate=self.scheduler.stochastic_approximation_rate,
+                ),
+                sigma_prop=stochastic_approximation(
+                    previous=current_res_var.sigma_prop,
+                    new=target_res_var.sigma_prop,
+                    learning_rate=self.scheduler.stochastic_approximation_rate,
+                ),
             )
 
             self.model.update_res_var(new_res_error_var)
@@ -324,8 +330,8 @@ class PySaem:
                 log_likelihood_observation(
                     predictions=predictions,
                     observations=self.model.data.full_obs,
-                    error_model_selector=self.model.error_model_selector,
-                    sigma=self.model.residual_var,
+                    residual_error=self.model.residual_var,
+                    min_variance=self.model.config.residual_min_variance,
                 )
                 .cpu()
                 .sum()
