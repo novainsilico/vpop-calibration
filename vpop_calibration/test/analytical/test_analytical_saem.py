@@ -44,7 +44,7 @@ def obs_data(np_rng) -> pd.DataFrame:
         "pdk_1": [0.0, 0.0],
         "protocol_arm": protocol_arms,
     }
-    outputs = ["out_1", "out_2"]
+    outputs = ["out_1", "out_2", "out_3"]
     time_steps = np.arange(0, 3.0, 1.0)
     df = pd.DataFrame.from_dict(patients)
     df = df.merge(pd.DataFrame(outputs, columns=["output_name"]), how="cross")
