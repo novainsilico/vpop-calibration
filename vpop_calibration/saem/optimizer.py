@@ -171,11 +171,13 @@ class PySaem:
 
             if self.config.live_plot:
                 self.plot.close()
+                delattr(self, "plot")
         except KeyboardInterrupt:
             print(f"Interrupted gracefully at iteration {self.scheduler.iteration}.")
 
             if self.config.live_plot:
                 self.plot.close()
+                delattr(self, "plot")
 
     def optimization_stream(self):
         for _ in tqdm(
