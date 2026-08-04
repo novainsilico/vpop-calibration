@@ -21,6 +21,7 @@ def test_check_convergence():
         sigma=sigma,
         complete_likelihood=tensor_1,
         model_intrinsic=tensor_1,
+        fixed_effects_loss=tensor_1,
     )
     current_estimates = PopEstimates(
         beta=tensor_1,
@@ -29,6 +30,7 @@ def test_check_convergence():
         sigma=sigma,
         complete_likelihood=tensor_1,
         model_intrinsic=tensor_2,
+        fixed_effects_loss=tensor_1,
     )
 
     assert check_convergence(
@@ -65,6 +67,7 @@ def test_iter_summary():
         sigma=sigma,
         ebe=torch.tensor([0.0]),
         complete_likelihood=torch.tensor([0.0]),
+        fixed_effects_loss=torch.tensor([0.0]),
     )
 
     _summary = IterSummary.from_pop_estimates(
@@ -96,6 +99,7 @@ def test_state_dict():
         sigma=sigma,
         ebe=torch.tensor([0.0]),
         complete_likelihood=torch.tensor([0.0]),
+        fixed_effects_loss=torch.tensor([0.0]),
     )
 
     state_dict = pop_estimates.get_state_dict()
