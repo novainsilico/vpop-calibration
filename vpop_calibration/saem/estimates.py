@@ -13,6 +13,7 @@ class PopEstimates(NamedTuple):
     sigma: ResidualErrorEstimates
     model_intrinsic: torch.Tensor
     complete_likelihood: torch.Tensor
+    fixed_effects_loss: torch.Tensor
 
     def get_state_dict(self) -> dict[str, Any]:
         state_dict = {
@@ -42,6 +43,7 @@ class PopEstimates(NamedTuple):
             "sigma",
             "model_intrinsic",
             "complete_likelihood",
+            "fixed_effects_loss",
         ]
 
         for elem in compared_attributes:
@@ -82,6 +84,7 @@ class IterSummary(NamedTuple):
     cov: dict[str, float]
     sigma: dict[str, float]
     convergence_indicator: float
+    fixed_effects_loss: float
 
     @property
     def headers(self) -> list[tuple[dict, str]]:
@@ -138,6 +141,7 @@ class IterSummary(NamedTuple):
             cov=cov_dict,
             sigma=sigma_dict,
             convergence_indicator=estimates.complete_likelihood.item(),
+            fixed_effects_loss=estimates.fixed_effects_loss.item(),
         )
 
     def print(self, width: int):
@@ -167,7 +171,12 @@ class IterSummary(NamedTuple):
         for d, prefix in self.headers:
             for k, v in d.items():
                 combined_dicts.update({prefix + k: v})
-        combined_dicts.update({"convergence_indicator": self.convergence_indicator})
+        combined_dicts.update(
+            {
+                "convergence_indicator": self.convergence_indicator,
+                "fixed_effects_loss": self.fixed_effects_loss,
+            }
+        )
         df = pd.DataFrame([combined_dicts])
         df.insert(0, "iteration", self.iteration)
 

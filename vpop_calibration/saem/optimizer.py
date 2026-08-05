@@ -1,7 +1,6 @@
 import numpy as np
 import torch
 from tqdm.notebook import tqdm
-from scipy.optimize import minimize
 from typing import Callable, Any
 import pandas as pd
 
@@ -16,7 +15,6 @@ from vpop_calibration.saem.utils import (
     stochastic_approximation,
     covariance_matrix_simulated_annealing,
 )
-from vpop_calibration.config import device
 from vpop_calibration.pynlme.residuals import (
     log_likelihood_observation,
     ResidualErrorEstimates,
@@ -24,6 +22,7 @@ from vpop_calibration.pynlme.residuals import (
 from vpop_calibration.pynlme.error_estimation import estimate_error_params
 from vpop_calibration.saem.plot import OptimizerPlot
 from vpop_calibration.config import smoke_test
+from vpop_calibration.saem.fixed_effects import optimize_fixed_effects
 
 
 class PySaem:
@@ -46,7 +45,7 @@ class PySaem:
                 nb_iter_burnin=1,
                 nb_iter_learning=2,
                 nb_iter_smoothing=2,
-                optim_max_fun=1,
+                optim_max_iter=1,
                 progress_bars=False,
                 live_plot=False,
                 logging=False,
@@ -74,6 +73,7 @@ class PySaem:
         init_step_size = self.config.init_step_size_unscaled / np.sqrt(
             self.model.nb_pdu
         )
+        fixed_effects_loss = torch.Tensor([np.nan])
         # Initialize the Metropolis Hastings state variables
         self.mh_state = MetropolisHastingsState(
             etas=init_samples,
@@ -90,6 +90,7 @@ class PySaem:
             sigma=self.model.residual_var,
             complete_likelihood=init_likelihood,
             model_intrinsic=self.model.log_mi,
+            fixed_effects_loss=fixed_effects_loss,
         )
         self.sufficient_statistics = MStepState.from_init_gaussian_params(
             design_matrix=self.model.full_design_matrix,
@@ -205,6 +206,10 @@ class PySaem:
         self.mh_state = current_mh_state
 
         # If in learning or smoothing phase, go through the rest of the iteration
+
+        # For model intrinsic, initialize the loss to the previous value
+        # Will only be modified if fixed effects are present
+        fixed_effects_loss = self.pop_estimates.fixed_effects_loss
         if self.scheduler.phase != "burnin":
             # M-step:
             # maximum-likelihood target for the residual error variance
@@ -267,13 +272,14 @@ class PySaem:
                 objective_fun = self.build_mi_objective_function(
                     self.mh_state.gaussian_params
                 )
-                target_log_MI_np = minimize(
-                    fun=objective_fun,
-                    x0=self.model.log_mi.cpu().squeeze().numpy(),
-                    method="Nelder-Mead",
-                    options={"maxiter": self.config.optim_max_fun},
-                ).x
-                target_log_MI = torch.from_numpy(target_log_MI_np).to(device)
+                psi0 = self.model.log_mi
+                target_log_MI, fixed_effects_loss = optimize_fixed_effects(
+                    loss_fn=objective_fun,
+                    psi0=psi0,
+                    lr=1e-2,
+                    nb_iter=self.config.optim_max_iter,
+                    eps_grad=self.config.eps_grad,
+                )
                 new_log_MI = stochastic_approximation(
                     previous=self.model.log_mi,
                     new=target_log_MI,
@@ -296,6 +302,7 @@ class PySaem:
             sigma=self.model.residual_var,
             model_intrinsic=self.model.log_mi,
             complete_likelihood=self.mh_state.complete_likelihood,
+            fixed_effects_loss=fixed_effects_loss,
         )
         self.update_pop_estimates_convergence_check(new_estimates=new_estimates)
         # Assemble the iteration summary
@@ -313,11 +320,10 @@ class PySaem:
     def build_mi_objective_function(self, gaussian_params: torch.Tensor) -> Callable:
         """Build the objective function to be optimized for model intrinsic parameters estimation."""
 
-        def mi_objective_function(log_MI: np.ndarray):
-            mi_tensor = torch.from_numpy(log_MI).to(device)
+        def mi_objective_function(log_MI: torch.Tensor):
             # Assemble the patient parameters
             new_physical_params = self.model.convert_gaussian_to_physical(
-                gaussian_params, mi_tensor
+                gaussian_params, log_MI
             )
             new_thetas = self.model.convert_physical_to_thetas_all_patients(
                 new_physical_params
@@ -335,7 +341,6 @@ class PySaem:
                 )
                 .cpu()
                 .sum()
-                .item()
             )
 
             return -total_log_lik
