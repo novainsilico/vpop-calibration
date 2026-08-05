@@ -22,6 +22,7 @@ def optimize_fixed_effects(
     nb_iter: int,
     eps_grad: float,
 ) -> tuple[torch.Tensor, torch.Tensor]:
+    assert psi0.dim() == 1
     fixed_effects = psi0.detach().clone().requires_grad_(True)
     optimizer = torch.optim.Adam([fixed_effects], lr=lr)
 

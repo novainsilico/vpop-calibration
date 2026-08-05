@@ -422,13 +422,28 @@ class StatisticalModel:
         Returns:
             torch.Tensor: Tensor of individual physical parameter values. Both PDUs and MIs are included. Size: (nb_chains, nb_patients, nb_pdu + nb_mi)
         """
-        nb_samples = psi.shape[0]
         nb_patients_local = psi.shape[1]
         assert psi.shape[2] == self.nb_pdu
 
+        if log_mi.dim() == 1:
+            # Regular case: fixed effects are fixed
+            psi_expanded = psi
+            nb_samples_physical = psi.shape[0]
+            log_mi_expanded = log_mi.expand(nb_samples_physical, nb_patients_local, -1)
+        elif log_mi.dim() == 2:
+            # Fixed effects optimization: when computing the gradient, we compute batched of fixed effect values, but the gaussian parameters have to be fixed
+            assert psi.shape[0] == 1, (
+                "Unexpected gaussian parameter shape in multiple fixed effects evaluation"
+            )
+            nb_samples_mi = log_mi.shape[0]
+            psi_expanded = psi.expand(nb_samples_mi, -1, -1)
+            log_mi_expanded = log_mi.unsqueeze(1).expand(-1, nb_patients_local, -1)
+        else:
+            raise ValueError(f"Unexpected fixed effect tensor dimension {log_mi.dim()}")
+
         # Apply the transforms
-        pdu = self.pdu_transform(psi)
-        mi = self.mi_transform(log_mi.expand(nb_samples, nb_patients_local, self.nb_mi))
+        pdu = self.pdu_transform(psi_expanded)
+        mi = self.mi_transform(log_mi_expanded)
 
         phi = torch.cat((pdu, mi), dim=-1).to(device)
         return phi

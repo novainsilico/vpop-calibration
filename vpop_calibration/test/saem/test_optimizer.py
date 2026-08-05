@@ -3,6 +3,7 @@ from vpop_calibration.saem.config import SaemConfigDict
 from vpop_calibration.pynlme.model import StatisticalModel
 from vpop_calibration.pynlme.params import MixedEffectParameters
 from vpop_calibration.pynlme.data import ObsData
+from vpop_calibration.pynlme.config import NlmeConfigDict
 from vpop_calibration.structural_model import StructuralAnalytical
 
 import pytest
@@ -15,7 +16,7 @@ from pandera.typing import DataFrame
 @pytest.fixture(scope="function")
 def sample_nlme_model(np_rng) -> StatisticalModel:
     input = {
-        "model_intrinsic": {"mi_1": {"prior": 10.0}},
+        "model_intrinsic": {"mi_1": {"prior": 10.0}, "mi_2": {"prior": 1.0}},
         "pdu": {
             "pdu_1": {
                 "prior": 10.0,
@@ -51,7 +52,7 @@ def sample_nlme_model(np_rng) -> StatisticalModel:
     df["value"] = np.abs(np_rng.normal(0, 1, df.shape[0]))
     obs_data = ObsData(DataFrame(df))
 
-    def equations(mi_1, pdu_1, pdu_2, pdk_1, t, protocol_ovr_1):
+    def equations(mi_1, mi_2, pdu_1, pdu_2, pdk_1, t, protocol_ovr_1):
         out = torch.zeros_like(t)
         return torch.cat((out, out), dim=-1)
 
@@ -65,7 +66,10 @@ def sample_nlme_model(np_rng) -> StatisticalModel:
     )
 
     nlme_model = StatisticalModel(
-        structural_model=struct_model, dataset=obs_data, prior_params=params
+        structural_model=struct_model,
+        dataset=obs_data,
+        prior_params=params,
+        config=NlmeConfigDict(nb_chains=3),
     )
 
     return nlme_model

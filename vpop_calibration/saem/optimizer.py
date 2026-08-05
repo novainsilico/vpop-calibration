@@ -268,9 +268,8 @@ class PySaem:
 
             # 3. Update fixed effects MIs
             if self.model.nb_mi > 0:
-                # This step is notoriously under-optimized
                 objective_fun = self.build_mi_objective_function(
-                    self.mh_state.gaussian_params
+                    self.mh_state.gaussian_params.mean(dim=0, keepdim=True)
                 )
                 psi0 = self.model.log_mi
                 target_log_MI, fixed_effects_loss = optimize_fixed_effects(
@@ -319,6 +318,10 @@ class PySaem:
 
     def build_mi_objective_function(self, gaussian_params: torch.Tensor) -> Callable:
         """Build the objective function to be optimized for model intrinsic parameters estimation."""
+
+        assert gaussian_params.shape[0] == 1, (
+            "Ensure to average the gaussian parameters before building the fixed effects objective function"
+        )
 
         def mi_objective_function(log_MI: torch.Tensor):
             # Assemble the patient parameters
