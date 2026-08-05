@@ -37,23 +37,6 @@ class ResidualErrorEstimates(NamedTuple):
             ),
         )
 
-    @classmethod
-    def uninitialized(cls, nb_outputs: int) -> "ResidualErrorEstimates":
-        return cls(
-            sigma_add=torch.full(
-                (nb_outputs,),
-                -1.0,
-                device=device,
-            ),
-            sigma_prop=torch.full(
-                (nb_outputs,),
-                -1.0,
-                device=device,
-            ),
-            additive_output=torch.ones(nb_outputs, device=device, dtype=torch.bool),
-            proportional_output=torch.ones(nb_outputs, device=device, dtype=torch.bool),
-        )
-
     def assert_initialized(self) -> None:
         if bool(((self.sigma_add < 0.0) | (self.sigma_prop < 0.0)).any()):
             raise RuntimeError(
@@ -195,35 +178,31 @@ def compute_survival_likelihood(
     )
     log_hz_rows_expanded = log_hz_rows.expand(nb_samples, -1)
     cumulative_hz_rows_expanded = cumulative_hz_rows.expand(nb_samples, -1)
-    # Patient indices have no reason to be sorted in the observation data set
-    # Get the ordering index tensor for each required output
-    patient_index_log_hz = torch.argsort(
-        observations.obs_index.id.index_values[log_hz_rows]
-    )
-    # Gather the rows where the prediction contains the log_hazard, and order them by increasing patient index
-    log_hz_predicted = (
-        predictions[log_hz_rows_expanded]
-        .view(nb_samples, nb_patients)
-        .index_select(1, patient_index_log_hz)
-    )
+    # Gather the rows where the prediction contains the log_hazard
+    log_hz_predicted = predictions[log_hz_rows_expanded].view(nb_samples, -1)
 
-    # Same thing for cumulative hazard
-    patient_index_cum_hz = torch.argsort(
-        observations.obs_index.id.index_values[cumulative_hz_rows]
-    )
-    cumulative_hz_predicted = (
-        predictions[cumulative_hz_rows_expanded]
-        .view(nb_samples, nb_patients)
-        .index_select(1, patient_index_cum_hz)
+    cumulative_hz_predicted = predictions[cumulative_hz_rows_expanded].view(
+        nb_samples, -1
     )
 
     event_status = observations.obs_values[log_hz_rows].expand(nb_samples, -1)
 
     # Log likelihood is computed as
     # (event is occurred) * log_hz (event_time) - cumulative_hazard(event_time)
-    ll = event_status * log_hz_predicted - cumulative_hz_predicted
+    ll_surv = event_status * log_hz_predicted - cumulative_hz_predicted
 
-    return ll.view(nb_samples, nb_patients)
+    # This log-likelihood is only computed on patients who have a survival event observation
+
+    patient_index_expanded = observations.obs_index.id.index_values[log_hz_rows].expand(
+        nb_samples, -1
+    )
+
+    ll_per_patient = torch.zeros(
+        (nb_samples, nb_patients), dtype=default_dtype, device=device
+    )
+    ll_per_patient.scatter_add_(1, patient_index_expanded, ll_surv)
+
+    return ll_per_patient
 
 
 def compute_normal_likelihood(

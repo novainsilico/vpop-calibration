@@ -111,20 +111,6 @@ class ObsData:
             if output not in self.survival_output_names
         ]
 
-        # Count the number of observations per output for variance scaling
-        self.nb_tot_observations_per_output = torch.zeros(
-            len(self.all_output_names), device=device
-        )
-        self.nb_tot_observations_per_output.scatter_add_(
-            0,
-            self.full_obs.obs_index.output_name.index_values,
-            torch.ones_like(
-                self.full_obs.obs_index.output_name.index_values,
-                device=device,
-                dtype=default_dtype,
-            ),
-        )
-
         self.individual_observations: dict[str, ObservationsDataSet] = {}
         for p in self.patients:
             patient_data = self.input_df_with_survival.loc[

@@ -338,7 +338,7 @@ def test_residuals_survival():
     event_status_p1 = 1.0
     event_status_p2 = 0.0
     obs_values = torch.tensor(
-        [event_status_p1, event_status_p1, event_status_p2, event_status_p2],
+        [event_status_p2, event_status_p2, event_status_p1, event_status_p1],
         dtype=default_dtype,
     )
 
@@ -373,7 +373,8 @@ def test_joint_likelihood():
     outputs: list = ["log_hz", "cumulative_hz", "out1"]
     event_time_p1 = 2
     event_time_p2 = 3
-    time: list = [event_time_p1, event_time_p2, 0]
+    obs_time_cont = 10
+    time: list = [event_time_p1, event_time_p2, obs_time_cont]
     tasks: list = ["log_hz_arm-1", "cumulative_hz_arm-1", "out1_arm-1"]
 
     # Patients are not ordered
@@ -393,20 +394,13 @@ def test_joint_likelihood():
         index_values=torch.tensor([1, 1, 0, 0, 2]),
         ref_values=time,
         raw_values=pd.Series(
-            [event_time_p2, event_time_p2, event_time_p1, event_time_p1, 0]
+            [event_time_p2, event_time_p2, event_time_p1, event_time_p1, obs_time_cont]
         ),
     )
     protocol_indices = TensorIndexing(
         index_values=torch.tensor([0, 0, 0, 0, 0]),
         ref_values=protocols,
-        raw_values=pd.Series(
-            [
-                "arm_1",
-                "arm_1",
-                "arm_1",
-                "arm_1",
-            ]
-        ),
+        raw_values=pd.Series(["arm_1", "arm_1", "arm_1", "arm_1", "arm_1"]),
     )
     task_indices = TensorIndexing(
         index_values=torch.tensor([0, 1, 0, 1, 2]),
@@ -436,10 +430,10 @@ def test_joint_likelihood():
     obs_continuous_out1 = 10.0
     obs_values = torch.tensor(
         [
-            event_status_p1,
-            event_status_p1,
             event_status_p2,
             event_status_p2,
+            event_status_p1,
+            event_status_p1,
             obs_continuous_out1,
         ],
         dtype=default_dtype,
@@ -488,8 +482,8 @@ def test_joint_likelihood():
     ll_p1 = event_status_p1 * pred_log_hz_p1 - pred_cum_hz_p1
     ll_p2 = event_status_p2 * pred_log_hz_p2 - pred_cum_hz_p2
     ll_out1 = -0.5 * (
-        log(2 * pi * sigma_val**2)
-        + ((pred_continuous_out1 - obs_continuous_out1) ** 2 / sigma_val**2)
+        log(2 * pi * sigma_val)
+        + ((pred_continuous_out1 - obs_continuous_out1) ** 2 / sigma_val)
     )
     expected_ll = torch.tensor(
         [[ll_p1 + ll_out1, ll_p2], [ll_p1 + ll_out1, ll_p2]], dtype=default_dtype

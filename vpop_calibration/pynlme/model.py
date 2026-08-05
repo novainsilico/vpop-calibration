@@ -137,9 +137,6 @@ class StatisticalModel:
         # This applies to output names, protocol arms and tasks
         # The ordering coming from the structural model takes precedence.
         self.output_names = self.structural_model.output_names
-        self.residual_var = ResidualErrorEstimates.uninitialized(
-            self.input_params.nb_outputs
-        )
         self.protocol_arms = self.structural_model.protocol_arms
         self.nb_protocols = len(self.protocol_arms)
         self.task_names = self.structural_model.task_names
