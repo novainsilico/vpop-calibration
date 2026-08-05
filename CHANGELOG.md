@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.7.0] - 2026-08-20
+
+### Added
+
+- Time to event data is now supported, allowing to fit joint-survival models. The pre-requisites are the following: the ODE model must output an instantaneous `log_hazard` and `cumulative_hazard`, which is integrated by the ODE solver. This allows to compute log-likelihood of a survival event. Survival coefficients may be defined in the input parameters, allowing to optimize gaussian parameters directly (no transformation). This is an experimental feature.
+
 ## [4.6.9] - 2026-08-24
 
 ### Modified
@@ -17,13 +23,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `pyproject.toml`: relax torch dependency to accept `>=2.10.0`
 
-## [4.6.1] - 2026-08-17
+## [4.6.3] - 2026-08-18
+
+### Modified
+
+- `pyproject.toml`: relax torch dependency to accept `>=2.10.0`
+
+## [4.6.2] - 2026-08-17
 
 ### Modified
 
 - For notebook users, the main module to import is now `vpop_calibration.api`
 
-## [4.6.0] - 2026-08-04
+## [4.6.1] - 2026-08-04
 
 ### Modified
 
