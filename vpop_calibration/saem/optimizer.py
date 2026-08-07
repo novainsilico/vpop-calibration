@@ -15,6 +15,7 @@ from vpop_calibration.saem.utils import (
     stochastic_approximation,
     covariance_matrix_simulated_annealing,
 )
+from vpop_calibration.saem.fim import Fim
 from vpop_calibration.pynlme.residuals import (
     log_likelihood_observation,
     ResidualErrorEstimates,
@@ -56,6 +57,7 @@ class PySaem:
             nb_iter_burnin=self.config.nb_iter_burnin,
             nb_iter_learning=self.config.nb_iter_learning,
             nb_iter_smoothing=self.config.nb_iter_smoothing,
+            nb_iter_fim=self.config.nb_iter_fim if self.config.covMethod == "sa" else 0,
             init_step_adaptation=config.init_step_adaptation,
             learning_rate_power=config.learning_rate_power,
             patience=config.patience,
@@ -210,88 +212,99 @@ class PySaem:
         # For model intrinsic, initialize the loss to the previous value
         # Will only be modified if fixed effects are present
         fixed_effects_loss = self.pop_estimates.fixed_effects_loss
-        if self.scheduler.phase != "burnin":
-            # M-step:
-            # maximum-likelihood target for the residual error variance
-            current_res_var: ResidualErrorEstimates = self.model.residual_var
-            target_res_var = estimate_error_params(
-                observations=self.model.data.full_obs,
-                predictions=self.mh_state.prediction,
-                residual_error=current_res_var,
-                min_variance=self.model.config.residual_min_variance,
-            )
-            if self.scheduler.phase == "learning":
-                # Simulated annealing is only considered in learning phase
-                target_res_var = target_res_var._replace(
-                    sigma_add=simulated_annealing(
-                        current=current_res_var.sigma_add,
-                        target=target_res_var.sigma_add,
-                        factor=self.config.annealing_factor,
-                    ),
-                    sigma_prop=simulated_annealing(
-                        current=current_res_var.sigma_prop,
-                        target=target_res_var.sigma_prop,
-                        factor=self.config.annealing_factor,
-                    ),
-                )
-            new_res_error_var = current_res_var._replace(
-                sigma_add=stochastic_approximation(
-                    previous=current_res_var.sigma_add,
-                    new=target_res_var.sigma_add,
-                    learning_rate=self.scheduler.stochastic_approximation_rate,
-                ),
-                sigma_prop=stochastic_approximation(
-                    previous=current_res_var.sigma_prop,
-                    new=target_res_var.sigma_prop,
-                    learning_rate=self.scheduler.stochastic_approximation_rate,
-                ),
-            )
 
-            self.model.update_res_var(new_res_error_var)
-
-            # Propose new values for beta and omega
-            mstep_proposal = self.sufficient_statistics.update(
-                new_gaussian_params=self.mh_state.gaussian_params,
+        if self.scheduler.phase == "fim":
+            # Fim estimation
+            if not hasattr(self, "fim_estimator"):
+                self.fim_estimator = Fim(model=self.model)
+            self.fim_estimator.update(
+                gaussian_params=self.mh_state.gaussian_params,
                 learning_rate=self.scheduler.stochastic_approximation_rate,
             )
-            self.model.update_betas(mstep_proposal.beta)
-            # Applying simulated annealing to omega, if in learning phase
-            if self.scheduler.phase == "learning":
-                new_omega = covariance_matrix_simulated_annealing(
-                    current_omega=self.model.omega_pop,
-                    target_omega=mstep_proposal.omega,
-                    factor=self.config.annealing_factor,
+            new_ebe = self.pop_estimates.ebe
+        else:
+            if self.scheduler.phase != "burnin":
+                # M-step:
+                # maximum-likelihood target for the residual error variance
+                current_res_var: ResidualErrorEstimates = self.model.residual_var
+                target_res_var = estimate_error_params(
+                    observations=self.model.data.full_obs,
+                    predictions=self.mh_state.prediction,
+                    residual_error=current_res_var,
+                    min_variance=self.model.config.residual_min_variance,
                 )
-            else:
-                new_omega = mstep_proposal.omega
-            self.model.update_omega(new_omega)
+                if self.scheduler.phase == "learning":
+                    # Simulated annealing is only considered in learning phase
+                    target_res_var = target_res_var._replace(
+                        sigma_add=simulated_annealing(
+                            current=current_res_var.sigma_add,
+                            target=target_res_var.sigma_add,
+                            factor=self.config.annealing_factor,
+                        ),
+                        sigma_prop=simulated_annealing(
+                            current=current_res_var.sigma_prop,
+                            target=target_res_var.sigma_prop,
+                            factor=self.config.annealing_factor,
+                        ),
+                    )
+                new_res_error_var = current_res_var._replace(
+                    sigma_add=stochastic_approximation(
+                        previous=current_res_var.sigma_add,
+                        new=target_res_var.sigma_add,
+                        learning_rate=self.scheduler.stochastic_approximation_rate,
+                    ),
+                    sigma_prop=stochastic_approximation(
+                        previous=current_res_var.sigma_prop,
+                        new=target_res_var.sigma_prop,
+                        learning_rate=self.scheduler.stochastic_approximation_rate,
+                    ),
+                )
 
-            # 3. Update fixed effects MIs
-            if self.model.nb_mi > 0:
-                objective_fun = self.build_mi_objective_function(
-                    self.mh_state.gaussian_params.mean(dim=0, keepdim=True)
-                )
-                psi0 = self.model.log_mi
-                target_log_MI, fixed_effects_loss = optimize_fixed_effects(
-                    loss_fn=objective_fun,
-                    psi0=psi0,
-                    lr=1e-2,
-                    nb_iter=self.config.optim_max_iter,
-                    eps_grad=self.config.eps_grad,
-                )
-                new_log_MI = stochastic_approximation(
-                    previous=self.model.log_mi,
-                    new=target_log_MI,
+                self.model.update_res_var(new_res_error_var)
+
+                # Propose new values for beta and omega
+                mstep_proposal = self.sufficient_statistics.update(
+                    new_gaussian_params=self.mh_state.gaussian_params,
                     learning_rate=self.scheduler.stochastic_approximation_rate,
                 )
+                self.model.update_betas(mstep_proposal.beta)
+                # Applying simulated annealing to omega, if in learning phase
+                if self.scheduler.phase == "learning":
+                    new_omega = covariance_matrix_simulated_annealing(
+                        current_omega=self.model.omega_pop,
+                        target_omega=mstep_proposal.omega,
+                        factor=self.config.annealing_factor,
+                    )
+                else:
+                    new_omega = mstep_proposal.omega
+                self.model.update_omega(new_omega)
 
-                self.model.update_log_mi(new_log_MI)
+                # 3. Update fixed effects MIs
+                if self.model.nb_mi > 0:
+                    objective_fun = self.build_mi_objective_function(
+                        self.mh_state.gaussian_params.mean(dim=0, keepdim=True)
+                    )
+                    psi0 = self.model.log_mi
+                    target_log_MI, fixed_effects_loss = optimize_fixed_effects(
+                        loss_fn=objective_fun,
+                        psi0=psi0,
+                        lr=1e-2,
+                        nb_iter=self.config.optim_max_iter,
+                        eps_grad=self.config.eps_grad,
+                    )
+                    new_log_MI = stochastic_approximation(
+                        previous=self.model.log_mi,
+                        new=target_log_MI,
+                        learning_rate=self.scheduler.stochastic_approximation_rate,
+                    )
 
-        new_ebe = stochastic_approximation(
-            previous=self.pop_estimates.ebe,
-            new=self.mh_state.gaussian_params.mean(dim=0),
-            learning_rate=self.scheduler.stochastic_approximation_rate,
-        )
+                    self.model.update_log_mi(new_log_MI)
+
+            new_ebe = stochastic_approximation(
+                previous=self.pop_estimates.ebe,
+                new=self.mh_state.gaussian_params.mean(dim=0),
+                learning_rate=self.scheduler.stochastic_approximation_rate,
+            )
 
         # Update population estimates and check for early convergence
         new_estimates = PopEstimates(
