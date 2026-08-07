@@ -2,7 +2,10 @@ import torch
 from tqdm.notebook import tqdm
 
 from vpop_calibration.pynlme.model import StatisticalModel
-from vpop_calibration.pynlme.residuals import log_likelihood_observation
+from vpop_calibration.pynlme.residuals import (
+    log_likelihood_observation,
+    ResidualErrorEstimates,
+)
 from vpop_calibration.saem.utils import stochastic_approximation
 from vpop_calibration.metropolis_hastings import MetropolisHastingsState, mh_step
 from vpop_calibration.config import device, default_dtype, smoke_test
@@ -11,10 +14,7 @@ from vpop_calibration.config import device, default_dtype, smoke_test
 class Fim:
     def __init__(self, model: StatisticalModel):
         self.model = model
-        # Free elements of Omega: lower triangle, diagonal included
         self.tril_idx = torch.tril_indices(model.nb_pdu, model.nb_pdu, device=device)
-        # Only the residual error components declared active are estimated: `sanitized()`
-        # forces the others to zero, and they would make the FIM singular.
         self.sigma_mask = torch.cat(
             (
                 model.residual_var.additive_output,
@@ -69,7 +69,9 @@ class Fim:
             [block.detach().flatten().to(default_dtype) for block in blocks]
         )
 
-    def _unflatten(self, flat: torch.Tensor) -> tuple[torch.Tensor, ...]:
+    def _unflatten(
+        self, flat: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, ResidualErrorEstimates]:
         """Rebuild the model parameters from the flat vector, keeping the autograd graph."""
         model = self.model
         cursor = 0
@@ -89,13 +91,12 @@ class Fim:
         log_mi = flat[cursor : cursor + model.nb_mi]
         cursor += model.nb_mi
 
-        sigma_add, sigma_prop = (
-            torch.cat((model.residual_var.sigma_add, model.residual_var.sigma_prop))
-            .detach()
-            .to(flat.dtype)
-            .masked_scatter(self.sigma_mask, flat[cursor:])
-            .chunk(2)
-        )
+        idx = self.sigma_mask.nonzero(as_tuple=True)[0]
+        full_sigma = torch.zeros(
+            2 * model.nb_outputs, device=device, dtype=flat.dtype
+        ).index_put((idx,), flat[cursor:])
+        sigma_add, sigma_prop = full_sigma.chunk(2)
+
         res_var = model.residual_var._replace(
             sigma_add=sigma_add, sigma_prop=sigma_prop
         )
