@@ -32,7 +32,12 @@ class SaemScheduler:
 
     @property
     def nb_iter_tot(self) -> int:
-        return self.nb_iter_burnin + self.nb_iter_learning + self.nb_iter_smoothing
+        return (
+            self.nb_iter_burnin
+            + self.nb_iter_learning
+            + self.nb_iter_smoothing
+            + self.nb_iter_fim
+        )
 
     @property
     def phase(self) -> Literal["burnin", "learning", "smoothing", "fim"]:
@@ -56,7 +61,7 @@ class SaemScheduler:
             return self.init_step_adaptation / (
                 np.maximum(1, self.iteration - self.nb_iter_burnin + 1) ** 0.5
             )
-        elif self.phase == ["smoothing", "fim"]:
+        elif self.phase in ["smoothing", "fim"]:
             return 0
         else:
             raise NotImplementedError
