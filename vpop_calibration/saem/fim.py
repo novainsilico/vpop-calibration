@@ -1,7 +1,6 @@
 import torch
 import pandas as pd
 import numpy as np
-import warnings
 from IPython.display import display
 
 from vpop_calibration.pynlme.model import StatisticalModel
@@ -223,9 +222,8 @@ class Fim:
     def _compute_louis_stats_hybrid(
         self, flat: torch.Tensor, gaussian_params: torch.Tensor, eps: float = 1e-3
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        """Louis' statistics: autograd on (beta, omega, sigma), finite differences
-        on MI. Only `log_mi` flows through the structural model, so Omega is never
-        perturbed numerically and every non-MI parameter is differentiated exactly.
+        """autograd on (beta, omega, sigma), finite differences
+        on MI
         """
         nb_chains = gaussian_params.shape[0]
         predictions = self._predict_detached(flat[self._mi_slice], gaussian_params)
@@ -347,12 +345,10 @@ class Fim:
                 self.parameter_names[i]
                 for i in negative.nonzero(as_tuple=True)[0].tolist()
             ]
-            warnings.warn(
+            print(
                 "Negative variance on the covariance diagonal for: "
                 f"{', '.join(bad)}. These parameters are not identified by the "
                 "data; their standard error is returned as NaN.",
-                RuntimeWarning,
-                stacklevel=2,
             )
         variances = variances.masked_fill(negative, float("nan"))
         return torch.sqrt(variances)
