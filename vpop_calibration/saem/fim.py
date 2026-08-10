@@ -1,8 +1,8 @@
 import torch
 import pandas as pd
 import numpy as np
+import warnings
 from IPython.display import display
-from tqdm.notebook import tqdm
 
 from vpop_calibration.pynlme.model import StatisticalModel
 from vpop_calibration.pynlme.residuals import (
@@ -10,9 +10,8 @@ from vpop_calibration.pynlme.residuals import (
     ResidualErrorEstimates,
 )
 from vpop_calibration.saem.utils import stochastic_approximation
-from vpop_calibration.metropolis_hastings import MetropolisHastingsState, mh_step
 from typing import Any
-from vpop_calibration.config import device, default_dtype, smoke_test
+from vpop_calibration.config import device, default_dtype
 
 
 class Fim:
@@ -218,7 +217,7 @@ class Fim:
 
     def get_history_df(self) -> pd.DataFrame:
 
-        if not hasattr(self, "fim_norm_history") or not self.fim_norm_history:
+        if not self.fim_norm_history:
             return pd.DataFrame()
 
         df = pd.DataFrame({"Global norm of FIM": self.fim_norm_history})
@@ -250,9 +249,30 @@ class Fim:
 
         return df_fim
 
+    def _invert_fim(self) -> torch.Tensor:
+        """Invert the observed FIM to get the covariance matrix."""
+        fim = self.fim
+        # eigvalsh: real, sorted eigenvalues, valid because fim is symmetric
+        eigvals = torch.linalg.eigvalsh(fim)
+        min_eig = eigvals.min()
+        tol = eigvals.abs().max() * fim.shape[-1] * torch.finfo(fim.dtype).eps
+
+        if min_eig > tol:
+            chol = torch.linalg.cholesky(fim)
+            return torch.cholesky_inverse(chol)
+
+        warnings.warn(
+            f"Observed FIM is not positive definite (smallest eigenvalue "
+            f"{min_eig.item():.3e}): falling back to the pseudo-inverse. Standard "
+            f"errors of the affected parameters are unreliable.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+        return torch.linalg.pinv(fim)
+
     @property
     def covariance_matrix(self) -> torch.Tensor:
-        return torch.linalg.inv(self.fim)
+        return self._invert_fim()
 
     def show_covMatrix(self) -> pd.DataFrame:
         """Returns the covariance Matrix as a Dataframe"""
@@ -269,7 +289,22 @@ class Fim:
 
     @property
     def standard_errors(self) -> torch.Tensor:
-        return torch.sqrt(torch.diagonal(self.covariance_matrix))
+        variances = torch.diagonal(self.covariance_matrix)
+        negative = variances < 0
+        if torch.any(negative):
+            bad = [
+                self.parameter_names[i]
+                for i in negative.nonzero(as_tuple=True)[0].tolist()
+            ]
+            warnings.warn(
+                "Negative variance on the covariance diagonal for: "
+                f"{', '.join(bad)}. These parameters are not identified by the "
+                "data; their standard error is returned as NaN.",
+                RuntimeWarning,
+                stacklevel=2,
+            )
+        variances = variances.masked_fill(negative, float("nan"))
+        return torch.sqrt(variances)
 
     @property
     def rse(self) -> torch.Tensor:
@@ -280,8 +315,6 @@ class Fim:
 
     def show_RSE(self) -> pd.DataFrame:
         """Returns estimates, standard errors and relative standard errors"""
-        import pandas as pd
-        from IPython.display import display
 
         estimates_np = self.flatten_parameters().detach().cpu().numpy()
         se_np = self.standard_errors.detach().cpu().numpy()
@@ -366,7 +399,6 @@ class Fim:
         df_summary = pd.DataFrame(summary_rows)
         df_summary.set_index("Parameter", inplace=True)
 
-        # --- NEW: Color coding for RSE (%) ---
         def color_rse(val):
             """Applies color coding based on standard pharmacometrics RSE thresholds."""
             if pd.isna(val):
@@ -386,7 +418,7 @@ class Fim:
         return df_summary
 
     def get_state_dict(self) -> dict[str, Any]:
-        """Sauvegarde l'état actuel de l'approximation stochastique."""
+
         return {
             "score": self.score.detach().cpu().numpy().tolist(),
             "hessian": self.hessian.detach().cpu().numpy().tolist(),
@@ -400,7 +432,6 @@ class Fim:
     def from_state_dict(
         cls, state_dict: dict[str, Any], model: StatisticalModel
     ) -> "Fim":
-        """Recharge l'état de l'approximation stochastique."""
         instance = cls(model)
         instance.score = torch.as_tensor(
             state_dict["score"], device=device, dtype=default_dtype
@@ -412,18 +443,3 @@ class Fim:
             state_dict["score_outer_product"], device=device, dtype=default_dtype
         )
         return instance
-
-
-def run_fim_sa_phase(
-    model: StatisticalModel,
-    fim: Fim,
-    mh_state: MetropolisHastingsState,
-    nb_iter: int = 50,
-) -> MetropolisHastingsState:
-    """Extra MCMC iterations at frozen population parameters (`covMethod = "sa"`)."""
-    if smoke_test:
-        nb_iter = 2
-    for k in tqdm(range(nb_iter), disable=not model.config.progress_bar):
-        mh_state = mh_step(nlme_model=model, previous_state=mh_state, learning_rate=0.0)
-        fim.update(mh_state.gaussian_params, learning_rate=1.0 / (k + 1))
-    return mh_state
