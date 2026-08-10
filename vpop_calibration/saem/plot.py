@@ -62,3 +62,13 @@ class OptimizerPlot:
 
     def close(self):
         plt.close(self.fig)
+
+
+class FimPlot(OptimizerPlot):
+    def __init__(
+        self,
+        history: pd.DataFrame,
+        nb_tot_iter: int,
+        facet_size: tuple[float, float],
+    ):
+        super().__init__(history, nb_tot_iter, facet_size, nb_cols=1)
