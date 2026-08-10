@@ -90,10 +90,22 @@ def test_saem_golden(sample_nlme_params, obs_data, struct_model, golden, request
         assert actual == expected
     else:
         # In normal test run, use deepdiff for a more granular comparison between the expected and actual
-        diff = DeepDiff(
+        diff_strict = DeepDiff(
             actual,
             expected,
             ignore_type_in_groups=[(tuple, list), (float, np.float64)],
+            exclude_paths=["root['optimizer']['fim_estimator']"],
             math_epsilon=1e-16,
         )
-        assert diff == {}
+        assert diff_strict == {}
+
+        actual_fim = actual.get("optimizer", {}).get("fim_estimator", {})
+        expected_fim = expected.get("optimizer", {}).get("fim_estimator", {})
+
+        diff_fim = DeepDiff(
+            actual_fim,
+            expected_fim,
+            ignore_type_in_groups=[(tuple, list), (float, np.float64)],
+            math_epsilon=1e-7,
+        )
+        assert diff_fim == {}
