@@ -366,8 +366,22 @@ class Fim:
         df_summary = pd.DataFrame(summary_rows)
         df_summary.set_index("Parameter", inplace=True)
 
+        # --- NEW: Color coding for RSE (%) ---
+        def color_rse(val):
+            """Applies color coding based on standard pharmacometrics RSE thresholds."""
+            if pd.isna(val):
+                return ""
+            if val < 30:
+                return "color: green"
+            elif val < 50:
+                return "color: orange"
+            else:
+                return "color: red"
+
+        styled_df = df_summary.style.map(color_rse, subset=["RSE (%)"])
+
         print("Summary of Population Parameters")
-        display(df_summary)
+        display(styled_df)
 
         return df_summary
 
