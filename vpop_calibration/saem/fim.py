@@ -11,6 +11,7 @@ from vpop_calibration.pynlme.residuals import (
 )
 from vpop_calibration.saem.utils import stochastic_approximation
 from vpop_calibration.metropolis_hastings import MetropolisHastingsState, mh_step
+from typing import Any
 from vpop_calibration.config import device, default_dtype, smoke_test
 
 
@@ -91,7 +92,10 @@ class Fim:
         omega = lower + lower.tril(-1).transpose(-1, -2)
         cursor += nb_omega
 
-        log_mi = flat[cursor : cursor + model.nb_mi]
+        if model.nb_mi == 0:
+            log_mi = torch.empty(0, device=device, dtype=flat.dtype)
+        else:
+            log_mi = flat[cursor : cursor + model.nb_mi]
         cursor += model.nb_mi
 
         idx = self.sigma_mask.nonzero(as_tuple=True)[0]
@@ -319,6 +323,34 @@ class Fim:
         display(df_summary)
 
         return df_summary
+
+    def get_state_dict(self) -> dict[str, Any]:
+        """Sauvegarde l'état actuel de l'approximation stochastique."""
+        return {
+            "score": self.score.detach().cpu().numpy().tolist(),
+            "hessian": self.hessian.detach().cpu().numpy().tolist(),
+            "score_outer_product": self.score_outer_product.detach()
+            .cpu()
+            .numpy()
+            .tolist(),
+        }
+
+    @classmethod
+    def from_state_dict(
+        cls, state_dict: dict[str, Any], model: StatisticalModel
+    ) -> "Fim":
+        """Recharge l'état de l'approximation stochastique."""
+        instance = cls(model)
+        instance.score = torch.as_tensor(
+            state_dict["score"], device=device, dtype=default_dtype
+        )
+        instance.hessian = torch.as_tensor(
+            state_dict["hessian"], device=device, dtype=default_dtype
+        )
+        instance.score_outer_product = torch.as_tensor(
+            state_dict["score_outer_product"], device=device, dtype=default_dtype
+        )
+        return instance
 
 
 def run_fim_sa_phase(
