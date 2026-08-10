@@ -119,6 +119,8 @@ class PySaem:
                     "has_run": True,
                 }
             )
+        if hasattr(self, "fim_estimator"):
+            state_dict["fim_estimator"] = self.fim_estimator.get_state_dict()
         else:
             state_dict.update({"has_run": False})
 
@@ -147,6 +149,10 @@ class PySaem:
             instance.sufficient_statistics = MStepState.from_state_dict(
                 state_dict=state_dict["sufficient_statistics"]
             )
+            if "fim_estimator" in state_dict:
+                instance.fim_estimator = Fim.from_state_dict(
+                    state_dict=state_dict["fim_estimator"], model=model
+                )
         return instance
 
     def run(self):
