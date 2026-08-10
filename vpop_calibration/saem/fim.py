@@ -36,6 +36,7 @@ class Fim:
         self.score_outer_product = torch.zeros(
             (nb_params, nb_params), device=device, dtype=default_dtype
         )
+        self.fim_norm_history = []
 
     # --- Parameter vector handling
     def _build_parameter_names(self) -> list[str]:
@@ -137,7 +138,6 @@ class Fim:
             loc=mu, covariance_matrix=omega
         ).log_prob(gaussian_params)
 
-        # Somme sur les patients (dim 1), on garde la dimension des chaînes (dim 0)
         return (log_lik_obs + log_lik_psi).sum(dim=1)
 
     def _complete_log_likelihood(
@@ -181,7 +181,6 @@ class Fim:
         flat = self.flatten_parameters()
 
         if self.model.nb_mi == 0:
-            # Option A : Autograd ultra-rapide (Pas de MI)
             theta = flat.clone().requires_grad_(True)
             scores = torch.stack(
                 [
@@ -200,7 +199,6 @@ class Fim:
             mean_score = scores.mean(dim=0)
             score_outer_product = scores.transpose(0, 1) @ scores / nb_chains
         else:
-            # Option B : Différences Finies universelles (Avec MI)
             mean_score, hessian, score_outer_product = self._compute_louis_stats_fd(
                 flat, gaussian_params
             )
@@ -216,6 +214,17 @@ class Fim:
             new=score_outer_product,
             learning_rate=learning_rate,
         )
+        self.fim_norm_history.append(torch.norm(self.fim).item())
+
+    def get_history_df(self) -> pd.DataFrame:
+
+        if not hasattr(self, "fim_norm_history") or not self.fim_norm_history:
+            return pd.DataFrame()
+
+        df = pd.DataFrame({"Global norm of FIM": self.fim_norm_history})
+        df.insert(0, "iteration", range(1, len(df) + 1))
+
+        return df
 
     # --- Results
     @property

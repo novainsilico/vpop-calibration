@@ -21,8 +21,8 @@ from vpop_calibration.pynlme.residuals import (
     ResidualErrorEstimates,
 )
 from vpop_calibration.pynlme.error_estimation import estimate_error_params
-from vpop_calibration.saem.plot import OptimizerPlot
-from vpop_calibration.config import smoke_test, default_dtype, device
+from vpop_calibration.saem.plot import OptimizerPlot, FimPlot
+from vpop_calibration.config import smoke_test
 from vpop_calibration.saem.fixed_effects import optimize_fixed_effects
 
 
@@ -177,7 +177,19 @@ class PySaem:
                         progress.iteration == self.scheduler.nb_iter_tot - 1
                     ):
                         self.plot_history()
-
+                        if self.scheduler.phase == "fim" and hasattr(
+                            self, "fim_estimator"
+                        ):
+                            fim_history = self.fim_estimator.get_history_df()
+                            if not fim_history.empty:
+                                if not hasattr(self, "fim_plot"):
+                                    self.fim_plot = FimPlot(
+                                        history=fim_history,
+                                        nb_tot_iter=self.scheduler.nb_iter_fim,
+                                        facet_size=self.config.facet_size,
+                                    )
+                                else:
+                                    self.fim_plot.update(fim_history)
             if self.config.live_plot:
                 self.plot.close()
 
