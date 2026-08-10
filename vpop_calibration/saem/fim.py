@@ -1,4 +1,7 @@
 import torch
+import pandas as pd
+import numpy as np
+from IPython.display import display
 from tqdm.notebook import tqdm
 
 from vpop_calibration.pynlme.model import StatisticalModel
@@ -103,12 +106,10 @@ class Fim:
 
         return beta, omega, log_mi, res_var
 
-    # --- Complete-data log-likelihood
     def _complete_log_likelihood(
         self, flat: torch.Tensor, gaussian_params: torch.Tensor
     ) -> torch.Tensor:
         """`log p(y, psi ; theta)` at fixed individual parameters, averaged over the chains.
-
         Args:
             flat (torch.Tensor): the population parameters, flattened.
             gaussian_params (torch.Tensor): individual parameters sampled in the E-step.
@@ -185,13 +186,139 @@ class Fim:
         )
         return 0.5 * (fim + fim.transpose(-1, -2))
 
+    def show_fim(self) -> pd.DataFrame:
+        """Returns the FIM as a Dataframe"""
+
+        fim_np = self.fim.detach().cpu().numpy()
+        names = self.parameter_names
+
+        df_fim = pd.DataFrame(fim_np, index=names, columns=names)
+
+        print("Fisher Information Matrix (FIM) :")
+        display(df_fim)
+
+        return df_fim
+
     @property
     def covariance_matrix(self) -> torch.Tensor:
         return torch.linalg.inv(self.fim)
 
+    def show_covMatrix(self) -> pd.DataFrame:
+        """Returns the covariance Matrix as a Dataframe"""
+
+        cov_np = self.covariance_matrix.detach().cpu().numpy()
+        names = self.parameter_names
+
+        df_cov = pd.DataFrame(cov_np, index=names, columns=names)
+
+        print("Covariance Matrix :")
+        display(df_cov)
+
+        return df_cov
+
     @property
     def standard_errors(self) -> torch.Tensor:
         return torch.sqrt(torch.diagonal(self.covariance_matrix))
+
+    @property
+    def rse(self) -> torch.Tensor:
+        """Relative Standard Error (RSE)"""
+
+        estimates = self.flatten_parameters()
+        return (self.standard_errors / torch.abs(estimates)) * 100
+
+    def show_RSE(self) -> pd.DataFrame:
+        """Returns estimates, standard errors and relative standard errors"""
+        import pandas as pd
+        from IPython.display import display
+
+        estimates_np = self.flatten_parameters().detach().cpu().numpy()
+        se_np = self.standard_errors.detach().cpu().numpy()
+        rse_np = self.rse.detach().cpu().numpy()
+        names = self.parameter_names
+
+        df_rse = pd.DataFrame(
+            {"Estimate": estimates_np, "Standard Error": se_np, "RSE (%)": rse_np},
+            index=names,
+        )
+
+        print("Standard Error:")
+        display(df_rse)
+
+        return df_rse
+
+    def summary(self) -> pd.DataFrame:
+        """Returns a summary of all parameters"""
+
+        estimates = self.flatten_parameters().detach().cpu().numpy()
+        se = self.standard_errors.detach().cpu().numpy()
+        rse = self.rse.detach().cpu().numpy()
+        names = self.parameter_names
+
+        data = {
+            name: {"Est": est, "SE": s, "RSE": r}
+            for name, est, s, r in zip(names, estimates, se, rse)
+        }
+
+        summary_rows = []
+
+        fixed_names = self.model.beta_names + self.model.mi_names
+        for name in fixed_names:
+            if name in data:
+                summary_rows.append(
+                    {
+                        "Parameter": name,
+                        "Estimate": data[name]["Est"],
+                        "SE": data[name]["SE"],
+                        "RSE (%)": data[name]["RSE"],
+                        "BSV (CV%)": np.nan,
+                    }
+                )
+
+        for pdu in self.model.pdu_names:
+            omega_name = f"omega_{pdu}_{pdu}"
+            if omega_name in data:
+                var_val = data[omega_name]["Est"]
+                cv_pct = np.sqrt(var_val) * 100 if var_val > 0 else np.nan
+
+                found = False
+                for row in summary_rows:
+                    if row["Parameter"] == pdu:
+                        row["BSV (CV%)"] = cv_pct
+                        found = True
+                        break
+
+                if not found:
+                    summary_rows.append(
+                        {
+                            "Parameter": f"BSV_{pdu}",
+                            "Estimate": np.nan,
+                            "SE": np.nan,
+                            "RSE (%)": np.nan,
+                            "BSV (CV%)": cv_pct,
+                        }
+                    )
+
+        sigma_names = [n for n in names if n.startswith("sigma_")]
+        for name in sigma_names:
+            if name in data:
+                summary_rows.append(
+                    {
+                        "Parameter": name,
+                        "Estimate": data[name]["Est"],
+                        "SE": data[name]["SE"],
+                        "RSE (%)": data[name]["RSE"],
+                        "BSV (CV%)": np.nan,
+                    }
+                )
+
+        df_summary = pd.DataFrame(summary_rows)
+        df_summary.set_index("Parameter", inplace=True)
+
+        print("Summary of Population Parameters")
+        display(df_summary)
+
+        return df_summary
 
 
 def run_fim_sa_phase(
@@ -200,12 +327,7 @@ def run_fim_sa_phase(
     mh_state: MetropolisHastingsState,
     nb_iter: int = 50,
 ) -> MetropolisHastingsState:
-    """Extra MCMC iterations at frozen population parameters (`covMethod = "sa"`).
-
-    The population parameters are not updated: the Louis statistics are simply averaged
-    over the new samples (learning rate `1 / (k + 1)`), which restarts the approximation
-    from the converged parameter values.
-    """
+    """Extra MCMC iterations at frozen population parameters (`covMethod = "sa"`)."""
     if smoke_test:
         nb_iter = 2
     for k in tqdm(range(nb_iter), disable=not model.config.progress_bar):
