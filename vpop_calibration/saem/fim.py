@@ -110,17 +110,13 @@ class Fim:
 
         return beta, omega, log_mi, res_var
 
-    def _complete_log_likelihood(
+    def _complete_log_likelihood_per_chain(
         self, flat: torch.Tensor, gaussian_params: torch.Tensor
     ) -> torch.Tensor:
-        """`log p(y, psi ; theta)` at fixed individual parameters, averaged over the chains.
-        Args:
-            flat (torch.Tensor): the population parameters, flattened.
-            gaussian_params (torch.Tensor): individual parameters sampled in the E-step.
-                Size (nb_chains, nb_patients, nb_pdu).
+        """`log p(y, psi ; theta)` at fixed individual parameters, returned per chain.
+        Size: (nb_chains,)
         """
         model = self.model
-        nb_chains = gaussian_params.shape[0]
         beta, omega, log_mi, res_var = self._unflatten(flat)
 
         # Observation term: log p(y | psi, sigma, mi)
@@ -141,41 +137,83 @@ class Fim:
             loc=mu, covariance_matrix=omega
         ).log_prob(gaussian_params)
 
-        return (log_lik_obs + log_lik_psi).sum() / nb_chains
+        # Somme sur les patients (dim 1), on garde la dimension des chaînes (dim 0)
+        return (log_lik_obs + log_lik_psi).sum(dim=1)
+
+    def _complete_log_likelihood(
+        self, flat: torch.Tensor, gaussian_params: torch.Tensor
+    ) -> torch.Tensor:
+        """`log p(y, psi ; theta)` averaged over the chains."""
+        return self._complete_log_likelihood_per_chain(flat, gaussian_params).mean()
+
+    def _compute_louis_stats_fd(
+        self, flat: torch.Tensor, gaussian_params: torch.Tensor, eps: float = 1e-3
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """Compute Score, Hessian and Score Outer Product using Finite Differences."""
+        h = eps * torch.clamp(flat.abs(), min=1.0)
+        P = torch.diag(h)
+
+        def ll(p):
+            return self._complete_log_likelihood_per_chain(flat + p, gaussian_params)
+
+        ll_0 = ll(0)
+        ll_p = torch.stack([ll(p) for p in P])
+        ll_m = torch.stack([ll(-p) for p in P])
+
+        scores = (ll_p - ll_m) / (2 * h.unsqueeze(1))
+        hessian = torch.diag((ll_p - 2 * ll_0 + ll_m).mean(dim=1) / (h**2))
+
+        for i, j in zip(*torch.triu_indices(len(flat), len(flat), offset=1)):
+            h_ij = (
+                ll(P[i] + P[j]) - ll(P[i] - P[j]) - ll(-P[i] + P[j]) + ll(-P[i] - P[j])
+            ).mean()
+            hessian[i, j] = hessian[j, i] = h_ij / (4 * h[i] * h[j])
+
+        return (
+            scores.mean(dim=1),
+            hessian,
+            (scores @ scores.T) / gaussian_params.shape[0],
+        )
 
     # --- Stochastic approximation
     def update(self, gaussian_params: torch.Tensor, learning_rate: float) -> None:
-        """Update the three Louis statistics with a new draw of the individual parameters."""
         nb_chains = gaussian_params.shape[0]
         flat = self.flatten_parameters()
 
-        # Score of every chain, size (nb_chains, nb_params)
-        theta = flat.clone().requires_grad_(True)
-        scores = torch.stack(
-            [
-                torch.autograd.grad(
-                    self._complete_log_likelihood(
-                        theta, gaussian_params[chain : chain + 1]
-                    ),
-                    theta,
-                )[0]
-                for chain in range(nb_chains)
-            ]
-        )
-        # Hessian of the chain-averaged complete log-likelihood, size (nb_params, nb_params)
-        hessian = torch.autograd.functional.hessian(
-            lambda t: self._complete_log_likelihood(t, gaussian_params), flat
-        )
+        if self.model.nb_mi == 0:
+            # Option A : Autograd ultra-rapide (Pas de MI)
+            theta = flat.clone().requires_grad_(True)
+            scores = torch.stack(
+                [
+                    torch.autograd.grad(
+                        self._complete_log_likelihood(
+                            theta, gaussian_params[chain : chain + 1]
+                        ),
+                        theta,
+                    )[0]
+                    for chain in range(nb_chains)
+                ]
+            )
+            hessian = torch.autograd.functional.hessian(
+                lambda t: self._complete_log_likelihood(t, gaussian_params), flat
+            )
+            mean_score = scores.mean(dim=0)
+            score_outer_product = scores.transpose(0, 1) @ scores / nb_chains
+        else:
+            # Option B : Différences Finies universelles (Avec MI)
+            mean_score, hessian, score_outer_product = self._compute_louis_stats_fd(
+                flat, gaussian_params
+            )
 
         self.score = stochastic_approximation(
-            previous=self.score, new=scores.mean(dim=0), learning_rate=learning_rate
+            previous=self.score, new=mean_score, learning_rate=learning_rate
         )
         self.hessian = stochastic_approximation(
             previous=self.hessian, new=hessian, learning_rate=learning_rate
         )
         self.score_outer_product = stochastic_approximation(
             previous=self.score_outer_product,
-            new=scores.transpose(0, 1) @ scores / nb_chains,
+            new=score_outer_product,
             learning_rate=learning_rate,
         )
 
