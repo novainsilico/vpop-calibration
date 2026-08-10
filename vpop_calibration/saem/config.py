@@ -30,7 +30,7 @@ class SaemConfigDict(NamedTuple):
 
     # Fim
     covMethod: Literal["sa", "none"] = "sa"
-    nb_iter_fim: int = 50
+    nb_iter_fim: int = 100
     # Output mode selector
     mode: Literal["debug", "cli", "notebook"] = "notebook"
 
