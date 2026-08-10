@@ -3,10 +3,11 @@ import pandas as pd
 import numpy as np
 import torch
 from deepdiff import DeepDiff
-
 from vpop_calibration.structural_model.base import StructuralModel
 from vpop_calibration.structural_model.analytical import StructuralAnalytical
 from vpop_calibration.interface import NlmeModel
+
+torch.set_num_threads(1)
 
 
 @pytest.fixture
@@ -106,6 +107,6 @@ def test_saem_golden(sample_nlme_params, obs_data, struct_model, golden, request
             actual_fim,
             expected_fim,
             ignore_type_in_groups=[(tuple, list), (float, np.float64)],
-            math_epsilon=1e-7,
+            math_epsilon=1e-8,
         )
         assert diff_fim == {}
