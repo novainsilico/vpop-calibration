@@ -110,97 +110,150 @@ class Fim:
 
         return beta, omega, log_mi, res_var
 
-    def _complete_log_likelihood_per_chain(
-        self, flat: torch.Tensor, gaussian_params: torch.Tensor
-    ) -> torch.Tensor:
-        """`log p(y, psi ; theta)` at fixed individual parameters, returned per chain.
-        Size: (nb_chains,)
-        """
-        model = self.model
-        beta, omega, log_mi, res_var = self._unflatten(flat)
+    @property
+    def _mi_slice(self) -> slice:
+        """Location of the model-intrinsic parameters in the flat vector."""
+        start = self.model.nb_betas + self.tril_idx.shape[1]
+        return slice(start, start + self.model.nb_mi)
 
-        # Observation term: log p(y | psi, sigma, mi)
-        physical_params = model.convert_gaussian_to_physical(gaussian_params, log_mi)
-        thetas = model.convert_physical_to_thetas_all_patients(physical_params)
+    def _predict_detached(
+        self, log_mi: torch.Tensor, gaussian_params: torch.Tensor
+    ) -> torch.Tensor:
+        model = self.model
+        physical = model.convert_gaussian_to_physical(gaussian_params, log_mi)
+        thetas = model.convert_physical_to_thetas_all_patients(physical)
         inputs = model.convert_thetas_to_model_parameters_all_patients(thetas)
         predictions, _ = model.predict_all_patients(inputs)
+        return predictions.detach()
+
+    def _analytic_ll_per_chain(
+        self,
+        flat: torch.Tensor,
+        predictions: torch.Tensor,
+        gaussian_params: torch.Tensor,
+    ) -> torch.Tensor:
+        model = self.model
+        beta, omega, _log_mi, res_var = self._unflatten(flat)
+
         log_lik_obs = log_likelihood_observation(
             observations=model.data.full_obs,
             predictions=predictions,
             residual_error=res_var,
             min_variance=model.config.residual_min_variance,
         )
-
-        # Random effects term: psi_i ~ N(X_i @ beta, Omega)
         mu = model.full_design_matrix @ beta
         log_lik_psi = torch.distributions.MultivariateNormal(
             loc=mu, covariance_matrix=omega
         ).log_prob(gaussian_params)
-
         return (log_lik_obs + log_lik_psi).sum(dim=1)
 
-    def _complete_log_likelihood(
-        self, flat: torch.Tensor, gaussian_params: torch.Tensor
-    ) -> torch.Tensor:
-        """`log p(y, psi ; theta)` averaged over the chains."""
-        return self._complete_log_likelihood_per_chain(flat, gaussian_params).mean()
+    def _analytic_louis_stats(
+        self,
+        flat: torch.Tensor,
+        predictions: torch.Tensor,
+        gaussian_params: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        theta = flat.clone().requires_grad_(True)
+        scores = torch.stack(
+            [
+                torch.autograd.grad(
+                    self._analytic_ll_per_chain(
+                        theta, predictions[c : c + 1], gaussian_params[c : c + 1]
+                    ).sum(),
+                    theta,
+                )[0]
+                for c in range(gaussian_params.shape[0])
+            ]
+        )
+        hessian = torch.autograd.functional.hessian(
+            lambda t: self._analytic_ll_per_chain(
+                t, predictions, gaussian_params
+            ).mean(),
+            flat,
+        )
+        assert isinstance(hessian, torch.Tensor)
+        return scores, hessian
 
-    def _compute_louis_stats_fd(
+    def _mi_finite_differences(
+        self,
+        flat: torch.Tensor,
+        gaussian_params: torch.Tensor,
+        base_predictions: torch.Tensor,
+        eps: float,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        model = self.model
+        theta = flat.clone().requires_grad_(True)
+        log_mi0 = flat[self._mi_slice]
+        h = eps * torch.clamp(log_mi0.abs(), min=1.0)
+        e = torch.eye(model.nb_mi, device=device, dtype=flat.dtype) * h  # step vectors
+
+        def ll(step: torch.Tensor) -> torch.Tensor:
+            preds = self._predict_detached(log_mi0 + step, gaussian_params)
+            return self._analytic_ll_per_chain(flat, preds, gaussian_params)
+
+        def ll_and_grad(step: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+            preds = self._predict_detached(log_mi0 + step, gaussian_params)
+            ll_step = self._analytic_ll_per_chain(flat, preds, gaussian_params)
+            grad_step = torch.autograd.grad(
+                self._analytic_ll_per_chain(theta, preds, gaussian_params).mean(),
+                theta,
+            )[0]
+            return ll_step, grad_step
+
+        ll_0 = self._analytic_ll_per_chain(flat, base_predictions, gaussian_params)
+        plus = [ll_and_grad(e[k]) for k in range(model.nb_mi)]
+        minus = [ll_and_grad(-e[k]) for k in range(model.nb_mi)]
+        ll_p = torch.stack([p[0] for p in plus])
+        ll_m = torch.stack([m[0] for m in minus])
+
+        mi_scores = (ll_p - ll_m) / (2 * h.unsqueeze(1))
+        cross = torch.stack(
+            [(plus[k][1] - minus[k][1]) / (2 * h[k]) for k in range(model.nb_mi)],
+            dim=1,
+        )
+
+        h_mm = torch.diag((ll_p - 2 * ll_0 + ll_m).mean(dim=1) / h**2)
+        for i, j in zip(*torch.triu_indices(model.nb_mi, model.nb_mi, offset=1)):
+            h_mm[i, j] = h_mm[j, i] = (
+                ll(e[i] + e[j]) - ll(e[i] - e[j]) - ll(-e[i] + e[j]) + ll(-e[i] - e[j])
+            ).mean() / (4 * h[i] * h[j])
+
+        return mi_scores, h_mm, cross
+
+    def _compute_louis_stats_hybrid(
         self, flat: torch.Tensor, gaussian_params: torch.Tensor, eps: float = 1e-3
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        """Compute Score, Hessian and Score Outer Product using Finite Differences."""
-        h = eps * torch.clamp(flat.abs(), min=1.0)
-        P = torch.diag(h)
+        """Louis' statistics: autograd on (beta, omega, sigma), finite differences
+        on MI. Only `log_mi` flows through the structural model, so Omega is never
+        perturbed numerically and every non-MI parameter is differentiated exactly.
+        """
+        nb_chains = gaussian_params.shape[0]
+        predictions = self._predict_detached(flat[self._mi_slice], gaussian_params)
+        scores, hessian = self._analytic_louis_stats(flat, predictions, gaussian_params)
 
-        def ll(p):
-            return self._complete_log_likelihood_per_chain(flat + p, gaussian_params)
-
-        ll_0 = ll(0)
-        ll_p = torch.stack([ll(p) for p in P])
-        ll_m = torch.stack([ll(-p) for p in P])
-
-        scores = (ll_p - ll_m) / (2 * h.unsqueeze(1))
-        hessian = torch.diag((ll_p - 2 * ll_0 + ll_m).mean(dim=1) / (h**2))
-
-        for i, j in zip(*torch.triu_indices(len(flat), len(flat), offset=1)):
-            h_ij = (
-                ll(P[i] + P[j]) - ll(P[i] - P[j]) - ll(-P[i] + P[j]) + ll(-P[i] - P[j])
-            ).mean()
-            hessian[i, j] = hessian[j, i] = h_ij / (4 * h[i] * h[j])
+        if self.model.nb_mi > 0:
+            mi = self._mi_slice
+            mi_scores, h_mm, cross = self._mi_finite_differences(
+                flat, gaussian_params, predictions, eps
+            )
+            scores, hessian = scores.clone(), hessian.clone()
+            scores[:, mi] = mi_scores.transpose(0, 1)
+            hessian[:, mi] = cross
+            hessian[mi, :] = cross.transpose(0, 1)
+            hessian[mi, mi] = h_mm  # written last: overrides the ~0 cross entries
 
         return (
-            scores.mean(dim=1),
+            scores.mean(dim=0),
             hessian,
-            (scores @ scores.T) / gaussian_params.shape[0],
+            scores.transpose(0, 1) @ scores / nb_chains,
         )
 
     # --- Stochastic approximation
     def update(self, gaussian_params: torch.Tensor, learning_rate: float) -> None:
-        nb_chains = gaussian_params.shape[0]
         flat = self.flatten_parameters()
-
-        if self.model.nb_mi == 0:
-            theta = flat.clone().requires_grad_(True)
-            scores = torch.stack(
-                [
-                    torch.autograd.grad(
-                        self._complete_log_likelihood(
-                            theta, gaussian_params[chain : chain + 1]
-                        ),
-                        theta,
-                    )[0]
-                    for chain in range(nb_chains)
-                ]
-            )
-            hessian = torch.autograd.functional.hessian(
-                lambda t: self._complete_log_likelihood(t, gaussian_params), flat
-            )
-            mean_score = scores.mean(dim=0)
-            score_outer_product = scores.transpose(0, 1) @ scores / nb_chains
-        else:
-            mean_score, hessian, score_outer_product = self._compute_louis_stats_fd(
-                flat, gaussian_params
-            )
+        mean_score, hessian, score_outer_product = self._compute_louis_stats_hybrid(
+            flat, gaussian_params
+        )
 
         self.score = stochastic_approximation(
             previous=self.score, new=mean_score, learning_rate=learning_rate
@@ -261,12 +314,10 @@ class Fim:
             chol = torch.linalg.cholesky(fim)
             return torch.cholesky_inverse(chol)
 
-        warnings.warn(
+        print(
             f"Observed FIM is not positive definite (smallest eigenvalue "
-            f"{min_eig.item():.3e}): falling back to the pseudo-inverse. Standard "
-            f"errors of the affected parameters are unreliable.",
-            RuntimeWarning,
-            stacklevel=2,
+            f"{min_eig.item():.3e}): falling back to the pseudo-inverse. "
+            f"Standard errors of the affected parameters are unreliable."
         )
         return torch.linalg.pinv(fim)
 
