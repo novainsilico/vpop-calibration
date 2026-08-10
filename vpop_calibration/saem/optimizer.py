@@ -46,6 +46,7 @@ class PySaem:
                 nb_iter_burnin=1,
                 nb_iter_learning=2,
                 nb_iter_smoothing=2,
+                covMethod="sa",
                 nb_iter_fim=2,
                 optim_max_iter=1,
                 progress_bars=False,
