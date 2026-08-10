@@ -173,6 +173,10 @@ class PySaem:
 
             if self.config.live_plot:
                 self.plot.close()
+
+            if self.config.covMethod == "sa" and hasattr(self, "fim_estimator"):
+                self.fim_estimator.summary()
+
         except KeyboardInterrupt:
             print(f"Interrupted gracefully at iteration {self.scheduler.iteration}.")
 
