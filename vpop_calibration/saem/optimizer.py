@@ -120,10 +120,10 @@ class PySaem:
                     "has_run": True,
                 }
             )
-        if hasattr(self, "fim_estimator"):
-            state_dict["fim_estimator"] = self.fim_estimator.get_state_dict()
         else:
             state_dict.update({"has_run": False})
+        if hasattr(self, "fim_estimator"):
+            state_dict["fim_estimator"] = self.fim_estimator.get_state_dict()
 
         return state_dict
 
