@@ -2,11 +2,9 @@ import pandas as pd
 import numpy as np
 import time
 import torch
-import matplotlib.pyplot as plt
 from deepdiff import DeepDiff
 
 from vpop_calibration import *
-from vpop_calibration.metropolis_hastings import mh_step
 
 ## Loading dataset
 df = pd.read_csv("Mavoglurant_Dataset.csv")
@@ -54,9 +52,9 @@ prior = {
 ## Config
 config = Config(
     saem=SaemConfigDict(
-        nb_iter_burnin=50,
-        nb_iter_learning=50,
-        nb_iter_smoothing=50,
+        nb_iter_burnin=10,
+        nb_iter_learning=10,
+        nb_iter_smoothing=10,
     ),
     nlme=NlmeConfigDict(nb_chains=1),
 )
@@ -168,18 +166,23 @@ print("total:", round(rt_sim["total_s"], 3), "s")
 
 
 # Coût d'un E-step sur un NlmeModel
-def time_mh_step(structural_model, obs_df, repeats=5, warmup=1):
+def time_predict_all_patients(structural_model, obs_df, repeats=5, warmup=1):
     nlme = NlmeModel(
         df=obs_df, prior_params=prior, structural_model=structural_model, config=config
     )
     opt = nlme.optimizer
     opt.init_state()
     model = nlme.statistical_model
-    state = opt.mh_state
-    lr = opt.scheduler.mh_learning_rate
+
+    etas = model.sample_etas(model.nb_chains)
+    gaussian_params = model.convert_etas_to_gaussian_all_patients(etas)
+    physical_params = model.convert_gaussian_to_physical(gaussian_params, model.log_mi)
+    thetas = model.convert_physical_to_thetas_all_patients(physical_params)
+    inputs = model.convert_thetas_to_model_parameters_all_patients(thetas)
 
     def one():
-        return mh_step(nlme_model=model, previous_state=state, learning_rate=lr)
+        # Benchmark only the true function of interest
+        return model.predict_all_patients(inputs)
 
     return _median_time(one, repeats, warmup)
 
@@ -193,8 +196,8 @@ for n in n_list:
     obs = build_population_obs(df, ids=ids, dose_col="Dose")[0]
     n_obs = obs.shape[0]
 
-    t_sbml = time_mh_step(sbml_model, obs)
-    t_sim = time_mh_step(StructuralSimwork(model=simwork_model), obs)
+    t_sbml = time_predict_all_patients(sbml_model, obs)
+    t_sim = time_predict_all_patients(StructuralSimwork(model=simwork_model), obs)
 
     rows.append(
         {
@@ -221,24 +224,6 @@ def fit(col):
 for eng in ["sbml_ms", "simwork_ms"]:
     s, i = fit(eng)
     print(f"{eng:11s}: {i:8.2f} ms fixe + {s:7.3f} ms/patient")
-
-# Tracé du runtime d'un E-step selon la taille d'un E-step
-fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(11, 4))
-for ax, logy in [(ax1, False), (ax2, True)]:
-    ax.plot(scaling["n_patients"], scaling["sbml_ms"], "o-", label="SBML")
-    ax.plot(scaling["n_patients"], scaling["simwork_ms"], "s-", label="Simwork")
-    ax.set_xlabel("nombre de patients")
-    ax.set_ylabel("mh_step (ms)")
-    ax.grid(True, alpha=0.3)
-    ax.legend()
-    if logy:
-        ax.set_yscale("log")
-        ax.set_title("échelle log")
-    else:
-        ax.set_title("échelle linéaire")
-fig.suptitle("Coût d'un mh_step (E-step) vs taille de vpop")
-plt.tight_layout()
-fig.savefig("scaling_E_step.png", dpi=120, bbox_inches="tight")
 
 
 # Prédictions déterministes à etas figés, structurées {patient_id: [valeurs]}.
