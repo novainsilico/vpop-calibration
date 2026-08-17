@@ -1,7 +1,6 @@
 stages:
   - lint
   - test
-  - test-sdk
   - deploy
 
 ruff:
@@ -10,15 +9,15 @@ ruff:
   script:
     - nix develop . --command ruff check
 
-pytest:
+pytest-full:
   stage: test
   tags: [ nix ]
   script:
     - nix develop . --command poetry install --extras full
     - nix develop . --command poetry run pytest
   
-pytest:
-  stage: test-sdk
+pytest-sdk:
+  stage: test
   tags: [ nix ]
   script:
     - nix develop . --command poetry install
