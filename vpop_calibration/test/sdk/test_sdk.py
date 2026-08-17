@@ -1,12 +1,12 @@
 from vpop_calibration.sdk import (
-    create_nlme_model,
+    create_nlme_interface,
     export_nlme_model,
     load_nlme_model,
     run_saem,
     run_diagnostics,
     DiagnosticsConfig,
+    Config,
 )
-from vpop_calibration.interface import Config
 
 import pytest
 import pandas as pd
@@ -14,7 +14,7 @@ import numpy as np
 
 
 @pytest.fixture(scope="function")
-def obs_data(np_rng) -> pd.DataFrame:
+def obs_data() -> pd.DataFrame:
     protocol_arms = ["dose-1", "dose-10"]
     patients = {
         "id": ["p1", "p2"],
@@ -26,8 +26,8 @@ def obs_data(np_rng) -> pd.DataFrame:
     df = pd.DataFrame.from_dict(patients)
     df = df.merge(pd.DataFrame(outputs, columns=["output_name"]), how="cross")
     df = df.merge(pd.DataFrame(time_steps, columns=["time"]), how="cross")
-    df["value"] = np.abs(np_rng.normal(10, 1, df.shape[0]))
-    df = df.sample(frac=0.7, random_state=np_rng)
+    df["value"] = np.linspace(0, 10, df.shape[0])
+    df = df.sample(frac=0.7)
 
     return df
 
@@ -68,7 +68,7 @@ def test_sdk(obs_data, sample_nlme_params):
     config = Config()
 
     # 1. Create model
-    model = create_nlme_model(
+    model = create_nlme_interface(
         data_table=obs_data,
         user_input=sample_nlme_params,
         config=config,

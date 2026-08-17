@@ -1,10 +1,17 @@
-from tqdm.notebook import tqdm
+from vpop_calibration.compatibility import tqdm
 import torch
 import pandas as pd
 from typing import NamedTuple, Any
 import numpy as np
-import matplotlib.pyplot as plt
-from IPython.display import display
+
+try:
+    import matplotlib.pyplot as plt
+except ImportError:
+    plt = None
+try:
+    from IPython.display import display
+except ImportError:
+    display = None
 
 
 from vpop_calibration.pynlme.model import StatisticalModel

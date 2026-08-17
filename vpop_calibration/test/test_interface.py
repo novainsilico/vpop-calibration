@@ -3,8 +3,9 @@ import numpy as np
 import pandas as pd
 import torch
 
-from vpop_calibration.interface import NlmeModel
-from vpop_calibration.structural_model import StructuralAnalytical, StructuralModel
+from vpop_calibration.api.interface import NlmeModel
+from vpop_calibration.structural_model.base import StructuralModel
+from vpop_calibration.structural_model.analytical import StructuralAnalytical
 
 
 @pytest.fixture(scope="function")

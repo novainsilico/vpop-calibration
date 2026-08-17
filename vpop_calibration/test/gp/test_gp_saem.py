@@ -2,7 +2,7 @@ import pandas as pd
 import pytest
 import numpy as np
 
-from vpop_calibration.interface import NlmeModel
+from vpop_calibration.api.interface import NlmeModel
 from vpop_calibration.structural_model.gp import StructuralGp
 from vpop_calibration.model.gp import GP
 

@@ -14,7 +14,7 @@ def extend_schema(
         return schema
     else:
         return schema.add_columns(
-            {col: pa.Column(type, default=pd.NA) for col in column_list}
+            {col: pa.Column(type, default=pd.NA, coerce=True) for col in column_list}
         )
 
 

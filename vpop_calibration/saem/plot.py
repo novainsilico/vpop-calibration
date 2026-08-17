@@ -1,7 +1,14 @@
-import matplotlib.pyplot as plt
+try:
+    import matplotlib.pyplot as plt
+except ImportError:
+    plt = None
+try:
+    from IPython.display import display
+except ImportError:
+    display = None
 import pandas as pd
 import numpy as np
-from IPython.display import display
+
 
 from vpop_calibration.config import smoke_test
 

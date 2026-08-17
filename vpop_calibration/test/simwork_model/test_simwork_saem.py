@@ -7,7 +7,12 @@ from vpop_calibration.structural_model.simwork import (
     StructuralSimwork,
 )
 from vpop_calibration.structural_model.base import StructuralModel
-from vpop_calibration.interface import NlmeModel, Config, SaemConfigDict, NlmeConfigDict
+from vpop_calibration.api.interface import (
+    NlmeModel,
+    Config,
+    SaemConfigDict,
+    NlmeConfigDict,
+)
 
 
 @pytest.fixture

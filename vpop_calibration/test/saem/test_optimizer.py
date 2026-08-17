@@ -4,7 +4,7 @@ from vpop_calibration.pynlme.model import StatisticalModel
 from vpop_calibration.pynlme.params import MixedEffectParameters
 from vpop_calibration.pynlme.data import ObsData
 from vpop_calibration.pynlme.config import NlmeConfigDict
-from vpop_calibration.structural_model import StructuralAnalytical
+from vpop_calibration.structural_model.analytical import StructuralAnalytical
 
 import pytest
 import pandas as pd
