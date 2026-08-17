@@ -91,6 +91,7 @@ class PySaem:
             complete_likelihood=init_likelihood,
             model_intrinsic=self.model.log_mi,
             fixed_effects_loss=fixed_effects_loss,
+            surv_coeffs=self.model.surv_coeffs,
         )
         self.sufficient_statistics = MStepState.from_init_gaussian_params(
             design_matrix=self.model.full_design_matrix,
@@ -312,6 +313,7 @@ class PySaem:
             ebe=new_ebe,
             sigma=self.model.residual_var,
             model_intrinsic=self.model.log_mi,
+            surv_coeffs=self.model.surv_coeffs,
             complete_likelihood=self.mh_state.complete_likelihood,
             fixed_effects_loss=fixed_effects_loss,
         )
@@ -324,6 +326,7 @@ class PySaem:
             pdu_names=self.model.pdu_names,
             covariate_coeff_names=self.model.covariate_coeff_names,
             mi_names=self.model.mi_names,
+            surv_coeffs_names=self.model.surv_coeff_names,
             output_names=self.model.input_params.continuous_output_names,
         )
         return summary
