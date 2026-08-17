@@ -1,5 +1,5 @@
 from vpop_calibration.sdk import (
-    create_nlme_model,
+    create_nlme_interface,
     export_nlme_model,
     load_nlme_model,
     run_saem,
@@ -68,7 +68,7 @@ def test_sdk(obs_data, sample_nlme_params):
     config = Config()
 
     # 1. Create model
-    model = create_nlme_model(
+    model = create_nlme_interface(
         data_table=obs_data,
         user_input=sample_nlme_params,
         config=config,

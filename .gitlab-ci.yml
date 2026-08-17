@@ -1,6 +1,7 @@
 stages:
   - lint
   - test
+  - test-sdk
   - deploy
 
 ruff:
@@ -13,15 +14,23 @@ pytest:
   stage: test
   tags: [ nix ]
   script:
-    - nix develop . --command poetry install
+    - nix develop . --command poetry install --extras full
     - nix develop . --command poetry run pytest
+  
+pytest:
+  stage: test-sdk
+  tags: [ nix ]
+  script:
+    - nix develop . --command poetry install
+    - nix develop . --command poetry sync
+    - nix develop . --command poetry run pytest vpop-calibration/test/sdk
 
 pypi_deploy:
   stage: deploy
   tags: [ nix ]
   image: $PYTHON_IMAGE
   script:
-    - nix develop . --command poetry install
+    - nix develop . --command poetry install --extras full
     - nix develop . --command poetry config pypi-token.pypi "$PYPI_TOKEN"
     # Extract the version number from pyproject.toml
     - VERSION=$(nix develop . --command poetry version -s)

@@ -1,5 +1,5 @@
 from vpop_calibration.sdk.model import (
-    create_nlme_model,
+    create_nlme_interface,
     export_nlme_model,
     load_nlme_model,
 )
@@ -11,7 +11,7 @@ from vpop_calibration.sdk.diagnostics import (
 )
 
 __all__ = [
-    "create_nlme_model",
+    "create_nlme_interface",
     "export_nlme_model",
     "load_nlme_model",
     "run_saem",

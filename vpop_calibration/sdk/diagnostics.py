@@ -1,4 +1,4 @@
-from vpop_calibration.interface import NlmeModel
+from vpop_calibration.sdk.model import NlmeInterface
 from vpop_calibration.pynlme.diagnostics import WeightedResidualsSchema
 
 from typing import NamedTuple
@@ -30,7 +30,9 @@ class DiagnosticsOutput(NamedTuple):
     log_likelihood: float | None
 
 
-def run_diagnostics(model: NlmeModel, config: DiagnosticsConfig) -> DiagnosticsOutput:
+def run_diagnostics(
+    model: NlmeInterface, config: DiagnosticsConfig
+) -> DiagnosticsOutput:
     # Run the estimation tasks
     if config.conditional_distrib:
         model.diagnostics.sample_conditional_distribution(nb_samples=config.nb_samples)
