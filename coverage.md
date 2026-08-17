@@ -11,7 +11,7 @@
 | vpop\_calibration/model/gp.py                         |      227 |       49 |       68 |       20 |     75% |61, 66, 102, 139, 141-142, 146-149, 224-225, 232, 252, 286, 308, 310, 364, 385, 389-394, 401-409, 411-\>346, 435-437, 465, 475-484, 514-\>exit, 589-596 |
 | vpop\_calibration/model/plot.py                       |      122 |       11 |       32 |        8 |     88% |76-77, 147-148, 174-\>177, 219-\>178, 224-225, 244, 253-\>255, 256-259 |
 | vpop\_calibration/pynlme/\_\_init\_\_.py              |        0 |        0 |        0 |        0 |    100% |           |
-| vpop\_calibration/pynlme/conditional\_distribution.py |      185 |       18 |       44 |        5 |     86% |9-10, 13-14, 129, 134-\>136, 142-146, 230, 251-257, 329 |
+| vpop\_calibration/pynlme/conditional\_distribution.py |      185 |       18 |       44 |        5 |     86% |9-10, 13-14, 131, 136-\>138, 144-148, 234, 255-261, 333 |
 | vpop\_calibration/pynlme/config.py                    |       14 |        0 |        0 |        0 |    100% |           |
 | vpop\_calibration/pynlme/data.py                      |       61 |        0 |       12 |        0 |    100% |           |
 | vpop\_calibration/pynlme/diagnostics.py               |      164 |        8 |       22 |        7 |     92% |84-85, 155-\>158, 203-205, 224-\>228, 299, 319, 390 |
@@ -27,23 +27,23 @@
 | vpop\_calibration/pynlme/utils.py                     |       26 |        4 |        2 |        0 |     79% |     82-85 |
 | vpop\_calibration/saem/\_\_init\_\_.py                |        0 |        0 |        0 |        0 |    100% |           |
 | vpop\_calibration/saem/config.py                      |       28 |        0 |        0 |        0 |    100% |           |
-| vpop\_calibration/saem/estimates.py                   |       94 |       17 |       26 |        0 |     78% |148-157, 160-167, 187, 191 |
+| vpop\_calibration/saem/estimates.py                   |       97 |       17 |       26 |        0 |     78% |158-167, 170-177, 197, 201 |
 | vpop\_calibration/saem/fixed\_effects.py              |       23 |        0 |        2 |        0 |    100% |           |
 | vpop\_calibration/saem/m\_step.py                     |       53 |        0 |        2 |        0 |    100% |           |
-| vpop\_calibration/saem/optimizer.py                   |      132 |       16 |       42 |        8 |     82% |37, 42-\>54, 154, 161-164, 167-170, 173-178, 270-\>290, 360-361, 377-385 |
+| vpop\_calibration/saem/optimizer.py                   |      140 |       18 |       42 |        8 |     81% |37, 42-\>54, 155, 162-165, 168-171, 174-181, 273-\>303, 379-380, 396-404 |
 | vpop\_calibration/saem/plot.py                        |       47 |       36 |       14 |        0 |     18% |3-4, 7-8, 24-57, 60-68, 71 |
 | vpop\_calibration/saem/scheduler.py                   |       48 |        0 |       14 |        0 |    100% |           |
 | vpop\_calibration/saem/utils.py                       |       27 |        0 |        0 |        0 |    100% |           |
 | vpop\_calibration/sdk/\_\_init\_\_.py                 |        5 |        0 |        0 |        0 |    100% |           |
 | vpop\_calibration/sdk/config.py                       |        7 |        0 |        0 |        0 |    100% |           |
-| vpop\_calibration/sdk/diagnostics.py                  |       43 |        4 |       12 |        6 |     82% |47-48, 52, 60, 62-\>65, 65-\>68, 68-\>72 |
-| vpop\_calibration/sdk/model.py                        |       44 |        0 |        0 |        0 |    100% |           |
-| vpop\_calibration/sdk/saem.py                         |        5 |        0 |        0 |        0 |    100% |           |
+| vpop\_calibration/sdk/diagnostics.py                  |       43 |       20 |       12 |        0 |     42% |     37-80 |
+| vpop\_calibration/sdk/model.py                        |       44 |       19 |        0 |        0 |     57% |42-43, 46-51, 60-73, 104, 108-110, 125-145 |
+| vpop\_calibration/sdk/saem.py                         |        5 |        2 |        0 |        0 |     60% |      7-10 |
 | vpop\_calibration/structural\_model/\_\_init\_\_.py   |        0 |        0 |        0 |        0 |    100% |           |
 | vpop\_calibration/structural\_model/analytical.py     |       41 |        0 |        2 |        0 |    100% |           |
 | vpop\_calibration/structural\_model/base.py           |       30 |        1 |        0 |        0 |     97% |        38 |
 | vpop\_calibration/structural\_model/gp.py             |       26 |        0 |        2 |        0 |    100% |           |
-| vpop\_calibration/structural\_model/sbml.py           |       80 |        1 |        8 |        1 |     98% |        55 |
+| vpop\_calibration/structural\_model/sbml.py           |       90 |        8 |       12 |        2 |     88% |29-30, 61-66, 69 |
 | vpop\_calibration/structural\_model/simwork.py        |      128 |        7 |       22 |        2 |     91% |72-89, 121 |
 | vpop\_calibration/utils.py                            |       24 |        3 |        6 |        2 |     83% | 29-30, 35 |
-| **TOTAL**                                             | **3199** |  **343** |  **636** |  **123** | **86%** |           |
+| **TOTAL**                                             | **3323** |  **391** |  **662** |  **120** | **85%** |           |
