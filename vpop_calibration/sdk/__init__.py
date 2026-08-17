@@ -9,6 +9,7 @@ from vpop_calibration.sdk.diagnostics import (
     DiagnosticsConfig,
     DiagnosticsOutput,
 )
+from vpop_calibration.sdk.config import Config
 
 __all__ = [
     "create_nlme_interface",
@@ -18,4 +19,5 @@ __all__ = [
     "run_diagnostics",
     "DiagnosticsConfig",
     "DiagnosticsOutput",
+    "Config",
 ]

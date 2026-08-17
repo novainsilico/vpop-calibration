@@ -8,7 +8,7 @@ from vpop_calibration.structural_model.simwork import (
     SimworkModelBinding,
     StructuralSimwork,
 )
-from vpop_calibration.interface import Config
+from vpop_calibration.sdk.config import Config
 from vpop_calibration.pynlme.params import MixedEffectParameters
 from vpop_calibration.pynlme.model import StatisticalModel
 from vpop_calibration.saem.optimizer import PySaem
@@ -25,7 +25,6 @@ class NlmeInterface:
         protocol_design: pd.DataFrame | None,
         categorical_attributes: pd.DataFrame | None,
     ):
-        config = config._replace(saem=config.saem._replace(mode="cli"))
         structural_model = StructuralSimwork(
             model=simwork_model,
             protocol_design=protocol_design,

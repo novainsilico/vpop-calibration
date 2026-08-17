@@ -5,7 +5,7 @@ from scipy.stats.qmc import Sobol, scale
 from pydantic import BaseModel, TypeAdapter
 from pandera.typing import DataFrame
 
-from vpop_calibration.structural_model import StructuralModel
+from vpop_calibration.structural_model.base import StructuralModel
 from vpop_calibration.pynlme.schemas import ObsDataSchema, patientDataSchema
 from vpop_calibration.pynlme.params import MixedEffectParameters
 from vpop_calibration.pynlme.model import StatisticalModel

@@ -1,11 +1,16 @@
-from vpop_calibration.interface import NlmeModel, Config, NlmeConfigDict, SaemConfigDict
-from vpop_calibration.structural_model import (
-    StructuralAnalytical,
-    StructuralGp,
+from vpop_calibration.api.interface import (
+    NlmeModel,
+    Config,
+    NlmeConfigDict,
+    SaemConfigDict,
+)
+from vpop_calibration.structural_model.analytical import StructuralAnalytical
+from vpop_calibration.structural_model.gp import StructuralGp
+from vpop_calibration.structural_model.simwork import (
     StructuralSimwork,
     SimworkModelBinding,
-    StructuralSbml,
 )
+from vpop_calibration.structural_model.sbml import StructuralSbml
 from vpop_calibration.model import GP
 from vpop_calibration.data_generation import (
     generate_synthetic_data,

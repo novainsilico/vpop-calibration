@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-from tqdm.notebook import tqdm
+from vpop_calibration.compatibility import tqdm
 from typing import Callable, Any
 import pandas as pd
 

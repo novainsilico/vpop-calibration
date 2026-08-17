@@ -2,7 +2,8 @@ from vpop_calibration.data_generation import (
     generate_training_data,
     generate_synthetic_data,
 )
-from vpop_calibration.structural_model import StructuralAnalytical, StructuralModel
+from vpop_calibration.structural_model.base import StructuralModel
+from vpop_calibration.structural_model.analytical import StructuralAnalytical
 
 import pytest
 import torch

@@ -20,9 +20,8 @@ pytest-sdk:
   stage: test
   tags: [ nix ]
   script:
-    - nix develop . --command poetry install
-    - nix develop . --command poetry sync
-    - nix develop . --command poetry run pytest vpop-calibration/test/sdk
+    - nix develop . --command poetry install --only main,dev
+    - nix develop . --command poetry run pytest ./vpop-calibration/test/sdk --noconftest
 
 pypi_deploy:
   stage: deploy

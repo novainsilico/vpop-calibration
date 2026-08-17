@@ -2,11 +2,11 @@ from vpop_calibration.data_generation import (
     generate_training_data,
     generate_synthetic_data,
 )
-from vpop_calibration.structural_model import (
+from vpop_calibration.structural_model.simwork import (
     StructuralSimwork,
-    StructuralModel,
     SimworkModelBinding,
 )
+from vpop_calibration.structural_model.base import StructuralModel
 
 import pytest
 

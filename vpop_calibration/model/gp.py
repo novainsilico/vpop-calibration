@@ -2,7 +2,7 @@ from matplotlib import pyplot as plt
 import math
 import torch
 import gpytorch
-from tqdm.notebook import tqdm
+from vpop_calibration.compatibility import tqdm
 from gpytorch.mlls import VariationalELBO, PredictiveLogLikelihood
 from torch.utils.data import TensorDataset, DataLoader
 import numpy as np

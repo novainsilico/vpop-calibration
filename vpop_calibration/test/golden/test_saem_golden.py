@@ -6,7 +6,7 @@ from deepdiff import DeepDiff
 
 from vpop_calibration.structural_model.base import StructuralModel
 from vpop_calibration.structural_model.analytical import StructuralAnalytical
-from vpop_calibration.interface import NlmeModel
+from vpop_calibration.api.interface import NlmeModel
 
 
 @pytest.fixture

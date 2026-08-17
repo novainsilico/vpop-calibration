@@ -91,3 +91,6 @@ ignore_errors = true
 [tool.ruff.lint]
 ignore = ["F403", "F405"]
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+[tool.ruff]
+exclude = [".venv*"]

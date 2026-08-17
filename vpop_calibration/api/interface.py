@@ -4,7 +4,7 @@ from typing import Literal, NamedTuple, Any
 import json
 import os
 
-from vpop_calibration.structural_model import StructuralModel
+from vpop_calibration.structural_model.base import StructuralModel
 from vpop_calibration.pynlme.model import StatisticalModel
 from vpop_calibration.pynlme.data import ObsData
 from vpop_calibration.pynlme.params import MixedEffectParameters
