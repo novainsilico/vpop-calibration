@@ -13,15 +13,13 @@ pytest-full:
   stage: test
   tags: [ nix ]
   script:
-    - nix develop . --command poetry install --extras full
-    - nix develop . --command poetry run pytest
+    - nix develop --command poetry run pytest
   
 pytest-sdk:
   stage: test
   tags: [ nix ]
   script:
-    - nix develop . --command poetry install --only main,dev
-    - nix develop . --command poetry run pytest ./vpop-calibration/test/sdk --noconftest
+    - nix develop .#slim --command poetry run pytest ./vpop-calibration/test/sdk --noconftest
 
 pypi_deploy:
   stage: deploy

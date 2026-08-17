@@ -43,7 +43,7 @@
           source .venv-slim/bin/activate
           export POETRY_VIRTUALENVS_IN_PROJECT=true
           export POETRY_VIRTUALENVS_PATH=".venv-slim"
-          poetry install
+          poetry install --only main,dev
           poetry sync
         '';
       };
