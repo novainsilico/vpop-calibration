@@ -12,6 +12,7 @@ class PopEstimates(NamedTuple):
     ebe: torch.Tensor
     sigma: ResidualErrorEstimates
     model_intrinsic: torch.Tensor
+    surv_coeffs: torch.Tensor
     complete_likelihood: torch.Tensor
     fixed_effects_loss: torch.Tensor
 
@@ -42,6 +43,7 @@ class PopEstimates(NamedTuple):
             "ebe",
             "sigma",
             "model_intrinsic",
+            "surv_coeffs",
             "complete_likelihood",
             "fixed_effects_loss",
         ]
@@ -57,7 +59,7 @@ def check_convergence(
     prev_est: PopEstimates, current_est: PopEstimates, threshold: float
 ):
     """Checks for convergence based on the relative change in parameters."""
-    variables_to_check = ["beta", "omega", "ebe", "model_intrinsic"]
+    variables_to_check = ["beta", "omega", "ebe", "model_intrinsic", "surv_coeffs"]
     compared_pairs = [
         (current_est._asdict()[name], prev_est._asdict()[name])
         for name in variables_to_check
@@ -81,6 +83,7 @@ class IterSummary(NamedTuple):
     mu: dict[str, float]
     omega: dict[str, float]
     model_intrinsic: dict[str, float]
+    surv_coeffs: dict[str, float]
     cov: dict[str, float]
     sigma: dict[str, float]
     convergence_indicator: float
@@ -92,6 +95,7 @@ class IterSummary(NamedTuple):
             (self.mu, "mu_"),
             (self.omega, "omega_"),
             (self.model_intrinsic, ""),
+            (self.surv_coeffs, ""),
             (self.cov, ""),
             (self.sigma, "sigma_"),
         ]
@@ -107,6 +111,7 @@ class IterSummary(NamedTuple):
         covariate_coeff_names: list[str],
         mi_names: list[str],
         output_names: list[str],
+        surv_coeffs_names: list[str],
     ) -> "IterSummary":
         mu_dict: dict[str, float] = {
             pdu: estimates.beta[beta_names.index(pdu)].item() for pdu in pdu_names
@@ -120,6 +125,10 @@ class IterSummary(NamedTuple):
         cov_dict: dict[str, float] = {
             cov: estimates.beta[beta_names.index(cov)].item()
             for cov in covariate_coeff_names
+        }
+        surv_coeffs_dict: dict[str, float] = {
+            coef: estimates.surv_coeffs[surv_coeffs_names.index(coef)].item()
+            for coef in surv_coeffs_names
         }
         sigma_dict: dict[str, float] = {}
         for i, (output, error_type) in enumerate(
@@ -142,6 +151,7 @@ class IterSummary(NamedTuple):
             sigma=sigma_dict,
             convergence_indicator=estimates.complete_likelihood.item(),
             fixed_effects_loss=estimates.fixed_effects_loss.item(),
+            surv_coeffs=surv_coeffs_dict,
         )
 
     def print(self, width: int):
