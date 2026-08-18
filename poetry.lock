@@ -4665,4 +4665,4 @@ test = ["nbmake"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<3.15"
-content-hash = "703cdf50a9fdf68664fe7f3c8979597defea477706174d2fa6827a9fecdd0569"
+content-hash = "66c07f3bd5a60359d1c0055f0a80ef67712eec309f13c6966fdec96b57cd6441"
