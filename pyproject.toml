@@ -10,7 +10,7 @@ requires-python = ">=3.12,<3.15"
 torch = ">=2.10.0"
 scipy = ">=1.16.3, <2.0.0"
 uuid = ">=1.30,<2.0"
-pandas = ">=2.3.3,<3.0.0"
+pandas = ">=2.2.2,<3.0.0"
 numpy = ">=2.3.4,<3.0.0"
 pydantic = ">=2.13.0,<3.0.0"
 pandera = ">=0.31.0,<0.32.0"
@@ -19,9 +19,9 @@ gpytorch = { version = ">=1.14.2,<2.0.0", optional = true}
 matplotlib = { version = ">=3.10.7,<4.0.0", optional = true}
 libroadrunner = { version = ">=2.9.2,<3.0.0", optional = true}
 tqdm = { version = ">=4.67.1,<5.0.0", optional = true}
-ipykernel = { version = "^7.1.0", optional = true}
+ipykernel = { version = "^6.17.1", optional = true}
 jupyter = { version = "^1.1.1", optional = true}
-ipython = { version = "^9.7.0", optional = true}
+ipython = { version = "^7.34.0", optional = true}
 jupyterlab = { version = "^4.4.10", optional = true}
 plotnine = { version = "^0.15.1", optional = true}
 nbmake = { version = "^1.5.5", optional = true}
