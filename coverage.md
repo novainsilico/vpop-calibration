@@ -36,9 +36,9 @@
 | vpop\_calibration/saem/utils.py                       |       27 |        0 |        0 |        0 |    100% |           |
 | vpop\_calibration/sdk/\_\_init\_\_.py                 |        5 |        0 |        0 |        0 |    100% |           |
 | vpop\_calibration/sdk/config.py                       |        7 |        0 |        0 |        0 |    100% |           |
-| vpop\_calibration/sdk/diagnostics.py                  |       43 |       20 |       12 |        0 |     42% |     37-80 |
-| vpop\_calibration/sdk/model.py                        |       44 |       19 |        0 |        0 |     57% |42-43, 46-51, 60-73, 104, 108-110, 125-145 |
-| vpop\_calibration/sdk/saem.py                         |        5 |        2 |        0 |        0 |     60% |      7-10 |
+| vpop\_calibration/sdk/diagnostics.py                  |       43 |        4 |       12 |        6 |     82% |47-48, 52, 60, 62-\>65, 65-\>68, 68-\>72 |
+| vpop\_calibration/sdk/model.py                        |       44 |        0 |        0 |        0 |    100% |           |
+| vpop\_calibration/sdk/saem.py                         |        5 |        0 |        0 |        0 |    100% |           |
 | vpop\_calibration/structural\_model/\_\_init\_\_.py   |        0 |        0 |        0 |        0 |    100% |           |
 | vpop\_calibration/structural\_model/analytical.py     |       41 |        0 |        2 |        0 |    100% |           |
 | vpop\_calibration/structural\_model/base.py           |       30 |        1 |        0 |        0 |     97% |        38 |
