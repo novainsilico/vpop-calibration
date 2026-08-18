@@ -25,7 +25,7 @@
           source .venv-full/bin/activate
           export POETRY_VIRTUALENVS_IN_PROJECT=true
           export POETRY_VIRTUALENVS_PATH=".venv-full"
-          poetry install --all-extras
+          poetry sync --only main,test,dev --extras "full"
         '';
       };
       slim = pkgs.mkShell {
@@ -43,8 +43,7 @@
           source .venv-slim/bin/activate
           export POETRY_VIRTUALENVS_IN_PROJECT=true
           export POETRY_VIRTUALENVS_PATH=".venv-slim"
-          poetry install --only main,dev
-          poetry sync
+          poetry sync --only main,test_slim
         '';
       };
     };
