@@ -160,11 +160,6 @@ print(res)
 res_df <- as.data.frame(res) %>%
   mutate(time_sec = time / 1e9)
 
-ggplot(res_df, aes(x = "", y = time_sec)) +
-  geom_boxplot() +
-  ylab("Runtime (s)") +
-  xlab("Mavoglurant_nlmixr_PDU model")
-
 write.csv(
   res_df,
   "nlmixr2_runtime.csv",
