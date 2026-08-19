@@ -7,14 +7,6 @@ library(microbenchmark)
 library(dplyr)
 library(stringr)
 
-dat <- nlmixr2data::mavoglurant
-dat$occ = unlist(with(dat, tapply(EVID, ID, function(x) cumsum(x>0))))
-dat = subset(dat, occ==1)
-dat = subset(dat, EVID>0 | DV>0)
-dat$CMT[dat$CMT == 0]  <- 1;
-dat$CMT[dat$EVID == 1]  <- "Venous_Blood" ## Compartment dosed to is Venous Blood
-dat$DV <- log(dat$DV)
-dat$CMT[dat$EVID != 1]  <- "logC15"
 
 pbpk <- function(){
   ini({
@@ -25,7 +17,7 @@ pbpk <- function(){
     lCLint = 7.6
     lKbBO = 0.03
     lKbRB = 0.3
-    eta.LClint ~ 4
+    eta.LClint ~ 1
     eta.LKbBR ~ 0.5
     eta.LKbMU ~ 0.5
     eta.LKbAD ~ 0.5
@@ -119,31 +111,62 @@ pbpk <- function(){
   })
 }
 
-fit <- nlmixr2(
-  pbpk,
-  dat,
-  est = "saem",
-  control = saemControl(
-    print  = 100,
-    nBurn  = 100,
-    nEm    = 100,
-    nmc    = 1,
-    nu     = c(1, 1, 1),
-    logLik = FALSE,
-    rxControl = rxControl(
-      method = "liblsoda",
-      atol   = 1e-6,
-      rtol   = 1e-6,
-      hini   = 1e-6
-    )
-  ),
-  table = tableControl(cwres = FALSE, npde = FALSE)
+dat <- nlmixr2data::mavoglurant
+dat$occ = unlist(with(dat, tapply(EVID, ID, function(x) cumsum(x>0))))
+dat = subset(dat, occ==1)
+dat = subset(dat, EVID>0 | DV>0)
+dat$CMT[dat$CMT == 0]  <- 1;
+dat$CMT[dat$EVID == 1]  <- "Venous_Blood" ## Compartment dosed to is Venous Blood
+dat$DV <- log(dat$DV)
+dat$CMT[dat$EVID != 1]  <- "logC15"
+
+fit_nlmixr <- function() {
+
+  fit <- nlmixr2(
+    pbpk,
+    dat,
+    est = "saem",
+    control = saemControl(
+      print  = 100,
+      nBurn  = 100,
+      nEm    = 100,
+      nmc    = 1,
+      nu     = c(1, 1, 1),
+      logLik = FALSE,
+      rxControl = rxControl(
+        method = "liblsoda",
+        atol   = 1e-6,
+        rtol   = 1e-6,
+        hini   = 1e-6
+      )
+    ),
+    table = list(cwres = FALSE, npde = FALSE)
+  )
+
+  fit
+}
+
+# --------------------------------------------------
+# Benchmark
+# --------------------------------------------------
+
+res <- microbenchmark(
+  fit_nlmixr(),
+  times = 5
 )
 
-ebe <- fit %>%
-  as.data.frame() %>%
-  select(ID, CLint, KbBR, KbMU, KbAD, KbBO, KbRB) %>%
-  distinct()
-ebe
+print(res)
 
-write.csv(ebe,file="Mavoglurant_nlmixr_ebe_PDU.csv",row.names = F,quote = F)
+res_df <- as.data.frame(res) %>%
+  mutate(time_sec = time / 1e9)
+
+ggplot(res_df, aes(x = "", y = time_sec)) +
+  geom_boxplot() +
+  ylab("Runtime (s)") +
+  xlab("Mavoglurant_nlmixr_PDU model")
+
+write.csv(
+  res_df,
+  "nlmixr2_runtime.csv",
+  row.names = FALSE
+)
