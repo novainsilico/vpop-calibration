@@ -309,7 +309,7 @@ class TrainingDataSet:
         """Given wide outputs from a model and a comparison data frame (wide format), add the patient descriptors and reshape to a long format, with a `protocol_arm` and an `output_name` column."""
         # Assuming Y is a wide output from the model, its columns are self.tasks
         base_df = pd.DataFrame(
-            data=Y.cpu().detach().double().numpy(),
+            data=Y.detach().cpu().double().numpy(),
             columns=self.tasks,
         )
         # The rows are assumed to correspond to the rows of the comparison data frame

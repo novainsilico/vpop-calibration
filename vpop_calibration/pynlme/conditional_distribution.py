@@ -87,7 +87,7 @@ class ConditionalDistributionSampler:
         self.samples: list[ConditionalDistribSamples] = [init_samples]
         self.map: ConditionalDistribSamples = init_samples
         self.nb_improved_history: list[float] = [0]
-        self.indiv_log_prob: np.ndarray = init_samples.log_prob.cpu().numpy()
+        self.indiv_log_prob: np.ndarray = init_samples.log_prob.detach().cpu().numpy()
 
     def get_state_dict(self) -> dict[str, Any]:
         if hasattr(self, "map"):
@@ -118,7 +118,7 @@ class ConditionalDistributionSampler:
                 state_dict=state_dict["map"]
             )
             instance.nb_improved_history = [0]
-            instance.indiv_log_prob = init_samples.log_prob.cpu().numpy()
+            instance.indiv_log_prob = init_samples.log_prob.detach().cpu().numpy()
 
         return instance
 

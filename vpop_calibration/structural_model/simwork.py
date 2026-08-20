@@ -300,7 +300,10 @@ class StructuralSimwork(StructuralModel):
         assert X_with_protocol_overrides.shape[2] == self.nb_parameters
         # melt the tensor to be 2d, and assemble it in a dataframe - assuming parameters are in the correct order
         vpop = pd.DataFrame(
-            data=X_with_protocol_overrides.view(-1, self.nb_parameters).numpy(),
+            data=X_with_protocol_overrides.view(-1, self.nb_parameters)
+            .detach()
+            .cpu()
+            .numpy(),
             columns=self.input_parameters,
         )
         # Add a temp patient id, to cover the fact that a single patient is simulated on each chain
@@ -323,6 +326,8 @@ class StructuralSimwork(StructuralModel):
                 .unsqueeze(0)
                 .expand(nb_chains, -1)
                 .reshape(-1)
+                .detach()
+                .cpu()
                 .numpy()
             )
             # Map the `real` id and the temporary id

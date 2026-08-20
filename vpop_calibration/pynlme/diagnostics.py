@@ -124,7 +124,9 @@ class ModelDiagnostics:
             self.model.data.full_obs.obs_index.id.ref_values
         ):
             this_patient_rows = self.model.data.full_obs.obs_index.id.index_values == i
-            this_patient_iwres = iwres_full[this_patient_rows].squeeze().cpu().numpy()
+            this_patient_iwres = (
+                iwres_full[this_patient_rows].squeeze().detach().cpu().numpy()
+            )
             this_patient_time = self.model.data.individual_observations[
                 patient_id
             ].obs_index.time.raw_values
@@ -210,7 +212,7 @@ class ModelDiagnostics:
                 {
                     "id": patient_id,
                     "time": time_steps_patient,
-                    "residual_value": pwres_patient.squeeze(-1).cpu().numpy(),
+                    "residual_value": pwres_patient.squeeze(-1).detach().cpu().numpy(),
                     "residual_type": "pwres",
                     "output_name": output_names_patient,
                 }
@@ -266,7 +268,10 @@ class ModelDiagnostics:
             this_patient_npde = pd.DataFrame(
                 {
                     "id": patient_id,
-                    "residual_value": this_patient_data.squeeze(-1).cpu().numpy(),
+                    "residual_value": this_patient_data.squeeze(-1)
+                    .detach()
+                    .cpu()
+                    .numpy(),
                     "residual_type": "npde",
                     "time": this_patient_time,
                     "output_name": this_patient_output_names,

@@ -342,6 +342,7 @@ class PySaem:
                     residual_error=self.model.residual_var,
                     min_variance=self.model.config.residual_min_variance,
                 )
+                .detach()
                 .cpu()
                 .sum()
             )

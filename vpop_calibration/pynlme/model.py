@@ -665,7 +665,9 @@ class StatisticalModel:
 
     def convert_theta_to_dataframe(self, theta: torch.Tensor) -> pd.DataFrame:
         assert theta.shape[0] == 1, "Cannot convert batched parameters to dataframe."
-        vpop = pd.DataFrame(theta.squeeze(0).cpu().numpy(), columns=self.descriptors)
+        vpop = pd.DataFrame(
+            theta.squeeze(0).detach().cpu().numpy(), columns=self.descriptors
+        )
         vpop["id"] = self.patients
 
         return vpop
