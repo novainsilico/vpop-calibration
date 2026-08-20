@@ -193,7 +193,9 @@ class ConditionalDistributionSampler:
 
         nb_improved = accept_mask.double().sum().item()
         self.nb_improved_history.append(nb_improved)
-        self.indiv_log_prob = np.concat((self.indiv_log_prob, new_log_prob), axis=0)
+        self.indiv_log_prob = np.concat(
+            (self.indiv_log_prob, new_log_prob.detach().cpu().numpy()), axis=0
+        )
 
     def clip_samples(self):
         self.nb_improved_history = self.nb_improved_history[-self.max_samples :]
