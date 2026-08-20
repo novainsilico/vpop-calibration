@@ -7,12 +7,6 @@
           <unit kind="second" exponent="1" scale="0" multiplier="86400"/>
         </listOfUnits>
       </unitDefinition>
-      <unitDefinition id="Day0_DOT_20PerSecond_000000450_DOT_20">
-        <listOfUnits>
-          <unit kind="second" exponent="0.2" scale="0" multiplier="86400"/>
-          <unit kind="second" exponent="-0.2" scale="0" multiplier="1"/>
-        </listOfUnits>
-      </unitDefinition>
       <unitDefinition id="DayPerSecond">
         <listOfUnits>
           <unit kind="second" exponent="1" scale="0" multiplier="86400"/>
@@ -79,15 +73,6 @@
       </unitDefinition>
     </listOfUnitDefinitions>
     <listOfParameters>
-      <parameter id="Day0_DOT_20PerSecond_000000450_DOT_20P" value="0.102966808427902" units="Day0_DOT_20PerSecond_000000450_DOT_20" constant="true">
-        <notes>
-          <body xmlns="http://www.w3.org/1999/xhtml">
-            <div>
-              <p>An auxiliary parameter to handle unit conversions</p>
-            </div>
-          </body>
-        </notes>
-      </parameter>
       <parameter id="DayPerSecondP" value="1.15740740740741e-05" units="DayPerSecond" constant="true">
         <notes>
           <body xmlns="http://www.w3.org/1999/xhtml">
@@ -256,6 +241,7 @@
           </rdf:RDF>
         </annotation>
       </parameter>
+      <parameter id="time__under__treatment" units="Day" constant="false"/>
       <parameter id="treatment__effect" units="dimensionless" constant="false"/>
       <parameter id="treatment__end" value="50" units="Day" constant="false"/>
       <parameter id="treatment__start" value="10" units="Day" constant="false"/>
@@ -315,7 +301,7 @@
               <power/>
               <apply>
                 <divide/>
-                <csymbol encoding="text" definitionURL="http://www.sbml.org/sbml/symbols/time"/>
+                <ci> time__under__treatment </ci>
                 <ci> lambda__weibull </ci>
               </apply>
               <apply>
@@ -324,7 +310,6 @@
                 <cn> 1 </cn>
               </apply>
             </apply>
-            <ci> Day0_DOT_20PerSecond_000000450_DOT_20P </ci>
           </apply>
         </math>
       </assignmentRule>
@@ -423,6 +408,32 @@
               </apply>
               <cn> 1 </cn>
             </apply>
+          </apply>
+        </math>
+      </assignmentRule>
+      <assignmentRule variable="time__under__treatment">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <apply>
+              <max/>
+              <apply>
+                <minus/>
+                <csymbol encoding="text" definitionURL="http://www.sbml.org/sbml/symbols/time"/>
+                <apply>
+                  <times/>
+                  <ci> treatment__start </ci>
+                  <ci> SecondPerDayP </ci>
+                </apply>
+              </apply>
+              <apply>
+                <times/>
+                <cn> 0.001 </cn>
+                <ci> OneDay </ci>
+                <ci> SecondPerDayP </ci>
+              </apply>
+            </apply>
+            <ci> DayPerSecondP </ci>
           </apply>
         </math>
       </assignmentRule>
