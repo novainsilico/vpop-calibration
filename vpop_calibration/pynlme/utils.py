@@ -4,7 +4,7 @@ from vpop_calibration.pynlme.params import (
     Constraint,
     TransformFunction,
 )
-from vpop_calibration.config import device
+from vpop_calibration.config import device, default_dtype
 
 import torch
 from typing import Callable
@@ -16,39 +16,39 @@ import numpy as np
 def init_transform_tensors(
     param_dict: dict[str, PatientDescriptorUnknown] | dict[str, ModelIntrinsicParam],
     param_names: list[str],
-) -> tuple[dict[str, torch.LongTensor], torch.Tensor, torch.Tensor]:
+) -> tuple[dict[str, torch.Tensor], torch.Tensor, torch.Tensor]:
     """Extract transform functions and parameters (scale and shift) into tensors for efficient gaussian parameters transformation."""
 
     transforms = {
-        "exp": torch.LongTensor(
-            torch.tensor(
-                [
-                    param_names.index(p_name)
-                    for p_name, p_content in param_dict.items()
-                    if p_content.constraint.transform == "log"
-                ],
-                device=device,
-                dtype=torch.long,
-            )
+        "exp": torch.tensor(
+            [
+                param_names.index(p_name)
+                for p_name, p_content in param_dict.items()
+                if p_content.constraint.transform == "log"
+            ],
+            device=device,
+            dtype=torch.long,
         ),
-        "sigmoid": torch.LongTensor(
-            torch.tensor(
-                [
-                    param_names.index(p_name)
-                    for p_name, p_content in param_dict.items()
-                    if p_content.constraint.transform == "logit"
-                ],
-                device=device,
-                dtype=torch.long,
-            )
+        "sigmoid": torch.tensor(
+            [
+                param_names.index(p_name)
+                for p_name, p_content in param_dict.items()
+                if p_content.constraint.transform == "logit"
+            ],
+            device=device,
+            dtype=torch.long,
         ),
     }
-    scale = torch.Tensor(
-        [[[param_dict[param].constraint.scale for param in param_names]]]
+    scale = torch.as_tensor(
+        [[[param_dict[param].constraint.scale for param in param_names]]],
+        device=device,
+        dtype=default_dtype,
     )
 
-    shift = torch.Tensor(
-        [[[param_dict[param].constraint.shift for param in param_names]]]
+    shift = torch.as_tensor(
+        [[[param_dict[param].constraint.shift for param in param_names]]],
+        device=device,
+        dtype=default_dtype,
     )
     return transforms, shift, scale
 

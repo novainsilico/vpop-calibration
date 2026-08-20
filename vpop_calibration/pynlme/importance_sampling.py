@@ -34,7 +34,7 @@ class ImportanceSampler:
         instance = cls(model=model, df=state_dict["df"])
         if state_dict["loc"]:
             instance.dist = dist.StudentT(
-                df=torch.tensor(instance.df),
+                df=torch.tensor(instance.df, device=device),
                 loc=torch.as_tensor(
                     state_dict["loc"], device=device, dtype=default_dtype
                 ),
@@ -60,7 +60,9 @@ class ImportanceSampler:
         mu = torch.mean(etas, dim=0)
         sigma = torch.clamp(torch.var(etas, 0), 1e-6)
 
-        self.dist = dist.StudentT(df=torch.tensor(self.df), loc=mu, scale=sigma)
+        self.dist = dist.StudentT(
+            df=torch.tensor(self.df, device=device), loc=mu, scale=sigma
+        )
 
     def _student_t_log_prob(self, student_samples: torch.Tensor) -> torch.Tensor:
         # Computes the log-density of a multivariate Student's t-distribution:
@@ -90,7 +92,7 @@ class ImportanceSampler:
         predictions = self.model.log_posterior_etas_all_patients(student_samples)
         log_posterior = predictions.log_posterior
 
-        N_tensor = torch.tensor(nb_samples)
+        N_tensor = torch.tensor(nb_samples, device=device, dtype=default_dtype)
 
         marginal_log_lik = torch.logsumexp(log_posterior - log_q, dim=0) - torch.log(
             N_tensor
