@@ -5,6 +5,7 @@ import pandas as pd
 from pandera.typing import DataFrame
 
 from vpop_calibration.pynlme.schemas import ObsDataSchema
+from vpop_calibration.config import device
 
 
 class IndexedValues(NamedTuple):
@@ -63,7 +64,7 @@ class ObservationIndex(NamedTuple):
             raw_values = df[field]
             ref_values = raw_values.drop_duplicates().sort_values().tolist()
             indexed_values = torch.tensor(
-                raw_values.apply(lambda x: ref_values.index(x)).values
+                raw_values.apply(lambda x: ref_values.index(x)).values, device=device
             )
             indexes.append(
                 IndexedValues(

@@ -21,7 +21,7 @@ from vpop_calibration.pynlme.residuals import (
 )
 from vpop_calibration.pynlme.error_estimation import estimate_error_params
 from vpop_calibration.saem.plot import OptimizerPlot
-from vpop_calibration.config import smoke_test
+from vpop_calibration.config import smoke_test, default_dtype, device
 from vpop_calibration.saem.fixed_effects import optimize_fixed_effects
 
 
@@ -68,12 +68,12 @@ class PySaem:
         init_samples = self.model.sample_etas(self.model.nb_chains)
         output = self.model.log_posterior_etas_all_patients(init_samples)
         # Give an initial dummy estimate for the total likelihood
-        init_likelihood = torch.tensor([0.0])
+        init_likelihood = torch.tensor([0.0], device=device, dtype=default_dtype)
         # Initialize the step size by incorporating problem dimension
         init_step_size = self.config.init_step_size_unscaled / np.sqrt(
             self.model.nb_pdu
         )
-        fixed_effects_loss = torch.Tensor([np.nan])
+        fixed_effects_loss = torch.tensor([np.nan], device=device, dtype=default_dtype)
         # Initialize the Metropolis Hastings state variables
         self.mh_state = MetropolisHastingsState(
             etas=init_samples,

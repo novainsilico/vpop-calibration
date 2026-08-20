@@ -2,6 +2,8 @@ import torch
 from typing import Callable
 import numpy as np
 
+from vpop_calibration.config import device, default_dtype
+
 
 def compute_fixed_effects_gradient(
     loss_fn: Callable, psi: torch.Tensor, eps_base
@@ -26,7 +28,7 @@ def optimize_fixed_effects(
     fixed_effects = psi0.detach().clone().requires_grad_(True)
     optimizer = torch.optim.Adam([fixed_effects], lr=lr)
 
-    loss_output = torch.Tensor([np.nan])
+    loss_output = torch.tensor([np.nan], device=device, dtype=default_dtype)
     for _ in range(nb_iter):
         optimizer.zero_grad()
         grad, loss = compute_fixed_effects_gradient(
