@@ -70,6 +70,6 @@ class StructuralModel:
 
         output, _ = self.simulate(X=X, prediction_index=obs_index)
         output_df = obs_df
-        output_df["predicted_value"] = output.squeeze(0).detach().numpy()
+        output_df["predicted_value"] = output.squeeze(0).detach().cpu().numpy()
 
         return output_df

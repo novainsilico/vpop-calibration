@@ -125,7 +125,7 @@ class IndexedObservations(BaseModel):
         output_name_col = self.obs_index.output_name.raw_values
         protocol_arm_col = self.obs_index.protocol_arm.raw_values
         time_col = self.obs_index.time.raw_values
-        value_col = self.obs_values.cpu().numpy()
+        value_col = self.obs_values.detach().cpu().numpy()
         df_long = pd.DataFrame(
             {
                 "id": id_col,
@@ -136,6 +136,6 @@ class IndexedObservations(BaseModel):
             }
         )
         if prediction is not None:
-            df_long["predicted_value"] = prediction.squeeze(0).cpu().numpy()
+            df_long["predicted_value"] = prediction.squeeze(0).detach().cpu().numpy()
 
         return df_long
