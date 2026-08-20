@@ -19,7 +19,8 @@ def remap_single_index(
     assert input_index.dim() == 1, (
         f"Unexpected indexing tensor dimension {input_index.dim()}"
     )
-    return input_index.apply_(mapping.get)
+    new_index = torch.as_tensor([mapping[int(i.item())] for i in input_index])
+    return new_index
 
 
 def remap_indexed_values(
