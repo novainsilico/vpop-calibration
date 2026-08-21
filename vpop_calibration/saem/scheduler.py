@@ -11,13 +11,11 @@ class SaemScheduler:
         init_step_adaptation: float,
         learning_rate_power: float,
         patience: int,
-        nb_iter_fim: int = 0,
     ):
         """Scheduler class for SAEM iterations and variable tuning parameters (learning rates)."""
         self.nb_iter_burnin = nb_iter_burnin
         self.nb_iter_learning = nb_iter_learning
         self.nb_iter_smoothing = nb_iter_smoothing
-        self.nb_iter_fim = nb_iter_fim
 
         self.init_step_adaptation = init_step_adaptation
         self.learning_rate_power = learning_rate_power
@@ -32,26 +30,16 @@ class SaemScheduler:
 
     @property
     def nb_iter_tot(self) -> int:
-        return (
-            self.nb_iter_burnin
-            + self.nb_iter_learning
-            + self.nb_iter_smoothing
-            + self.nb_iter_fim
-        )
+        return self.nb_iter_burnin + self.nb_iter_learning + self.nb_iter_smoothing
 
     @property
-    def phase(self) -> Literal["burnin", "learning", "smoothing", "fim"]:
+    def phase(self) -> Literal["burnin", "learning", "smoothing"]:
         if self.iteration < self.nb_iter_burnin:
             return "burnin"
         elif self.iteration < self.nb_iter_burnin + self.nb_iter_learning:
             return "learning"
-        elif (
-            self.iteration
-            < self.nb_iter_burnin + self.nb_iter_learning + self.nb_iter_smoothing
-        ):
-            return "smoothing"
         else:
-            return "fim"
+            return "smoothing"
 
     @property
     def mh_learning_rate(self) -> float:
@@ -61,7 +49,7 @@ class SaemScheduler:
             return self.init_step_adaptation / (
                 np.maximum(1, self.iteration - self.nb_iter_burnin + 1) ** 0.5
             )
-        elif self.phase in ["smoothing", "fim"]:
+        elif self.phase == "smoothing":
             return 0
         else:
             raise NotImplementedError
@@ -78,11 +66,6 @@ class SaemScheduler:
                 / (self.iteration - self.nb_iter_burnin - self.nb_iter_learning + 1)
                 ** self.learning_rate_power
             )
-        elif self.phase == "fim":
-            k = self.iteration - (
-                self.nb_iter_burnin + self.nb_iter_learning + self.nb_iter_smoothing
-            )
-            return 1.0 / (k + 1.0)
         else:
             raise NotImplementedError
 
@@ -91,7 +74,6 @@ class SaemScheduler:
             "nb_iter_burnin": self.nb_iter_burnin,
             "nb_iter_learning": self.nb_iter_learning,
             "nb_iter_smoothing": self.nb_iter_smoothing,
-            "nb_iter_fim": self.nb_iter_fim,
             "init_step_adaptation": self.init_step_adaptation,
             "learning_rate_power": self.learning_rate_power,
             "patience": self.patience,
@@ -104,7 +86,6 @@ class SaemScheduler:
             nb_iter_burnin=state_dict["nb_iter_burnin"],
             nb_iter_learning=state_dict["nb_iter_learning"],
             nb_iter_smoothing=state_dict["nb_iter_smoothing"],
-            nb_iter_fim=state_dict["nb_iter_fim"],
             init_step_adaptation=state_dict["init_step_adaptation"],
             learning_rate_power=state_dict["learning_rate_power"],
             patience=state_dict["patience"],

@@ -68,8 +68,14 @@ class ModelDiagnostics:
     def sample_conditional_distribution(
         self,
         nb_samples: int = 100,
+        compute_fim: bool | None = None,
+        fim_burn_in: int = 50,
     ) -> None:
-        self.sampler.run_sampler(nb_samples=nb_samples)
+        self.sampler.run_sampler(
+            nb_samples=nb_samples,
+            compute_fim=compute_fim,
+            fim_burn_in=fim_burn_in,
+        )
 
     def compute_iwres(self) -> None:
         """Compute Individual Weighted Residuals (IWRES), following the formula :
@@ -390,3 +396,13 @@ class ModelDiagnostics:
             conditional_samples=self.sampler.total_samples
         )
         self.importance_sampler.compute_likelihood(nb_samples=nb_proposal_samples)
+
+    @property
+    def fim_estimator(self):
+        if not getattr(self.sampler, "compute_fim", False) or not hasattr(
+            self.sampler, "fim_estimator"
+        ):
+            print(
+                "Fim has not been calculated. Please run sample_conditional_distribution(compute_fim=True)"
+            )
+        return self.sampler.fim_estimator

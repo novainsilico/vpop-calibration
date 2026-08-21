@@ -8,6 +8,7 @@ from IPython.display import display
 
 
 from vpop_calibration.pynlme.model import StatisticalModel
+from vpop_calibration.pynlme.fim.estimator import FimEstimator
 from vpop_calibration.config import smoke_test, device, default_dtype
 from vpop_calibration.metropolis_hastings import MetropolisHastingsState, mh_step
 from vpop_calibration.utils import reproducible_uuid4
@@ -54,6 +55,10 @@ class ConditionalDistributionSampler:
         self.progress_bar = self.model.config.progress_bar
         self.plot_frequency = self.model.config.plot_frequency
         self.max_samples = self.model.config.max_samples
+        self.total_iters = 0
+        self.compute_fim = False
+        if self.compute_fim:
+            self.fim_estimator = FimEstimator(self.model)
 
     def init_samples(self):
 
@@ -89,7 +94,12 @@ class ConditionalDistributionSampler:
                 "map": self.map.get_state_dict(),
                 "last_sample": self.samples[-1].get_state_dict(),
                 "has_run": True,
+                "compute_fim": getattr(self, "compute_fim", False),
+                "fim_burn_in": getattr(self, "fim_burn_in", 0),
+                "total_iters": getattr(self, "total_iters", 0),
             }
+            if getattr(self, "compute_fim", False):
+                state_dict["fim_estimator"] = self.fim_estimator.get_state_dict()
         else:
             state_dict = {"has_run": False}
         return state_dict
@@ -99,6 +109,9 @@ class ConditionalDistributionSampler:
         cls, state_dict: dict[str, Any], model: StatisticalModel
     ) -> "ConditionalDistributionSampler":
         instance = cls(model)
+        instance.compute_fim = state_dict.get("compute_fim", False)
+        instance.fim_burn_in = state_dict.get("fim_burn_in", 0)
+        instance.total_iters = state_dict.get("total_iters", 0)
         if state_dict["has_run"]:
             instance.current_state = MetropolisHastingsState.from_state_dict(
                 state_dict=state_dict["current_state"]
@@ -112,10 +125,25 @@ class ConditionalDistributionSampler:
             )
             instance.nb_improved_history = [0]
             instance.indiv_log_prob = init_samples.log_prob.cpu().numpy()
-
+            if instance.compute_fim and "fim_estimator" in state_dict:
+                instance.fim_estimator = FimEstimator.from_state_dict(
+                    state_dict["fim_estimator"], model
+                )
         return instance
 
-    def run_sampler(self, nb_samples: int = 100):
+    def run_sampler(
+        self,
+        nb_samples: int = 100,
+        compute_fim: bool | None = None,
+        fim_burn_in: int = 50,
+    ):
+        if compute_fim is not None:
+            self.compute_fim = compute_fim
+            if self.compute_fim and not hasattr(self, "fim_estimator"):
+                self.fim_estimator = FimEstimator(self.model)
+
+        self.fim_burn_in = fim_burn_in
+
         if not hasattr(self, "map"):
             self.init_samples()
         else:
@@ -140,9 +168,19 @@ class ConditionalDistributionSampler:
 
     def sampling_stream(self, nb_samples: int):
         for i in tqdm(range(nb_samples), disable=not self.progress_bar):
+            if not hasattr(self, "total_iters"):
+                self.total_iters = len(self.samples) - 1
+            self.total_iters += 1
             self.current_state = mh_step(
                 self.model, previous_state=self.current_state, learning_rate=0.0
             )
+            if getattr(self, "compute_fim", False) and self.total_iters > getattr(
+                self, "fim_burn_in", 0
+            ):
+                self.fim_estimator.accumulate(
+                    self.current_state.gaussian_params.unsqueeze(0),
+                    max_history=self.max_samples,
+                )
             new_physical = self.model.convert_gaussian_to_physical(
                 psi=self.current_state.gaussian_params, log_mi=self.model.log_mi
             )
@@ -194,9 +232,11 @@ class ConditionalDistributionSampler:
         self.samples = self.samples[-self.max_samples :]
 
     def build_convergence_plot(self, plot_indiv_figsize=(5.0, 5.0)):
-        self.fig, self.axes = plt.subplots(
-            2, 1, figsize=plot_indiv_figsize, sharex=True
-        )
+        nb_plots = 3 if self.compute_fim else 2
+
+        figsize = (plot_indiv_figsize[0], plot_indiv_figsize[1] * (nb_plots / 2))
+
+        self.fig, self.axes = plt.subplots(nb_plots, 1, figsize=figsize, sharex=True)
 
         for ax in self.axes:
             ax.grid(True)
@@ -205,7 +245,11 @@ class ConditionalDistributionSampler:
         self.axes[0].set_ylabel("Patients improved")
 
         self.axes[1].set_ylabel("Individual LL")
-        self.axes[1].set_xlabel("Iteration")
+        self.axes[-1].set_xlabel("Iteration")
+
+        if self.compute_fim:
+            self.axes[2].set_ylabel("FIM Standard Errors (Fixed Effects)")
+            self.axes[2].set_yscale("log")
 
         (line1_raw,) = self.axes[0].plot([], color="lightgray", linewidth=1)
         (line1_ma,) = self.axes[0].plot([], linewidth=2)
@@ -219,6 +263,19 @@ class ConditionalDistributionSampler:
             "num_improved_ma": line1_ma,
             "individual": patient_lines,
         }
+        if self.compute_fim:
+            self.traces["fim_se"] = []
+            self.fim_plot_indices = []
+            for i, name in enumerate(self.fim_estimator.parameter_names):
+                if not (
+                    "omega" in name.lower()
+                    or "residual" in name.lower()
+                    or "sigma" in name.lower()
+                ):
+                    (line,) = self.axes[2].plot([], linewidth=1.5, label=name)
+                    self.traces["fim_se"].append(line)
+                    self.fim_plot_indices.append(i)
+
         if not smoke_test:
             self.handle = display(self.fig, display_id=True)
 
@@ -239,6 +296,16 @@ class ConditionalDistributionSampler:
         )
         for i in range(self.model.nb_patients):
             self.traces["individual"][i].set_data(x, self.indiv_log_prob[:, i])
+
+        if self.compute_fim and hasattr(self, "fim_estimator"):
+            var_history = self.fim_estimator.state.variance_history
+            if var_history:
+                x_fim = x[-len(var_history) :]
+                var_array = np.array(var_history)
+                with np.errstate(invalid="ignore"):
+                    se_array = np.where(var_array > 0, np.sqrt(var_array), np.nan)
+                for j, param_idx in enumerate(self.fim_plot_indices):
+                    self.traces["fim_se"][j].set_data(x_fim, se_array[:, param_idx])
 
         if not smoke_test:
             for ax in self.axes:
