@@ -28,9 +28,6 @@ class SaemConfigDict(NamedTuple):
     convergence_threshold: float = 1e-4
     patience: int = 5
 
-    # Fim
-    covMethod: Literal["sa", "none"] = "sa"
-    nb_iter_fim: int = 100
     # Output mode selector
     mode: Literal["debug", "cli", "notebook"] = "notebook"
 
