@@ -94,7 +94,7 @@ class PriorVisualizer:
                 return np.geomspace(theta_min, theta_max, 500)
             else:
                 raise ValueError(
-                    f"Unexpected negative value in physical space {theta_min}"
+                    f"Some values are negative in physical parameter space {theta_min}. Consider using `log_scale = False`"
                 )
         else:
             return np.linspace(theta_min, theta_max, 500)
