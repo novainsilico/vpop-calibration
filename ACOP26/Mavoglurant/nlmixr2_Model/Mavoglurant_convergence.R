@@ -25,7 +25,7 @@ pbpk <- function(){
     lCLint = 7.6
     lKbBO = 0.03
     lKbRB = 0.3
-    eta.LClint ~ 4
+    eta.LClint ~ 1
     eta.LKbBR ~ 0.5
     eta.LKbMU ~ 0.5
     eta.LKbAD ~ 0.5
@@ -146,4 +146,4 @@ ebe <- fit %>%
   distinct()
 ebe
 
-write.csv(ebe,file="Mavoglurant_nlmixr_ebe_PDU.csv",row.names = F,quote = F)
+write.csv(ebe,file="nlmixr2_map.csv",row.names = F,quote = F)

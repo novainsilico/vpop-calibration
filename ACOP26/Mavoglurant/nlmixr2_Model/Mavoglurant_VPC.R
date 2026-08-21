@@ -25,7 +25,7 @@ pbpk <- function(){
     lCLint = 7.6
     lKbBO = 0.03
     lKbRB = 0.3
-    eta.LClint ~ 4
+    eta.LClint ~ 1
     eta.LKbBR ~ 0.5
     eta.LKbMU ~ 0.5
     eta.LKbAD ~ 0.5
@@ -211,5 +211,5 @@ vpc_R <- q_obs %>%
          model = "R (nlmixr2 SAEM)") %>%
   arrange(quantile, bin_center)
 
-write.csv(vpc_R, "nlmixr_PDU_VPC.csv", row.names = FALSE)
+write.csv(vpc_R, "nlmixr2_VPC.csv", row.names = FALSE)
 print(head(vpc_R, 12))
