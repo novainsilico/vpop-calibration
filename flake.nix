@@ -44,6 +44,11 @@
           uv sync --group test_slim
         '';
       };
+      ruff = pkgs.mkShell {
+        buildInputs = with pkgs; [
+          ruff
+        ];
+      };
     };
   });
 }

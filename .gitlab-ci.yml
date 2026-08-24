@@ -7,7 +7,7 @@ ruff:
   stage: lint
   tags: [ nix ]
   script:
-    - nix develop . --command ruff check
+    - nix develop .#ruff --command ruff check
 
 pytest-full:
   stage: test
