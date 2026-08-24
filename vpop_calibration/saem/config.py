@@ -18,8 +18,11 @@ class SaemConfigDict(NamedTuple):
     learning_rate_power: float = 0.8
     # Simulated annealing factor
     annealing_factor: float = 0.95
-    optim_max_iter: int = 5  # for MI optimization
-    eps_grad: float = 1e-3
+
+    # Fixed effects optimization parameters
+    fixed_effects_nb_iter: int = 5
+    fixed_effects_grad_scale: float = 1e-3
+    fixed_effects_lr: float = 1e-2
 
     # Convergence parameters
     convergence_threshold: float = 1e-4

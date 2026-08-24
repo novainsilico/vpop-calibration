@@ -93,8 +93,9 @@ output:
       init_step_adaptation: 0.5
       learning_rate_power: 0.8
       annealing_factor: 0.95
-      optim_max_iter: 1
-      eps_grad: 0.001
+      fixed_effects_nb_iter: 1
+      fixed_effects_grad_scale: 0.001
+      fixed_effects_lr: 0.01
       convergence_threshold: 0.0001
       patience: 5
       mode: notebook
@@ -190,7 +191,8 @@ output:
       model_intrinsic:
       - 2.2668416013298067
       complete_likelihood: 126.0967315521988
-      fixed_effects_loss: 57.512406434151984
+      fixed_effects_loss:
+      - 57.512406434151984
       sigma:
         sigma_add:
         - 3046.981093782411

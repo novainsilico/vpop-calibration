@@ -8,11 +8,15 @@ from vpop_calibration.config import device, default_dtype
 def compute_fixed_effects_gradient(
     loss_fn: Callable, psi: torch.Tensor, eps_base
 ) -> tuple[torch.Tensor, torch.Tensor]:
+    nb_params = psi.shape[0]
     loss = loss_fn(psi)
     eps_scaled = eps_base * torch.clamp(psi.abs(), min=1.0)
     perturbation_matrix = torch.diag(eps_scaled)
     perturbed_psi = psi.unsqueeze(0) + perturbation_matrix
     loss_eps = loss_fn(perturbed_psi)
+    assert loss_eps.shape == (nb_params,), (
+        f"Unexpected perturbed loss shape in gradient calculation: {loss_eps.shape} ."
+    )
     grad = (loss_eps - loss) / eps_scaled
     return grad, loss
 
