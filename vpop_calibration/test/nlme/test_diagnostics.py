@@ -83,7 +83,7 @@ def test_diagnostics(sample_nlme_params, obs_data, struct_model):
         structural_model=struct_model, dataset=obs_data, input_params=sample_nlme_params
     )
     diagnostics = ModelDiagnostics(nlme_model)
-    diagnostics.sample_conditional_distribution(compute_fim=True)
+    diagnostics.sample_conditional_distribution(compute_fim=True, fim_burn_in=0)
     diagnostics.compute_iwres()
     diagnostics.compute_pwres()
     diagnostics.compute_npde()
