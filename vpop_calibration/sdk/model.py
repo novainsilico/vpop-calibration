@@ -36,7 +36,7 @@ class NlmeInterface:
         self.statistical_model = StatisticalModel(
             structural_model=structural_model,
             dataset=obs_data,
-            prior_params=nlme_params,
+            input_params=nlme_params,
             config=config.nlme,
         )
         self.optimizer = PySaem(model=self.statistical_model, config=config.saem)

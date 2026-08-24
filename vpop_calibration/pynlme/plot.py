@@ -134,7 +134,7 @@ class PlottingUtility:
             self.model_diag.sample_conditional_distribution()
         obs_vs_simulated = self.model_diag.sampler.map_predictions_df
 
-        n_cols = self.model_diag.model.nb_outputs
+        n_cols = self.model_diag.model.input_params.nb_continuous_outputs
         n_rows = self.model_diag.model.nb_protocols
         fig, axes = plt.subplots(
             n_rows,
@@ -145,7 +145,9 @@ class PlottingUtility:
 
         cmap = plt.get_cmap("Spectral")
         colors = cmap(np.linspace(0, 1, self.model_diag.model.nb_patients))
-        for output_index, output_name in enumerate(self.model_diag.model.output_names):
+        for output_index, output_name in enumerate(
+            self.model_diag.model.input_params.continuous_output_names
+        ):
             for protocol_index, protocol_arm in enumerate(
                 self.model_diag.model.protocol_arms
             ):
@@ -218,7 +220,7 @@ class PlottingUtility:
             print(patient_params.loc[patient_params["id"] == patient_ind])
 
         # Initialize subplots
-        n_cols = self.model_diag.model.nb_outputs
+        n_cols = self.model_diag.model.input_params.nb_continuous_outputs
         n_rows = 1
         fig, axes = plt.subplots(
             n_rows,
@@ -230,9 +232,13 @@ class PlottingUtility:
 
         # Initialize colormap according to outputs
         cmap = plt.get_cmap("brg")
-        colors = cmap(np.linspace(0, 1, len(self.model_diag.model.output_names)))
+        colors = cmap(
+            np.linspace(0, 1, self.model_diag.model.input_params.nb_continuous_outputs)
+        )
 
-        for output_index, output_name in enumerate(self.model_diag.model.output_names):
+        for output_index, output_name in enumerate(
+            self.model_diag.model.input_params.continuous_output_names
+        ):
             # Filter dataset on current output
             data_output = patient_data.loc[patient_data["output_name"] == output_name]
             if data_output.shape[0] == 0:
@@ -314,10 +320,14 @@ class PlottingUtility:
             ind_to_plot = list(range(n_patients_to_plot))
 
         cmap = plt.get_cmap("brg")
-        colors = cmap(np.linspace(0, 1, self.model_diag.model.nb_outputs))
+        colors = cmap(
+            np.linspace(0, 1, self.model_diag.model.input_params.nb_continuous_outputs)
+        )
 
         # One plot for each output, containing all individual patients subplots for this output
-        for output_index, output_name in enumerate(self.model_diag.model.output_names):
+        for output_index, output_name in enumerate(
+            self.model_diag.model.input_params.continuous_output_names
+        ):
             fig, axes = plt.subplots(
                 n_rows,
                 n_cols,
@@ -386,14 +396,16 @@ class PlottingUtility:
             self.model_diag.sample_conditional_distribution()
         obs_vs_simulated = self.model_diag.sampler.map_predictions_df
 
-        num_plots = self.model_diag.model.nb_outputs
+        num_plots = self.model_diag.model.input_params.nb_continuous_outputs
         fig, axes = plt.subplots(
             1, num_plots, figsize=(facet_width * num_plots, facet_height), squeeze=False
         )
 
         fig.suptitle("Observed vs. simulated plot")
 
-        for output_index, output_name in enumerate(self.model_diag.model.output_names):
+        for output_index, output_name in enumerate(
+            self.model_diag.model.input_params.continuous_output_names
+        ):
             ax = axes[0, output_index]
             gof_df = obs_vs_simulated.loc[
                 (obs_vs_simulated["output_name"] == output_name)

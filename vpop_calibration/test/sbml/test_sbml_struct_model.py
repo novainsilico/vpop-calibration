@@ -3,7 +3,7 @@ import torch
 import pytest
 
 from vpop_calibration.structural_model.sbml import StructuralSbml
-from vpop_calibration.pynlme.indexing import ObservationIndex, ObsDataSchema
+from vpop_calibration.pynlme.indexing import DataIndex, ObsDataSchema
 
 
 def test_sbml_model_wrong_inputs():
@@ -32,7 +32,7 @@ def test_sbml_model():
         .merge(pd.DataFrame({"output_name": ["A0", "A1", "A2"]}), how="cross")
     )
     df["value"] = 0.0
-    obs_index = ObservationIndex.from_dataframe(ObsDataSchema.validate(df))
+    obs_index = DataIndex.from_dataframe(ObsDataSchema.validate(df))
 
     protocol_design = pd.DataFrame(
         {"protocol_arm": ["arm-A", "arm-B"], "k__21": [0, 1]}

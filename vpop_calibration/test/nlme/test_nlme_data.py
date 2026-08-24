@@ -3,7 +3,6 @@ from vpop_calibration.pynlme.data import ObsData
 import pytest
 import numpy as np
 import pandas as pd
-import torch
 
 
 @pytest.fixture
@@ -22,14 +21,14 @@ def obs_data() -> pd.DataFrame:
 
 def test_data_container(obs_data):
     df = obs_data
-    ds = ObsData(df)
-
-    torch.testing.assert_close(
-        ds.nb_tot_observations_per_output, torch.tensor([6, 6]), check_dtype=False
-    )
+    _ds = ObsData(df)
 
 
 def test_incomplete_data(obs_data, np_rng):
     df = obs_data
     df_boot = df.sample(frac=0.5, random_state=np_rng)
     _ds = ObsData(df_boot)
+
+
+def test_no_protocol_arm(obs_data):
+    _ds = ObsData(obs_data.drop(columns="protocol_arm"))

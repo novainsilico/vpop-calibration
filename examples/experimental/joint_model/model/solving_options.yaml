@@ -1,0 +1,3 @@
+settings:
+  relative_tolerance: 1.0e-9
+  absolute_tolerance: 1.0e-9

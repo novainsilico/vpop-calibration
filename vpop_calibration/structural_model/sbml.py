@@ -4,11 +4,12 @@ import roadrunner
 import pandera.pandas as pa
 import torch
 import uuid
+import yaml
 
 from vpop_calibration.structural_model.base import StructuralModel
 from vpop_calibration.utils import extend_schema
 from vpop_calibration.config import default_dtype, device
-from vpop_calibration.pynlme.indexing import ObservationIndex
+from vpop_calibration.pynlme.indexing import DataIndex
 
 
 def simulate_rr_single_patient(
@@ -23,7 +24,11 @@ def simulate_rr_single_patient(
     rr.setValues(patient_overrides)
     # Reset the floating species to their init value
     rr.reset()
-    out = rr.simulate(times=time_steps, selections=outputs)
+    try:
+        out = rr.simulate(times=time_steps, selections=outputs)
+    except Exception:
+        raise RuntimeError(f"Solving failed for {patient_overrides}")
+
     patient_df = pd.DataFrame(data=out, columns=outputs)
     patient_df["time"] = time_steps
     patient_df["id"] = patient_id
@@ -36,6 +41,7 @@ class StructuralSbml(StructuralModel):
         model_path: str,
         inputs: list[str],
         outputs: list[str],
+        solving_options_path: str | None = None,
         protocol_design: pd.DataFrame | None = None,
     ):
         self.rr = roadrunner.RoadRunner(model_path)
@@ -50,6 +56,14 @@ class StructuralSbml(StructuralModel):
             raise ValueError(
                 f"The following outputs are not part of the SBML model: {invalid_outputs}"
             )
+
+        if solving_options_path is not None:
+            with open(solving_options_path, "r") as f:
+                config = yaml.safe_load(f)
+            integrator = self.rr.getIntegrator()
+
+            for key, val in config.get("settings", {}).items():
+                integrator.setSetting(key, val)
 
         if protocol_design is None:
             protocol_design = pd.DataFrame({"protocol_arm": ["identity"]})
@@ -111,7 +125,7 @@ class StructuralSbml(StructuralModel):
     def assemble_numeric_vpop(
         self,
         X: torch.Tensor,
-        prediction_index: ObservationIndex,
+        prediction_index: DataIndex,
     ) -> pd.DataFrame:
         nb_chains, nb_patients, nb_timesteps, _ = X.shape
         # Create a mapping from patient index to protocol index
@@ -180,7 +194,7 @@ class StructuralSbml(StructuralModel):
     def simulate(
         self,
         X: torch.Tensor,
-        prediction_index: ObservationIndex,
+        prediction_index: DataIndex,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         nb_chains, nb_patients, nb_timesteps, _ = X.shape
         vpop = self.assemble_numeric_vpop(X, prediction_index)
