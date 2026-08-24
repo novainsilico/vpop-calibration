@@ -13,27 +13,26 @@ pytest-full:
   stage: test
   tags: [ nix ]
   script:
-    - nix develop --command poetry run pytest
+    - nix develop --command uv run pytest
   
 pytest-sdk:
   stage: test
   tags: [ nix ]
   script:
-    - nix develop .#slim --command poetry run pytest vpop_calibration/test/sdk --noconftest -o addopts=""
+    - nix develop .#slim --command uv run pytest vpop_calibration/test/sdk --noconftest -o addopts=""
 
 pypi_deploy:
   stage: deploy
   tags: [ nix ]
   image: $PYTHON_IMAGE
   script:
-    - nix develop . --command poetry install --extras full
-    - nix develop . --command poetry config pypi-token.pypi "$PYPI_TOKEN"
     # Extract the version number from pyproject.toml
-    - VERSION=$(nix develop . --command poetry version -s | tail -1)
+    - VERSION=$(nix develop . --command uv version --short | tail -1)
     # Check if the version already exists on PyPI for jinko-sdk using the HTTP status code
     - response=$(curl -s -o /dev/null -w "%{http_code}" https://pypi.org/pypi/vpop-calibration/$VERSION/json)
     - if [ "$response" -eq 200 ]; then echo "Version $VERSION already exists on PyPI. Skipping deployment."; exit 0; fi
-    - nix develop . --command poetry publish --build
+    - nix develop . --command uv build
+    - nix develop . --command uv publish --token "$PYPI_TOKEN"
   environment:
     name: production
   rules:

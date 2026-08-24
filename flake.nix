@@ -13,7 +13,7 @@
       default = pkgs.mkShell {
         buildInputs = with pkgs; [
           python313
-          poetry
+          uv
           gcc
           openssl
           libz
@@ -23,15 +23,14 @@
           export LD_LIBRARY_PATH=${pkgs.stdenv.cc.cc.lib}/lib:${pkgs.libz}/lib
           python -m venv .venv-full
           source .venv-full/bin/activate
-          export POETRY_VIRTUALENVS_IN_PROJECT=true
-          export POETRY_VIRTUALENVS_PATH=".venv-full"
-          poetry sync --only main,test,dev --extras "full"
+          export UV_PROJECT_ENVIRONMENT=.venv-full
+          uv sync --group dev --group test --active --extra full
         '';
       };
       slim = pkgs.mkShell {
         buildInputs = with pkgs; [
           python313
-          poetry
+          uv
           gcc
           openssl
           libz
@@ -41,9 +40,8 @@
           export LD_LIBRARY_PATH=${pkgs.stdenv.cc.cc.lib}/lib:${pkgs.libz}/lib
           python -m venv .venv-slim
           source .venv-slim/bin/activate
-          export POETRY_VIRTUALENVS_IN_PROJECT=true
-          export POETRY_VIRTUALENVS_PATH=".venv-slim"
-          poetry sync --only main,test_slim
+          export UV_PROJECT_ENVIRONMENT=.venv-slim
+          uv sync --group test_slim
         '';
       };
     };

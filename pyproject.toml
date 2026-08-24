@@ -5,53 +5,30 @@ description = ""
 authors = [{ name = "Paul Lemarre", email = "paul.lemarre@novainsilico.ai" }]
 readme = "README.md"
 requires-python = ">=3.12,<3.15"
+dependencies = ["torch", "scipy", "uuid", "pandas", "numpy", "pydantic", "pandera"]
 
-[tool.poetry.dependencies]
-torch = ">=2.10.0"
-scipy = ">=1.16.3, <2.0.0"
-uuid = ">=1.30,<2.0"
-pandas = ">=2.2.2,<3.0.0"
-numpy = ">=2.3.4,<3.0.0"
-pydantic = ">=2.13.0,<3.0.0"
-pandera = ">=0.31.0,<0.32.0"
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
 
-gpytorch = { version = ">=1.14.2,<2.0.0", optional = true}
-matplotlib = { version = ">=3.10.7,<4.0.0", optional = true}
-libroadrunner = { version = ">=2.9.2,<3.0.0", optional = true}
-tqdm = { version = ">=4.67.1,<5.0.0", optional = true}
-plotnine = { version = "^0.15.1", optional = true}
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu" }]
 
-[tool.poetry.extras]
-full = ["gpytorch", "matplotlib", "libroadrunner", "tqdm", "plotnine"]
+[project.optional-dependencies]
+full = ["gpytorch", "matplotlib","libroadrunner", "tqdm","plotnine"]
 
-[tool.poetry.group.dev.dependencies]
-torch = { url = "https://download.pytorch.org/whl/cpu/torch-2.10.0%2Bcpu-cp313-cp313-manylinux_2_28_x86_64.whl" }
-ipykernel = "^7.1.0"
-ipython = "^9.7.0"
-nbmake = "^1.5.5"
-jupyter = "^1.1.1"
-jupyterlab = "^4.4.10"
-
-[tool.poetry.group.test.dependencies]
-pytest = "^9.0.1"
-pytest-cov = "^7.0.0"
-pytest-env = "^1.2.0"
-pytest-profiling = "^1.8.1"
-pre-commit = "^4.5.0"
-pytest-subtests = "^0.15.0"
-py-spy = "^0.4.2"
-pytest-golden = "^1.0.1"
-deepdiff = "^9.1.0"
-nbmake = "^1.5.5"
-
-[tool.poetry.group.test_slim.dependencies]
-pytest = "^9.0.1"
-pytest-env = "^1.2.0"
-
+[dependency-groups]
+dev = ["ipykernel", "ipython","jupyter"]
+test = ["pytest","pytest-cov","pytest-env","pytest-profiling","pre-commit","pytest-subtests","py-spy","pytest-golden","deepdiff","nbmake"]
+test_slim = ["pytest", "pytest-env"]
 
 [build-system]
-requires = ["poetry-core>=2.0.0,<3.0.0"]
-build-backend = "poetry.core.masonry.api"
+requires = ["uv_build>=0.11,<0.12"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-root = ""
 
 [tool.pytest]
 minversion = "9.0"
