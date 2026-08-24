@@ -13,18 +13,6 @@
           <unit kind="second" exponent="-1" scale="0" multiplier="1"/>
         </listOfUnits>
       </unitDefinition>
-      <unitDefinition id="MicroSubstance__countPerMilliLiter">
-        <listOfUnits>
-          <unit kind="litre" exponent="-1" scale="-3" multiplier="1"/>
-          <unit kind="item" exponent="1" scale="-6" multiplier="1"/>
-        </listOfUnits>
-      </unitDefinition>
-      <unitDefinition id="MicroSubstance__countPerSubstance__count">
-        <listOfUnits>
-          <unit kind="item" exponent="-1" scale="0" multiplier="1"/>
-          <unit kind="item" exponent="1" scale="-6" multiplier="1"/>
-        </listOfUnits>
-      </unitDefinition>
       <unitDefinition id="MilliLiterPerSubstance__count">
         <listOfUnits>
           <unit kind="litre" exponent="1" scale="-3" multiplier="1"/>
@@ -59,12 +47,6 @@
           <unit kind="item" exponent="1" scale="0" multiplier="1"/>
         </listOfUnits>
       </unitDefinition>
-      <unitDefinition id="Substance__countPerMicroSubstance__count">
-        <listOfUnits>
-          <unit kind="item" exponent="1" scale="0" multiplier="1"/>
-          <unit kind="item" exponent="-1" scale="-6" multiplier="1"/>
-        </listOfUnits>
-      </unitDefinition>
       <unitDefinition id="Substance__countPerMilliLiter">
         <listOfUnits>
           <unit kind="litre" exponent="-1" scale="-3" multiplier="1"/>
@@ -74,15 +56,6 @@
     </listOfUnitDefinitions>
     <listOfParameters>
       <parameter id="DayPerSecondP" value="1.15740740740741e-05" units="DayPerSecond" constant="true">
-        <notes>
-          <body xmlns="http://www.w3.org/1999/xhtml">
-            <div>
-              <p>An auxiliary parameter to handle unit conversions</p>
-            </div>
-          </body>
-        </notes>
-      </parameter>
-      <parameter id="MicroSubstance__countPerSubstance__countP" value="1000000" units="MicroSubstance__countPerSubstance__count" constant="true">
         <notes>
           <body xmlns="http://www.w3.org/1999/xhtml">
             <div>
@@ -130,7 +103,7 @@
       </parameter>
       <parameter id="PSA" units="NanoGramPerMilliLiter" constant="false"/>
       <parameter id="PSA__baseline" value="10" units="NanoGramPerMilliLiter" constant="false"/>
-      <parameter metaid="parameter_R" id="R" units="MicroSubstance__countPerMilliLiter" constant="false">
+      <parameter metaid="parameter_R" id="R" units="Substance__countPerMilliLiter" constant="false">
         <annotation>
           <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:vCard="http://www.w3.org/2001/vcard-rdf/3.0#" xmlns:vCard4="http://www.w3.org/2006/vcard/ns#" xmlns:bqbiol="http://biomodels.net/biology-qualifiers/" xmlns:bqmodel="http://biomodels.net/model-qualifiers/">
             <rdf:Description rdf:about="#parameter_R">
@@ -158,15 +131,6 @@
         </annotation>
       </parameter>
       <parameter id="SecondPerDayP" value="86400" units="SecondPerDay" constant="true">
-        <notes>
-          <body xmlns="http://www.w3.org/1999/xhtml">
-            <div>
-              <p>An auxiliary parameter to handle unit conversions</p>
-            </div>
-          </body>
-        </notes>
-      </parameter>
-      <parameter id="Substance__countPerMicroSubstance__countP" value="1e-06" units="Substance__countPerMicroSubstance__count" constant="true">
         <notes>
           <body xmlns="http://www.w3.org/1999/xhtml">
             <div>
@@ -255,17 +219,13 @@
       <initialAssignment symbol="R">
         <math xmlns="http://www.w3.org/1998/Math/MathML">
           <apply>
-            <times/>
+            <divide/>
+            <ci> baseline__total__cells </ci>
             <apply>
-              <divide/>
-              <ci> baseline__total__cells </ci>
-              <apply>
-                <plus/>
-                <cn> 1 </cn>
-                <ci> baseline__ratio__S__R </ci>
-              </apply>
+              <plus/>
+              <cn> 1 </cn>
+              <ci> baseline__ratio__S__R </ci>
             </apply>
-            <ci> MicroSubstance__countPerSubstance__countP </ci>
           </apply>
         </math>
       </initialAssignment>
@@ -308,6 +268,21 @@
                 <minus/>
                 <ci> k__weibull </ci>
                 <cn> 1 </cn>
+              </apply>
+            </apply>
+            <apply>
+              <exp/>
+              <apply>
+                <minus/>
+                <apply>
+                  <power/>
+                  <apply>
+                    <divide/>
+                    <ci> time__under__treatment </ci>
+                    <ci> lambda__weibull </ci>
+                  </apply>
+                  <ci> k__weibull </ci>
+                </apply>
               </apply>
             </apply>
           </apply>
@@ -374,7 +349,6 @@
                       <times/>
                       <ci> R </ci>
                       <ci> OneMilliLiterPerSubstance__count </ci>
-                      <ci> Substance__countPerMicroSubstance__countP </ci>
                     </apply>
                   </apply>
                 </apply>
@@ -499,11 +473,7 @@
                   <apply>
                     <plus/>
                     <ci> S </ci>
-                    <apply>
-                      <times/>
-                      <ci> R </ci>
-                      <ci> Substance__countPerMicroSubstance__countP </ci>
-                    </apply>
+                    <ci> R </ci>
                   </apply>
                 </apply>
                 <ci> OneSubstance__count </ci>
@@ -548,11 +518,7 @@
                       <apply>
                         <plus/>
                         <ci> S </ci>
-                        <apply>
-                          <times/>
-                          <ci> R </ci>
-                          <ci> Substance__countPerMicroSubstance__countP </ci>
-                        </apply>
+                        <ci> R </ci>
                       </apply>
                       <ci> Nmax </ci>
                     </apply>
@@ -565,13 +531,8 @@
                   <apply>
                     <minus/>
                     <ci> S </ci>
-                    <apply>
-                      <times/>
-                      <ci> R </ci>
-                      <ci> Substance__countPerMicroSubstance__countP </ci>
-                    </apply>
+                    <ci> R </ci>
                   </apply>
-                  <ci> MicroSubstance__countPerSubstance__countP </ci>
                 </apply>
               </apply>
               <apply>
@@ -615,11 +576,7 @@
                       <apply>
                         <plus/>
                         <ci> S </ci>
-                        <apply>
-                          <times/>
-                          <ci> R </ci>
-                          <ci> Substance__countPerMicroSubstance__countP </ci>
-                        </apply>
+                        <ci> R </ci>
                       </apply>
                       <ci> Nmax </ci>
                     </apply>
@@ -632,13 +589,8 @@
                   <apply>
                     <minus/>
                     <ci> R </ci>
-                    <apply>
-                      <times/>
-                      <ci> S </ci>
-                      <ci> MicroSubstance__countPerSubstance__countP </ci>
-                    </apply>
+                    <ci> S </ci>
                   </apply>
-                  <ci> Substance__countPerMicroSubstance__countP </ci>
                 </apply>
               </apply>
               <apply>
