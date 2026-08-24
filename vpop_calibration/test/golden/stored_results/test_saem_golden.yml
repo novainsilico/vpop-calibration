@@ -1,6 +1,6 @@
 output:
   statistical_model:
-    prior_params:
+    input_params:
       model_intrinsic:
         mi_1:
           prior: 10.0
@@ -44,6 +44,11 @@ output:
       - coef_foo_pdu1
       - pdu_2
       - coef_foo_pdu2
+      omega_init:
+      - 0.1
+      - 0.1
+      mu_mi_init:
+      - 2.302585092994046
       covariate_names:
       - foo
       covariate_coeff_names:
@@ -70,6 +75,7 @@ output:
         - 0.1
       log_mi:
       - 2.302585092994046
+      surv_coeffs: []
       res_var:
         sigma_add:
         - 0.1
@@ -190,6 +196,7 @@ output:
         - 0.9019703973592392
       model_intrinsic:
       - 2.2668416013298067
+      surv_coeffs: []
       complete_likelihood: 126.0967315521988
       fixed_effects_loss:
       - 57.512406434151984

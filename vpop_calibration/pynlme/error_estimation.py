@@ -1,6 +1,6 @@
 import torch
 from torch.optim import LBFGS
-from vpop_calibration.pynlme.indexing import IndexedObservations
+from vpop_calibration.pynlme.indexing import ObservationsDataSet
 from vpop_calibration.pynlme.residuals import (
     calculate_residuals,
     ResidualErrorEstimates,
@@ -33,7 +33,7 @@ def _solve_combined_output(
 
 # @torch.compile
 def estimate_error_params(
-    observations: IndexedObservations,
+    observations: ObservationsDataSet,
     predictions: torch.Tensor,
     min_variance: float,
     residual_error: ResidualErrorEstimates,

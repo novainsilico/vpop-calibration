@@ -8,7 +8,7 @@ from vpop_calibration.pynlme.schemas import ObsDataSchema
 from vpop_calibration.config import device
 
 
-class IndexedValues(NamedTuple):
+class TensorIndexing(NamedTuple):
     index_values: torch.Tensor
     ref_values: list
     raw_values: pd.Series
@@ -25,9 +25,9 @@ def remap_single_index(
 
 
 def remap_indexed_values(
-    source_index: IndexedValues,
+    source_index: TensorIndexing,
     dest_ref_values: list | None,
-) -> IndexedValues:
+) -> TensorIndexing:
     if dest_ref_values is None:
         return source_index
 
@@ -38,7 +38,7 @@ def remap_indexed_values(
         i: dest_ref_values.index(val) for i, val in enumerate(source_index.ref_values)
     }
     new_index_values = remap_single_index(source_index.index_values, mapping)
-    new_index = IndexedValues(
+    new_index = TensorIndexing(
         index_values=new_index_values,
         ref_values=dest_ref_values,
         raw_values=source_index.raw_values,
@@ -46,19 +46,19 @@ def remap_indexed_values(
     return new_index
 
 
-class ObservationIndex(NamedTuple):
+class DataIndex(NamedTuple):
     """Utility class to store and manipulate tensor indexings"""
 
     # The field names correspond to actual column names in ObsData
-    id: IndexedValues
-    output_name: IndexedValues
-    protocol_arm: IndexedValues
-    task: IndexedValues
-    time: IndexedValues
+    id: TensorIndexing
+    output_name: TensorIndexing
+    protocol_arm: TensorIndexing
+    task: TensorIndexing
+    time: TensorIndexing
 
     @classmethod
-    def from_dataframe(cls, df: DataFrame[ObsDataSchema]) -> "ObservationIndex":
-        """Instantiate an ObservationIndex from an observed dataframe."""
+    def from_dataframe(cls, df: DataFrame[ObsDataSchema]) -> "DataIndex":
+        """Instantiate an DataIndex from an observed dataframe."""
         indexes = []
         for field in cls._fields:
             raw_values = df[field]
@@ -67,7 +67,7 @@ class ObservationIndex(NamedTuple):
                 raw_values.apply(lambda x: ref_values.index(x)).values, device=device
             )
             indexes.append(
-                IndexedValues(
+                TensorIndexing(
                     index_values=indexed_values,
                     ref_values=ref_values,
                     raw_values=raw_values,
@@ -84,7 +84,7 @@ class ObservationIndex(NamedTuple):
         new_protocol_arms: list | None = None,
         new_tasks: list | None = None,
         new_times: list | None = None,
-    ) -> "ObservationIndex":
+    ) -> "DataIndex":
         """Given an existing indexing, remap to new (compatible) reference values."""
         replacement_map = [
             (self.id, new_patient_ids),
@@ -93,15 +93,21 @@ class ObservationIndex(NamedTuple):
             (self.task, new_tasks),
             (self.time, new_times),
         ]
-        new_obs_index = ObservationIndex(
+        new_obs_index = DataIndex(
             *tuple(map(lambda args: remap_indexed_values(*args), replacement_map))
         )
         return new_obs_index
 
 
-class IndexedObservations(BaseModel):
-    obs_index: ObservationIndex
+class SurvivalOutputs(NamedTuple):
+    log_hazard: str
+    cumulative_hazard: str
+
+
+class ObservationsDataSet(BaseModel):
+    obs_index: DataIndex
     obs_values: torch.Tensor
+    survival_outputs: SurvivalOutputs | None = None
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 

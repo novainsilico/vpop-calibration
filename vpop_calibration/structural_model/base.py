@@ -1,7 +1,7 @@
 import torch
 import pandas as pd
 
-from vpop_calibration.pynlme.indexing import ObservationIndex
+from vpop_calibration.pynlme.indexing import DataIndex
 from vpop_calibration.config import device, default_dtype
 from vpop_calibration.pynlme.schemas import ObsDataSchema, patientDataSchema
 
@@ -33,7 +33,7 @@ class StructuralModel:
     def simulate(
         self,
         X: torch.Tensor,
-        prediction_index: ObservationIndex,
+        prediction_index: DataIndex,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         raise ValueError("Not implemented")
 
@@ -41,7 +41,7 @@ class StructuralModel:
         self, vpop: pd.DataFrame, obs_df: pd.DataFrame
     ) -> pd.DataFrame:
         obs_df_validated = ObsDataSchema.validate(obs_df)
-        obs_index = ObservationIndex.from_dataframe(obs_df_validated)
+        obs_index = DataIndex.from_dataframe(obs_df_validated)
         # The patients in the vpop data frame have no reason to be in the correct order, so enforce the ordering here
         patient_data_validated = patientDataSchema.validate(vpop)
         patients_order = pd.DataFrame({"id": obs_index.id.ref_values})

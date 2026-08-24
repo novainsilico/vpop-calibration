@@ -1,11 +1,11 @@
 import torch
-from typing import get_args, NamedTuple, Callable, Any
+from typing import NamedTuple, Callable, Any
 import pandas as pd
 
 from vpop_calibration.structural_model.base import StructuralModel
 from vpop_calibration.pynlme.data import ObsData
-from vpop_calibration.pynlme.indexing import ObservationIndex
-from vpop_calibration.pynlme.params import MixedEffectParameters, ErrorType
+from vpop_calibration.pynlme.indexing import DataIndex
+from vpop_calibration.pynlme.params import MixedEffectParameters
 from vpop_calibration.pynlme.utils import init_transform_function
 from vpop_calibration.pynlme.residuals import (
     log_likelihood_observation,
@@ -26,6 +26,7 @@ class NlmeModelState(NamedTuple):
     omega: torch.Tensor
     log_mi: torch.Tensor
     res_var: ResidualErrorEstimates
+    surv_coeffs: torch.Tensor
 
     def get_state_dict(self) -> dict[str, Any]:
         state_dict = {
@@ -49,12 +50,7 @@ class NlmeModelState(NamedTuple):
         return instance
 
     def __eq__(self, other) -> bool:
-        compared_attributes = [
-            "beta",
-            "omega",
-            "log_mi",
-            "res_var",
-        ]
+        compared_attributes = ["beta", "omega", "log_mi", "res_var", "surv_coeffs"]
 
         for elem in compared_attributes:
             torch.testing.assert_close(getattr(self, elem), getattr(other, elem))
@@ -66,7 +62,7 @@ class StatisticalModel:
         self,
         structural_model: StructuralModel,
         dataset: ObsData,
-        prior_params: MixedEffectParameters,
+        input_params: MixedEffectParameters,
         config: NlmeConfigDict = NlmeConfigDict(),
     ):
         """Non-linear mixed effects model
@@ -76,13 +72,13 @@ class StatisticalModel:
         Args:
             structural_model (StructuralModel): The deterministic model equations
             dataset (ObsData): The observed longitudinal data.
-            prior_params (MixedEffectParameters): The user-defined parameter priors and configuration.
-            num_chains (int, optional): Number of parallel MC chains to track. Defaults to 1.
+            input_params (MixedEffectParameters): The user-defined parameter priors and configuration.
+            config (NlmeConfigDict): configuration options
         """
         # -- Class composition
         self.structural_model = structural_model
         self.data = dataset
-        self.prior_params = prior_params
+        self.input_params = input_params
         self.config = config
         if smoke_test:
             # Override with test config
@@ -91,26 +87,30 @@ class StatisticalModel:
             )
 
         # -- Attributes initialization
-        self.mi_names = self.prior_params.mi_names
+        self.mi_names = self.input_params.mi_names
         self.nb_mi = len(self.mi_names)
-        self.pdu_names = self.prior_params.pdu_names
+        self.pdu_names = self.input_params.pdu_names
         self.nb_pdu = len(self.pdu_names)
-        self.pdk_names = self.prior_params.pdk
+        self.pdk_names = self.input_params.pdk
         self.nb_pdk = len(self.pdk_names)
-        self.beta_names = self.prior_params.beta_names
+        self.beta_names = self.input_params.beta_names
         self.nb_betas = len(self.beta_names)
-        self.descriptors = self.pdk_names + self.pdu_names + self.mi_names
-        self.nb_descriptors = len(self.descriptors)
-        self.covariate_names = self.prior_params.covariate_names
+        self.covariate_names = self.input_params.covariate_names
         self.nb_covariates = len(self.covariate_names)
-        self.covariate_coeff_names = self.prior_params.covariate_coeff_names
+        self.covariate_coeff_names = self.input_params.covariate_coeff_names
+        self.surv_coeff_names = self.input_params.surv_coeff_names
+        self.nb_surv_coeffs = len(self.surv_coeff_names)
+        self.descriptors = (
+            self.pdk_names + self.pdu_names + self.mi_names + self.surv_coeff_names
+        )
+        self.nb_descriptors = len(self.descriptors)
         self.patients = self.data.patients
         self.nb_patients = len(self.patients)
         self.nb_chains = self.config.nb_chains
 
         # -- Validation
         # Validate observed data against the user-specified parameters
-        self.prior_params.validate_data(self.data)
+        self.input_params.validate_data(self.data)
         # Validate the structural model against user-specified parameters
         assert set(self.descriptors) == set(self.structural_model.parameter_names), (
             f"Inconsistent parameter set between patient data and structural model:\nIn the data: {set(self.descriptors)}\nIn the structural model: {set(self.structural_model.parameter_names)}"
@@ -125,61 +125,61 @@ class StatisticalModel:
             ],
             device=device,
         ).long()
+        # Map outputs the other way (struct model -> nlme model)
+        self.struct_model_outputs_to_nlme_output = torch.as_tensor(
+            [
+                self.data.all_output_names.index(out)
+                for out in self.input_params.all_output_names
+            ]
+        )
 
         # Map observation indices to structural model reference values
         # This applies to output names, protocol arms and tasks
         # The ordering coming from the structural model takes precedence.
         self.output_names = self.structural_model.output_names
-        self.nb_outputs = len(self.output_names)
-        self.residual_var = ResidualErrorEstimates.uninitialized(self.nb_outputs)
         self.protocol_arms = self.structural_model.protocol_arms
         self.nb_protocols = len(self.protocol_arms)
         self.task_names = self.structural_model.task_names
         self.nb_tasks = len(self.task_names)
+
         self.data.remap_all_indexings(
-            new_output_names=self.output_names,
+            new_output_names=self.structural_model.output_names,
             new_protocol_arms=self.protocol_arms,
             new_tasks=self.task_names,
         )
-        # Map the error model type to the output indices
-        self.error_model_selector: dict[ErrorType, list[int]] = {}
-        for error_type in get_args(ErrorType):
-            self.error_model_selector.update({error_type: []})
-        for i, output in enumerate(self.output_names):
-            self.error_model_selector[
-                self.prior_params.error_model[output].error_type
-            ].append(i)
 
         # -- NLME state initialization
         # Initiate the nlme model parameters in torch tensors
         init_beta = torch.as_tensor(
-            self.prior_params.beta_init, device=device, dtype=default_dtype
+            self.input_params.beta_init, device=device, dtype=default_dtype
         )
         init_omega = torch.diag(
             torch.as_tensor(
-                [
-                    self.prior_params.pdu[param].prior_omega
-                    for param in self.prior_params.pdu_names
-                ],
+                self.input_params.omega_init,
                 device=device,
                 dtype=default_dtype,
             )
         )
         init_mi = torch.as_tensor(
-            [
-                self.prior_params.model_intrinsic[param].tansformed_prior
-                for param in self.mi_names
-            ],
+            self.input_params.mu_mi_init,
             device=device,
             dtype=default_dtype,
         )
-        init_res_var = ResidualErrorEstimates.from_priors(
-            error_model_priors=self.prior_params.error_model,
+        init_sigma = ResidualErrorEstimates.from_priors(
+            error_model_priors=self.input_params.error_model,
             output_names=self.output_names,
         )
 
+        init_surv_coeffs = torch.as_tensor(
+            self.input_params.surv_coeff_init, device=device, dtype=default_dtype
+        )
+
         init_params = NlmeModelState(
-            beta=init_beta, omega=init_omega, log_mi=init_mi, res_var=init_res_var
+            beta=init_beta,
+            omega=init_omega,
+            log_mi=init_mi,
+            res_var=init_sigma,
+            surv_coeffs=init_surv_coeffs,
         )
 
         self.set_current_parameters(pop_params=init_params)
@@ -192,16 +192,16 @@ class StatisticalModel:
 
         # Initiate transforms
         self.pdu_transform = init_transform_function(
-            self.prior_params.pdu, self.pdu_names
+            self.input_params.pdu, self.pdu_names
         )
 
         self.mi_transform = init_transform_function(
-            self.prior_params.model_intrinsic, self.mi_names
+            self.input_params.model_intrinsic, self.mi_names
         )
 
     def get_state_dict(self) -> dict[str, Any]:
         state_dict = {
-            "prior_params": self.prior_params.get_state_dict(),
+            "input_params": self.input_params.get_state_dict(),
             "config": self.config.get_state_dict(),
             "current_params": self.current_params.get_state_dict(),
         }
@@ -217,8 +217,8 @@ class StatisticalModel:
         instance = cls(
             structural_model=structural_model,
             dataset=dataset,
-            prior_params=MixedEffectParameters.from_state_dict(
-                state_dict=state_dict["prior_params"]
+            input_params=MixedEffectParameters.from_state_dict(
+                state_dict=state_dict["input_params"]
             ),
             config=NlmeConfigDict.from_state_dict(state_dict=state_dict["config"]),
         )
@@ -238,7 +238,7 @@ class StatisticalModel:
         for i, param in enumerate(self.pdu_names):
             design_matrix_X_i[i, col_idx] = 1.0
             col_idx += 1
-            param_covariates = self.prior_params.pdu[param].covariates
+            param_covariates = self.input_params.pdu[param].covariates
             if param_covariates is not None:
                 for covariate in param_covariates:
                     design_matrix_X_i[i, col_idx] = float(patient_covariates[covariate])
@@ -297,9 +297,9 @@ class StatisticalModel:
     def update_res_var(self, residual_var: ResidualErrorEstimates) -> None:
         """Update the residual variance of the NLME model, while ensuring it remains positive."""
 
-        assert residual_var.nb_outputs == self.nb_outputs, (
+        assert residual_var.nb_outputs == self.input_params.nb_outputs, (
             f"Wrong number of outputs in residual variance update: "
-            f"{residual_var.nb_outputs}, expected: {self.nb_outputs}"
+            f"{residual_var.nb_outputs}, expected: {self.input_params.nb_outputs}"
         )
         residual_var.assert_initialized()
         self.residual_var: ResidualErrorEstimates = residual_var.sanitized()
@@ -330,6 +330,15 @@ class StatisticalModel:
 
         self.log_mi = log_mi
 
+    def update_surv_coeffs(self, surv_coeffs: torch.Tensor) -> None:
+        if hasattr(self, "surv_coeffs"):
+            expected_shape = self.surv_coeffs.shape
+        else:
+            expected_shape = (self.nb_surv_coeffs,)
+        assert surv_coeffs.shape == expected_shape
+
+        self.surv_coeffs = surv_coeffs
+
     def set_current_parameters(self, pop_params: NlmeModelState):
         """Update or initialize the current population parameter values
 
@@ -344,6 +353,7 @@ class StatisticalModel:
         self.update_betas(pop_params.beta)
         self.update_log_mi(pop_params.log_mi)
         self.update_res_var(pop_params.res_var)
+        self.update_surv_coeffs(pop_params.surv_coeffs)
 
     # @torch.compile
     def sample_etas(self, nb_samples: int) -> torch.Tensor:
@@ -411,33 +421,44 @@ class StatisticalModel:
 
     # @torch.compile
     def convert_gaussian_to_physical(
-        self, psi: torch.Tensor, log_mi: torch.Tensor
+        self, psi: torch.Tensor, log_mi: torch.Tensor, surv_coeffs: torch.Tensor
     ) -> torch.Tensor:
         """Transform gaussian parameters to physical parameters (thetas)
 
         Args:
             psi (torch.Tensor): Tensor of individual unconstrained parameter values, converted from etas with `convert_etas_to_gaussian`. Size: (nb_chains, nb_patients, nb_pdu)
             log_mi (torch.Tensor): Tensor of current estimates for the (transformed) model intrinsic parameters.
+            surv_coeffs (torch.Tensor): Tensor of estimates for the survival model coefficients
 
         Returns:
             torch.Tensor: Tensor of individual physical parameter values. Both PDUs and MIs are included. Size: (nb_chains, nb_patients, nb_pdu + nb_mi)
         """
         nb_patients_local = psi.shape[1]
         assert psi.shape[2] == self.nb_pdu
+        assert log_mi.dim() == surv_coeffs.dim(), (
+            "Incompatible model intrinsics and survival coefficients"
+        )
 
         if log_mi.dim() == 1:
             # Regular case: fixed effects are fixed
             psi_expanded = psi
             nb_samples_physical = psi.shape[0]
             log_mi_expanded = log_mi.expand(nb_samples_physical, nb_patients_local, -1)
+            surv_coeffs_expanded = surv_coeffs.expand(
+                nb_samples_physical, nb_patients_local, self.nb_surv_coeffs
+            )
         elif log_mi.dim() == 2:
             # Fixed effects optimization: when computing the gradient, we compute batched of fixed effect values, but the gaussian parameters have to be fixed
             assert psi.shape[0] == 1, (
                 "Unexpected gaussian parameter shape in multiple fixed effects evaluation"
             )
             nb_samples_mi = log_mi.shape[0]
+            assert surv_coeffs.shape[0] == nb_samples_mi
             psi_expanded = psi.expand(nb_samples_mi, -1, -1)
             log_mi_expanded = log_mi.unsqueeze(1).expand(-1, nb_patients_local, -1)
+            surv_coeffs_expanded = surv_coeffs.unsqueeze(1).expand(
+                -1, nb_patients_local, self.nb_surv_coeffs
+            )
         else:
             raise ValueError(f"Unexpected fixed effect tensor dimension {log_mi.dim()}")
 
@@ -445,17 +466,21 @@ class StatisticalModel:
         pdu = self.pdu_transform(psi_expanded)
         mi = self.mi_transform(log_mi_expanded)
 
-        phi = torch.cat((pdu, mi), dim=-1).to(device)
+        phi = torch.cat((pdu, mi, surv_coeffs_expanded), dim=-1).to(device)
         return phi
 
     # @torch.compile
     def _combine_physical_pdk(
-        self, physical_params: torch.Tensor, pdk: torch.Tensor
+        self,
+        physical_params: torch.Tensor,
+        pdk: torch.Tensor,
     ) -> torch.Tensor:
-        """Atomic method to combine physical parameters and pdks"""
+        """Atomic method to combine physical parameters, survival model coefficients and pdks"""
         nb_samples = physical_params.shape[0]
         nb_patients_local = physical_params.shape[1]
-        assert physical_params.shape[2] == self.nb_pdu + self.nb_mi
+        assert (
+            physical_params.shape[2] == self.nb_pdu + self.nb_mi + self.nb_surv_coeffs
+        )
         assert pdk.shape == (
             nb_patients_local,
             self.nb_pdk,
@@ -486,7 +511,7 @@ class StatisticalModel:
         assert physical_params.shape == (
             nb_samples,
             self.nb_patients,
-            self.nb_pdu + self.nb_mi,
+            self.nb_pdu + self.nb_mi + self.nb_surv_coeffs,
         )
         theta = self._combine_physical_pdk(
             physical_params=physical_params, pdk=self.data.patients_pdk_full
@@ -543,7 +568,7 @@ class StatisticalModel:
         return struct_model_inputs
 
     def _predict(
-        self, inputs: torch.Tensor, pred_index: ObservationIndex
+        self, inputs: torch.Tensor, pred_index: DataIndex
     ) -> tuple[torch.Tensor, torch.Tensor]:
         pred_mean, pred_var = self.structural_model.simulate(
             X=inputs, prediction_index=pred_index
@@ -576,6 +601,8 @@ class StatisticalModel:
         assert pred_mean.shape == (
             nb_samples,
             self.data.nb_total_observations,
+        ), (
+            f"Expected ({nb_samples}, {self.data.nb_total_observations}), \nActual: {pred_mean.shape}"
         )
 
         return pred_mean, pred_var
@@ -588,7 +615,7 @@ class StatisticalModel:
 
         gaussian_params = self.convert_etas_to_gaussian_all_patients(etas)
         physical_params = self.convert_gaussian_to_physical(
-            gaussian_params, self.log_mi
+            psi=gaussian_params, log_mi=self.log_mi, surv_coeffs=self.surv_coeffs
         )
         thetas = self.convert_physical_to_thetas_all_patients(physical_params)
         inputs = self.convert_thetas_to_model_parameters_all_patients(thetas)
@@ -634,7 +661,7 @@ class StatisticalModel:
                 etas=etas, design_matrix=design_matrix
             )
             physical_params = self.convert_gaussian_to_physical(
-                psi=gaussian_params, log_mi=self.log_mi
+                psi=gaussian_params, log_mi=self.log_mi, surv_coeffs=self.surv_coeffs
             )
             thetas = self._combine_physical_pdk(
                 physical_params=physical_params, pdk=pdk

@@ -2,7 +2,7 @@ from vpop_calibration.structural_model.simwork import (
     SimworkModelBinding,
     StructuralSimwork,
 )
-from vpop_calibration.pynlme.indexing import ObservationIndex
+from vpop_calibration.pynlme.indexing import DataIndex
 from vpop_calibration.pynlme.schemas import ObsDataSchema
 
 import torch
@@ -28,7 +28,7 @@ def test_analytical_simwork_no_protocol_override(dummy_simwork_model):
         .merge(pd.DataFrame({"output_name": ["A0", "A1", "A2"]}), how="cross")
     )
     df["value"] = 0.0
-    obs_index = ObservationIndex.from_dataframe(ObsDataSchema.validate(df))
+    obs_index = DataIndex.from_dataframe(ObsDataSchema.validate(df))
 
     struct_model = StructuralSimwork(model=dummy_simwork_model)
     X = torch.tensor(
@@ -49,7 +49,7 @@ def test_analytical_simwork_two_chains(dummy_simwork_model):
         .merge(pd.DataFrame({"output_name": ["A0", "A1", "A2"]}), how="cross")
     )
     df["value"] = 0.0
-    obs_index = ObservationIndex.from_dataframe(ObsDataSchema.validate(df))
+    obs_index = DataIndex.from_dataframe(ObsDataSchema.validate(df))
 
     struct_model = StructuralSimwork(model=dummy_simwork_model)
     X = torch.tensor(
@@ -75,7 +75,7 @@ def test_analytical_simwork_one_protocol_override(dummy_simwork_model):
         .merge(pd.DataFrame({"output_name": ["A0", "A1", "A2"]}), how="cross")
     )
     df["value"] = 0.0
-    obs_index = ObservationIndex.from_dataframe(ObsDataSchema.validate(df))
+    obs_index = DataIndex.from_dataframe(ObsDataSchema.validate(df))
 
     protocol_design = pd.DataFrame({"protocol_arm": ["arm-A", "arm-B"], "k_21": [0, 1]})
 
@@ -101,7 +101,7 @@ def test_categorical_override(dummy_simwork_model):
         .merge(pd.DataFrame({"output_name": ["A0", "A1", "A2"]}), how="cross")
     )
     df["value"] = 0.0
-    obs_index = ObservationIndex.from_dataframe(ObsDataSchema.validate(df))
+    obs_index = DataIndex.from_dataframe(ObsDataSchema.validate(df))
 
     protocol_design = pd.DataFrame({"protocol_arm": ["arm-A", "arm-B"], "k_21": [0, 1]})
 

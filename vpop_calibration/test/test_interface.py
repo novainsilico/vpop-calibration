@@ -63,12 +63,12 @@ def sample_inputs(np_rng) -> tuple[dict, pd.DataFrame, StructuralModel]:
 
 def test_nlme_interface(sample_inputs):
     priors, df, struct_model = sample_inputs
-    _nlme_model = NlmeModel(df=df, prior_params=priors, structural_model=struct_model)
+    _nlme_model = NlmeModel(df=df, input_params=priors, structural_model=struct_model)
 
 
 def test_state_dict(sample_inputs):
     priors, df, struct_model = sample_inputs
-    nlme_model = NlmeModel(df=df, prior_params=priors, structural_model=struct_model)
+    nlme_model = NlmeModel(df=df, input_params=priors, structural_model=struct_model)
     state_dict = nlme_model.get_state_dict()
     _new_nlme_model = NlmeModel.from_state_dict(
         state_dict=state_dict, df=df, structural_model=struct_model
@@ -87,7 +87,7 @@ def test_state_dict(sample_inputs):
 
 def test_save_load(sample_inputs, tmp_path):
     priors, df, struct_model = sample_inputs
-    nlme_model = NlmeModel(df=df, prior_params=priors, structural_model=struct_model)
+    nlme_model = NlmeModel(df=df, input_params=priors, structural_model=struct_model)
     nlme_model.optimizer.run()
     nlme_model.diagnostics.sample_conditional_distribution()
 
@@ -101,6 +101,6 @@ def test_save_load(sample_inputs, tmp_path):
     )
 
     assert (
-        nlme_model.statistical_model.prior_params
-        == nlme_model.statistical_model.prior_params
+        nlme_model.statistical_model.input_params
+        == nlme_model.statistical_model.input_params
     )

@@ -8,10 +8,10 @@ repos:
     - id: ruff-format
       name: Ruff format python code
       entry: ruff format
-      language: system
-      types: [python]
+      language: python
+      types: [python, jupyter, pyi]
     - id: ruff-lint
       name: Ruff lint
       entry: ruff check
-      language: system
-      types: [python]
+      language: python
+      types: [python, jupyter, pyi]

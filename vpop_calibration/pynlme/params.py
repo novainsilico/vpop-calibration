@@ -1,4 +1,4 @@
-from pydantic import BaseModel, computed_field, Field, model_validator, ConfigDict
+from pydantic import BaseModel, Field, model_validator, ConfigDict
 import numpy as np
 from typing import Literal, Optional, get_args, Any
 from typing_extensions import Self
@@ -56,7 +56,6 @@ class PopulationParameter(BaseModel):
             raise ValueError("Prior value cannot be larger than higher bound.")
         return self
 
-    @computed_field
     @property
     def tansformed_prior(self) -> float:
         return transform_param(self.prior, self.constraint)
@@ -78,19 +77,19 @@ class PatientDescriptorUnknown(PopulationParameter):
     prior_omega: float = Field(ge=0)
     covariates: Optional[dict[str, Covariate]] = None
 
-    @computed_field
     @property
     def transformed_prior(self) -> float:
         return transform_param(self.prior, self.constraint)
 
 
-ErrorType = Literal["additive", "proportional", "combined"]
+ErrorType = Literal["additive", "proportional", "combined", "survival"]
 
 error_components: dict[ErrorType, tuple[bool, bool]] = {
     # (additive used, proportional used)
     "additive": (True, False),
     "proportional": (False, True),
     "combined": (True, True),
+    "survival": (False, False),
 }
 
 
@@ -116,7 +115,7 @@ class ErrorModel(BaseModel):
                 raise ValueError(
                     "error_type='combined' requires both sigma_add and sigma_prop"
                 )
-        else:
+        elif self.error_type == "additive" or self.error_type == "proportional":
             if self.sigma_add is not None or self.sigma_prop is not None:
                 raise ValueError(
                     f"error_type='{self.error_type}' uses sigma, "
@@ -124,6 +123,9 @@ class ErrorModel(BaseModel):
                 )
             if self.sigma is None:
                 raise ValueError(f"error_type='{self.error_type}' requires sigma")
+        elif self.error_type == "survival":
+            if any([self.sigma, self.sigma_add, self.sigma_prop]):
+                raise ValueError("Survival error type requires no sigma to be defined")
         return self
 
     @property
@@ -132,7 +134,19 @@ class ErrorModel(BaseModel):
             "additive": (self.sigma, 0.0),
             "proportional": (0.0, self.sigma),
             "combined": (self.sigma_add, self.sigma_prop),
+            "survival": (0.0, 0.0),
         }[self.error_type]
+
+
+class GaussianParameter(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    prior: float
+
+
+class TimeToEvent(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    hazard_name: str  # name of the hazard variable in the structural model
+    coefficients: dict[str, GaussianParameter]
 
 
 class MixedEffectParameters(BaseModel):
@@ -143,29 +157,52 @@ class MixedEffectParameters(BaseModel):
     pdu: dict[str, PatientDescriptorUnknown] = {}
     pdk: list[str] = []
     error_model: dict[str, ErrorModel]
+    time_to_event: TimeToEvent | None = None
 
     # Properties to be assigned after initialization
     beta_init: list[float] = []
     beta_names: list[str] = []
+    omega_init: list[float] = []
+    mu_mi_init: list[float] = []
     covariate_names: list[str] = []
     covariate_coeff_names: list[str] = []
+    surv_coeff_init: list[float] = []
+    surv_coeff_names: list[str] = []
 
-    @computed_field
     @property
     def mi_names(self) -> list[str]:
         return list(self.model_intrinsic.keys())
 
-    @computed_field
     @property
     def pdu_names(self) -> list[str]:
         return list(self.pdu.keys())
 
-    @computed_field
     @property
-    def output_names(self) -> list[str]:
+    def continuous_output_names(self) -> list[str]:
         return list(self.error_model.keys())
 
-    @computed_field
+    @property
+    def survival_output_names(self) -> list[str]:
+        if self.time_to_event is not None:
+            return [
+                "log_" + self.time_to_event.hazard_name,
+                "cumulative_" + self.time_to_event.hazard_name,
+            ]
+        else:
+            return []
+
+    @property
+    def nb_continuous_outputs(self) -> int:
+        return len(self.continuous_output_names)
+
+    @property
+    def all_output_names(self) -> list[str]:
+        return self.continuous_output_names + self.survival_output_names
+
+    @property
+    def nb_outputs(self) -> int:
+        return len(self.all_output_names)
+
     @property
     def descriptors(self) -> list[str]:
         return self.mi_names + self.pdu_names + self.pdk
@@ -174,10 +211,12 @@ class MixedEffectParameters(BaseModel):
         covariate_set = set()
         self.beta_init = []
         self.beta_names = []
+        self.omega_init = []
         self.covariate_coeff_names = []
         for pdu_name, pdu_val in self.pdu.items():
             self.beta_names.append(pdu_name)
             self.beta_init.append(pdu_val.transformed_prior)
+            self.omega_init.append(pdu_val.prior_omega)
             if pdu_val.covariates is not None:
                 for cov_name, cov_val in pdu_val.covariates.items():
                     covariate_set.add(cov_name)
@@ -185,6 +224,17 @@ class MixedEffectParameters(BaseModel):
                     self.beta_init.append(cov_val.prior)
                     self.covariate_coeff_names.append(cov_val.coef_name)
         self.covariate_names = list(covariate_set)
+
+        self.mu_mi_init = []
+        for _, mi_val in self.model_intrinsic.items():
+            self.mu_mi_init.append(mi_val.tansformed_prior)
+
+        self.surv_coeff_init = []
+        self.surv_coeff_names = []
+        if self.time_to_event is not None:
+            for name, param in self.time_to_event.coefficients.items():
+                self.surv_coeff_init.append(param.prior)
+                self.surv_coeff_names.append(name)
 
     def validate_data(self, data: ObsData) -> None:
         """Validate an observed data set against the NLME parameters.
@@ -196,12 +246,19 @@ class MixedEffectParameters(BaseModel):
             f"Discrepancy between descriptor set and data set columns. The data set informs \n{data.descriptors_known}\n The input parameters inform\n{descriptors_known_params}"
         )
 
-        assert set(self.output_names) == set(data.observed_output_names), (
-            f"Discrepancy in output names. The data set contains \n{data.observed_output_names}\n The input parameters contain \n{self.output_names}"
+        assert set(self.all_output_names) == set(data.all_output_names), (
+            f"Discrepancy in output names. The data set contains \n{data.all_output_names}\n The input parameters contain \n{self.all_output_names}"
         )
 
+        assert (self.time_to_event is not None) == (
+            "event_time" in data.patients_df.columns
+        )
+
+        if self.time_to_event is not None:
+            assert self.time_to_event.hazard_name == data.hazard_name
+
     def get_state_dict(self) -> dict[str, Any]:
-        return self.model_dump(exclude_computed_fields=True, exclude_defaults=True)
+        return self.model_dump(exclude_defaults=True)
 
     @classmethod
     def from_state_dict(cls, state_dict: dict[str, Any]) -> "MixedEffectParameters":

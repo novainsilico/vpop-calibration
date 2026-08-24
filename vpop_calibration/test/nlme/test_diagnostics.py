@@ -80,7 +80,7 @@ def struct_model() -> StructuralModel:
 
 def test_diagnostics(sample_nlme_params, obs_data, struct_model):
     nlme_model = StatisticalModel(
-        structural_model=struct_model, dataset=obs_data, prior_params=sample_nlme_params
+        structural_model=struct_model, dataset=obs_data, input_params=sample_nlme_params
     )
     diagnostics = ModelDiagnostics(nlme_model)
     diagnostics.sample_conditional_distribution()

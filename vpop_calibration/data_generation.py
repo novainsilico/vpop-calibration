@@ -186,13 +186,13 @@ def generate_synthetic_data(
     # Create the nlme model
     config = NlmeConfigDict(nb_chains=1)
     nlme_model = StatisticalModel(
-        structural_model=struct_model, dataset=data, prior_params=params, config=config
+        structural_model=struct_model, dataset=data, input_params=params, config=config
     )
     # Prepare model inputs
     eta = nlme_model.sample_etas(1)
     gaussian = nlme_model.convert_etas_to_gaussian_all_patients(eta)
     physical = nlme_model.convert_gaussian_to_physical(
-        psi=gaussian, log_mi=nlme_model.log_mi
+        psi=gaussian, log_mi=nlme_model.log_mi, surv_coeffs=nlme_model.surv_coeffs
     )
     theta = nlme_model.convert_physical_to_thetas_all_patients(physical_params=physical)
     inputs = nlme_model.convert_thetas_to_model_parameters_all_patients(theta)

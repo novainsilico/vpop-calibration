@@ -1,15 +1,16 @@
 import pytest
-import numpy as np
 import pandas as pd
+import numpy as np
 from pandera.typing import DataFrame
 import torch
 
-from vpop_calibration.pynlme.params import MixedEffectParameters
 from vpop_calibration.pynlme.data import ObsData
+from vpop_calibration.pynlme.params import MixedEffectParameters
 from vpop_calibration.pynlme.model import StatisticalModel
 from vpop_calibration.structural_model.base import StructuralModel
 from vpop_calibration.structural_model.analytical import StructuralAnalytical
-from vpop_calibration.metropolis_hastings import MetropolisHastingsState, mh_step
+from vpop_calibration.saem.optimizer import PySaem
+from vpop_calibration.saem.config import SaemConfigDict
 
 
 @pytest.fixture
@@ -34,6 +35,10 @@ def sample_nlme_params() -> MixedEffectParameters:
             "out_2": {"error_type": "proportional", "sigma": 0.5},
         },
         "pdk": ["pdk_1"],
+        "time_to_event": {
+            "hazard_name": "hz",
+            "coefficients": {"beta_0": {"prior": -0.5}},
+        },
     }
     return MixedEffectParameters.model_validate(input)
 
@@ -46,6 +51,9 @@ def obs_data(np_rng) -> ObsData:
         "foo": [0.0, 5.0],
         "pdk_1": [0.0, 0.0],
         "protocol_arm": protocol_arms,
+        "event_time": [0.5, 2],
+        "event_status": [True, False],
+        "hazard_name": ["hz", "hz"],
     }
     outputs = ["out_1", "out_2"]
     time_steps = np.arange(0, 3.0, 1.0)
@@ -59,67 +67,31 @@ def obs_data(np_rng) -> ObsData:
 
 @pytest.fixture
 def struct_model() -> StructuralModel:
-    def equations(mi_1, pdu_1, pdu_2, pdk_1, t, protocol_ovr_1):
+    def equations(mi_1, pdu_1, pdu_2, pdk_1, t, protocol_ovr_1, beta_0):
         out = torch.zeros_like(t)
-        return torch.cat((out, out), dim=-1)
+        return torch.cat((out, out, out, out), dim=-1)
 
     protocol_design = pd.DataFrame(
         {"protocol_arm": ["arm-A", "arm-B"], "protocol_ovr_1": [1, 2]}
     )
     struct_model = StructuralAnalytical(
         equations=equations,
-        variable_names=["out_1", "out_2"],
+        variable_names=["out_1", "out_2", "log_hz", "cumulative_hz"],
         protocol_design=protocol_design,
     )
     return struct_model
 
 
-def test_mh_step(sample_nlme_params, obs_data, struct_model):
+def test_joint_log_posterior(sample_nlme_params, obs_data, struct_model):
     nlme_model = StatisticalModel(
         structural_model=struct_model, dataset=obs_data, input_params=sample_nlme_params
     )
     nb_samples = 1
     etas = nlme_model.sample_etas(nb_samples)
     etas = torch.zeros_like(etas)
-    gaussian_params = nlme_model.convert_etas_to_gaussian_all_patients(etas)
     # Test the log prior function for etas
     predictions = nlme_model.log_posterior_etas_all_patients(etas)
     assert predictions.log_posterior.shape == (nb_samples, nlme_model.nb_patients)
-    init_state = MetropolisHastingsState(
-        etas=etas,
-        gaussian_params=gaussian_params,
-        log_prob=predictions.log_posterior,
-        step_size=0.1,
-        complete_likelihood=predictions.log_posterior.mean(dim=0).sum(dim=0),
-        prediction=predictions.predictions,
-    )
 
-    _new_state = mh_step(
-        nlme_model=nlme_model, previous_state=init_state, learning_rate=0.1
-    )
-
-
-def test_state_dict(sample_nlme_params, obs_data, struct_model):
-    nlme_model = StatisticalModel(
-        structural_model=struct_model, dataset=obs_data, input_params=sample_nlme_params
-    )
-    nb_samples = 1
-    etas = nlme_model.sample_etas(nb_samples)
-    etas = torch.zeros_like(etas)
-    gaussian_params = nlme_model.convert_etas_to_gaussian_all_patients(etas)
-    # Test the log prior function for etas
-    predictions = nlme_model.log_posterior_etas_all_patients(etas)
-    assert predictions.log_posterior.shape == (nb_samples, nlme_model.nb_patients)
-    init_state = MetropolisHastingsState(
-        etas=etas,
-        gaussian_params=gaussian_params,
-        log_prob=predictions.log_posterior,
-        step_size=0.1,
-        complete_likelihood=predictions.log_posterior.mean(dim=0).sum(dim=0),
-        prediction=predictions.predictions,
-    )
-
-    state_dict = init_state.get_state_dict()
-    new_mh_state = MetropolisHastingsState.from_state_dict(state_dict)
-
-    assert init_state == new_mh_state
+    optimizer = PySaem(model=nlme_model, config=SaemConfigDict())
+    optimizer.run()

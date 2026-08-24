@@ -76,7 +76,7 @@ def test_analytical_saem(sample_nlme_params, obs_data, struct_model):
     nlme_model = NlmeModel(
         structural_model=struct_model,
         df=obs_data,
-        prior_params=sample_nlme_params,
+        input_params=sample_nlme_params,
     )
     nlme_model.optimizer.run()
     nlme_model.diagnostics.sample_conditional_distribution()
