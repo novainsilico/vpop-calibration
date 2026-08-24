@@ -12,7 +12,7 @@ from vpop_calibration.pynlme.fim.standard_error import (
     invert_fim,
 )
 from vpop_calibration.pynlme.fim.likelihood_derivation import compute_fim_components
-from vpop_calibration.pynlme.fim.parametrization import FimParametrization
+from vpop_calibration.pynlme.fim.parametrization import flatten, get_parameter_names
 from vpop_calibration.pynlme.fim.state import FimState
 from vpop_calibration.pynlme.fim.utils import (
     history_dataframe,
@@ -28,17 +28,15 @@ class FimEstimator:
 
     def __init__(self, model: StatisticalModel, state: FimState | None = None) -> None:
         self.model = model
-        self.parametrization = FimParametrization(model)
+        nb_params = len(get_parameter_names(model))
         self.state = (
-            state
-            if state is not None
-            else FimState.initialize(nb_params=self.parametrization.nb_params)
+            state if state is not None else FimState.initialize(nb_params=nb_params)
         )
 
     # --- Parameters
     @property
     def parameter_names(self) -> list[str]:
-        return self.parametrization.names
+        return get_parameter_names(self.model)
 
     # --- Accumulation
     def accumulate(
@@ -46,8 +44,7 @@ class FimEstimator:
     ) -> FimState:
         statistics = compute_fim_components(
             model=self.model,
-            parametrization=self.parametrization,
-            flat=self.parametrization.flatten(),
+            flat=flatten(self.model),
             gaussian_params=gaussian_params,
         )
         self.state = self.state.accumulate(
@@ -93,7 +90,6 @@ class FimEstimator:
     def standard_errors(self) -> torch.Tensor:
         return compute_standard_errors(
             covariance_matrix=self.covariance_matrix,
-            parameter_names=self.parameter_names,
         )
 
     @property
@@ -101,15 +97,13 @@ class FimEstimator:
         """Relative Standard Error (RSE), in percent."""
         return compute_relative_standard_errors(
             standard_errors=self.standard_errors,
-            estimates=self.parametrization.flatten(),
+            estimates=flatten(self.model),
         )
 
     def _check_has_samples(self) -> None:
         if self.state.nb_samples == 0:
             raise RuntimeError(
                 "No posterior sample accumulated yet: the FIM is undefined. "
-                "Feed the estimator with samples of the conditional distribution "
-                "first, for instance through `estimate_fim`."
             )
 
     # --- Tables
@@ -124,7 +118,7 @@ class FimEstimator:
 
     def get_rse_df(self) -> pd.DataFrame:
         return rse_dataframe(
-            estimates=self.parametrization.flatten(),
+            estimates=flatten(self.model),
             standard_errors=self.standard_errors,
             relative_standard_errors=self.rse,
             names=self.parameter_names,
@@ -132,7 +126,7 @@ class FimEstimator:
 
     def get_summary_df(self) -> pd.DataFrame:
         return summary_dataframe(
-            estimates=self.parametrization.flatten(),
+            estimates=flatten(self.model),
             standard_errors=self.standard_errors,
             relative_standard_errors=self.rse,
             names=self.parameter_names,

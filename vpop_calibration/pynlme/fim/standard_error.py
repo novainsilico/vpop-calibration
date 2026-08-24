@@ -13,10 +13,8 @@ def invert_fim(fim: torch.Tensor) -> torch.Tensor:
     return torch.linalg.pinv(fim)
 
 
-def compute_standard_errors(
-    covariance_matrix: torch.Tensor, parameter_names: list[str]
-) -> torch.Tensor:
-    """Standard errors of the estimates, ``NaN`` where the variance is negative."""
+def compute_standard_errors(covariance_matrix: torch.Tensor) -> torch.Tensor:
+    """Standard errors of the estimates, NaN where the variance is negative."""
     variances = torch.diagonal(covariance_matrix)
     negative = variances < 0
     variances = variances.masked_fill(negative, float("nan"))
@@ -26,5 +24,5 @@ def compute_standard_errors(
 def compute_relative_standard_errors(
     standard_errors: torch.Tensor, estimates: torch.Tensor
 ) -> torch.Tensor:
-    """Relative Standard Errors (RSE), in percentage."""
+    """Relative Standard Errors (RSE)"""
     return (standard_errors / torch.abs(estimates)) * 100

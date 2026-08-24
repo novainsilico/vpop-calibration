@@ -3,7 +3,7 @@ from typing import Literal, overload
 from vpop_calibration.config import device
 from vpop_calibration.pynlme.model import StatisticalModel
 from vpop_calibration.pynlme.residuals import log_likelihood_observation
-from vpop_calibration.pynlme.fim.parametrization import FimParametrization
+from vpop_calibration.pynlme.fim.parametrization import unflatten
 from vpop_calibration.pynlme.fim.state import FimComponents
 
 
@@ -25,13 +25,12 @@ def predict_detached(
 
 def complete_log_likelihood(
     model: StatisticalModel,
-    parametrization: FimParametrization,
     flat: torch.Tensor,
     predictions: torch.Tensor,
     gaussian_params: torch.Tensor,
 ) -> torch.Tensor:
     """log-likelihood, summed over patients, per MCMC chain."""
-    params = parametrization.unflatten(flat)
+    params = unflatten(flat, model)
     nb_chains = gaussian_params.shape[0]
 
     log_lik_chains = []
@@ -53,7 +52,6 @@ def complete_log_likelihood(
 
 def analytic_score_and_hessian(
     model: StatisticalModel,
-    parametrization: FimParametrization,
     flat: torch.Tensor,
     predictions: torch.Tensor,
     gaussian_params: torch.Tensor,
@@ -65,7 +63,6 @@ def analytic_score_and_hessian(
             torch.autograd.grad(
                 complete_log_likelihood(
                     model,
-                    parametrization,
                     theta,
                     predictions[c : c + 1],
                     gaussian_params[c : c + 1],
@@ -77,7 +74,7 @@ def analytic_score_and_hessian(
     )
     hessian = torch.autograd.functional.hessian(
         lambda t: complete_log_likelihood(
-            model, parametrization, t, predictions, gaussian_params
+            model, t, predictions, gaussian_params
         ).mean(),
         flat,
     )
@@ -87,14 +84,13 @@ def analytic_score_and_hessian(
 
 def model_intrinsic_finite_differences(
     model: StatisticalModel,
-    parametrization: FimParametrization,
     flat: torch.Tensor,
     gaussian_params: torch.Tensor,
     base_predictions: torch.Tensor,
     eps: float,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     theta = flat.clone().requires_grad_(True)
-    log_mi0 = flat[parametrization.mi_location]
+    log_mi0 = flat[model.mi_location]
     h = eps * torch.clamp(log_mi0.abs(), min=1.0)
     e = torch.eye(model.nb_mi, device=device, dtype=flat.dtype) * h
 
@@ -109,24 +105,18 @@ def model_intrinsic_finite_differences(
 
     def perturb_log_likelihood(step: torch.Tensor, compute_grad: bool = False):
         preds = predict_detached(model, log_mi0 + step, gaussian_params)
-        ll_step = complete_log_likelihood(
-            model, parametrization, flat, preds, gaussian_params
-        )
+        ll_step = complete_log_likelihood(model, flat, preds, gaussian_params)
 
         if not compute_grad:
             return ll_step
 
         grad_step = torch.autograd.grad(
-            complete_log_likelihood(
-                model, parametrization, theta, preds, gaussian_params
-            ).mean(),
+            complete_log_likelihood(model, theta, preds, gaussian_params).mean(),
             theta,
         )[0]
         return ll_step, grad_step
 
-    ll_0 = complete_log_likelihood(
-        model, parametrization, flat, base_predictions, gaussian_params
-    )
+    ll_0 = complete_log_likelihood(model, flat, base_predictions, gaussian_params)
     plus = [perturb_log_likelihood(e[k], compute_grad=True) for k in range(model.nb_mi)]
     minus = [
         perturb_log_likelihood(-e[k], compute_grad=True) for k in range(model.nb_mi)
@@ -154,24 +144,21 @@ def model_intrinsic_finite_differences(
 
 def compute_fim_components(
     model: StatisticalModel,
-    parametrization: FimParametrization,
     flat: torch.Tensor,
     gaussian_params: torch.Tensor,
     eps: float = 1e-3,
 ) -> FimComponents:
     """autograd on (beta, omega, sigma),finite differences on the model-intrinsic parameters."""
     nb_chains = gaussian_params.shape[0]
-    predictions = predict_detached(
-        model, flat[parametrization.mi_location], gaussian_params
-    )
+    predictions = predict_detached(model, flat[model.mi_location], gaussian_params)
     scores, hessian = analytic_score_and_hessian(
-        model, parametrization, flat, predictions, gaussian_params
+        model, flat, predictions, gaussian_params
     )
 
     if model.nb_mi > 0:
-        mi = parametrization.mi_location
+        mi = model.mi_location
         mi_scores, mi_hessian, cross = model_intrinsic_finite_differences(
-            model, parametrization, flat, gaussian_params, predictions, eps
+            model, flat, gaussian_params, predictions, eps
         )
         scores, hessian = scores.clone(), hessian.clone()
         scores[:, mi] = mi_scores.transpose(0, 1)

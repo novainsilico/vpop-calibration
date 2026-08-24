@@ -199,6 +199,18 @@ class StatisticalModel:
             self.input_params.model_intrinsic, self.mi_names
         )
 
+    @property
+    def mi_location(self) -> slice:
+        """Location of the model-intrinsic parameters in the flat vector."""
+        nb_omega_flat = (self.nb_pdu * (self.nb_pdu + 1)) // 2
+        start = self.nb_betas + nb_omega_flat
+        return slice(start, start + self.nb_mi)
+
+    @property
+    def omega_indices(self) -> torch.Tensor:
+        """Indices of the lower triangular part of the Omega matrix."""
+        return torch.tril_indices(self.nb_pdu, self.nb_pdu, device=device)
+
     def get_state_dict(self) -> dict[str, Any]:
         state_dict = {
             "input_params": self.input_params.get_state_dict(),
