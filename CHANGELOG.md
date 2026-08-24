@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Modified
 
-- Fixed effect optimization: bug fix. Summing likelihood in the objective function is now done over all patients rather than all sampels, ensuring that the finite difference gradient has the correct shape. An assertion test is added to catch this error
+- Fixed effect optimization: bug fix. Summing likelihood in the objective function is now done over all patients rather than all samples, ensuring that the finite difference gradient has the correct shape. An assertion test is added to catch this error
 
 ## [4.6.3] - 2026-08-18
 
