@@ -45,7 +45,7 @@ class PySaem:
                 nb_iter_burnin=1,
                 nb_iter_learning=2,
                 nb_iter_smoothing=2,
-                optim_max_iter=1,
+                fixed_effects_nb_iter=1,
                 progress_bars=False,
                 live_plot=False,
                 logging=False,
@@ -275,9 +275,9 @@ class PySaem:
                 target_log_MI, fixed_effects_loss = optimize_fixed_effects(
                     loss_fn=objective_fun,
                     psi0=psi0,
-                    lr=1e-2,
-                    nb_iter=self.config.optim_max_iter,
-                    eps_grad=self.config.eps_grad,
+                    lr=self.config.fixed_effects_lr,
+                    nb_iter=self.config.fixed_effects_nb_iter,
+                    eps_grad=self.config.fixed_effects_grad_scale,
                 )
                 new_log_MI = stochastic_approximation(
                     previous=self.model.log_mi,
@@ -344,7 +344,7 @@ class PySaem:
                 )
                 .detach()
                 .cpu()
-                .sum()
+                .sum(dim=1)
             )
 
             return -total_log_lik
