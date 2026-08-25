@@ -1,5 +1,8 @@
 import pandas as pd
-from IPython.display import display
+try:
+    from IPython.display import display
+except ImportError:
+    display = None
 from typing import Any
 
 good_threshold = 30.0
@@ -19,7 +22,8 @@ def color_rse(value: Any) -> str:
 
 def show_table(df: pd.DataFrame, title: str) -> pd.DataFrame:
     print(title)
-    display(df)
+    if display is not None:
+        display(df)
     return df
 
 
@@ -27,5 +31,6 @@ def display_show_summary(
     df: pd.DataFrame, title: str = "Summary of Population Parameters"
 ):
     print(title)
-    display(df.style.map(color_rse, subset=["RSE (%)"]))
+    if display is not None:
+        display(df.style.map(color_rse, subset=["RSE (%)"]))
     return df

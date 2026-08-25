@@ -14,7 +14,7 @@ def predict_detached(
     preds_list = []
 
     for c in range(gaussian_params.shape[0]):
-        physical = model.convert_gaussian_to_physical(gaussian_params[c], log_mi)
+        physical = model.convert_gaussian_to_physical(gaussian_params[c], log_mi, model.surv_coeffs)
         thetas = model.convert_physical_to_thetas_all_patients(physical)
         inputs = model.convert_thetas_to_model_parameters_all_patients(thetas)
         predictions, _ = model.predict_all_patients(inputs)
