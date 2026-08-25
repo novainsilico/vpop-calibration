@@ -168,12 +168,14 @@ class ConditionalDistributionSampler:
                 if self.live_plot:
                     self.update_convergence_plot()
             if self.live_plot:
-                plt.close(self.fig)
+                if plt is not None:
+                    plt.close(self.fig)
         except KeyboardInterrupt:
             print("Interrupting sampling.")
             if self.live_plot:
                 self.update_convergence_plot()
-                plt.close(self.fig)
+                if plt is not None:
+                    plt.close(self.fig)
 
     def sampling_stream(self, nb_samples: int):
         for i in tqdm(range(nb_samples), disable=not self.progress_bar):
@@ -249,7 +251,8 @@ class ConditionalDistributionSampler:
 
         figsize = (plot_indiv_figsize[0], plot_indiv_figsize[1] * (nb_plots / 2))
 
-        self.fig, self.axes = plt.subplots(nb_plots, 1, figsize=figsize, sharex=True)
+        if plt is not None:
+            self.fig, self.axes = plt.subplots(nb_plots, 1, figsize=figsize, sharex=True)
 
         for ax in self.axes:
             ax.grid(True)
@@ -290,7 +293,8 @@ class ConditionalDistributionSampler:
                     self.fim_plot_indices.append(i)
 
         if not smoke_test:
-            self.handle = display(self.fig, display_id=True)
+            if display is not None:
+                self.handle = display(self.fig, display_id=True)
 
     def update_convergence_plot(self):
 

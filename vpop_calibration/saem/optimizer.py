@@ -21,7 +21,7 @@ from vpop_calibration.pynlme.residuals import (
 )
 from vpop_calibration.pynlme.error_estimation import estimate_error_params
 from vpop_calibration.saem.plot import OptimizerPlot
-from vpop_calibration.config import smoke_test
+from vpop_calibration.config import smoke_test, default_dtype, device
 from vpop_calibration.saem.fixed_effects import optimize_fixed_effects
 
 
@@ -45,7 +45,7 @@ class PySaem:
                 nb_iter_burnin=1,
                 nb_iter_learning=2,
                 nb_iter_smoothing=2,
-                optim_max_iter=1,
+                fixed_effects_nb_iter=1,
                 progress_bars=False,
                 live_plot=False,
                 logging=False,
@@ -119,6 +119,7 @@ class PySaem:
             )
         else:
             state_dict.update({"has_run": False})
+
         return state_dict
 
     @classmethod
@@ -168,9 +169,10 @@ class PySaem:
                         progress.iteration == self.scheduler.nb_iter_tot - 1
                     ):
                         self.plot_history()
+
             if self.config.live_plot:
                 self.plot.close()
-
+                delattr(self, "plot")
         except KeyboardInterrupt:
             print(f"Interrupted gracefully at iteration {self.scheduler.iteration}.")
 
@@ -211,7 +213,6 @@ class PySaem:
         # For model intrinsic, initialize the loss to the previous value
         # Will only be modified if fixed effects are present
         fixed_effects_loss = self.pop_estimates.fixed_effects_loss
-
         if self.scheduler.phase != "burnin":
             # M-step:
             # maximum-likelihood target for the residual error variance
@@ -269,25 +270,35 @@ class PySaem:
             self.model.update_omega(new_omega)
 
             # 3. Update fixed effects MIs
-            if self.model.nb_mi > 0:
-                objective_fun = self.build_mi_objective_function(
+            if self.model.nb_mi + self.model.nb_surv_coeffs > 0:
+                objective_fun = self.build_fixed_effects_objective_function(
                     self.mh_state.gaussian_params.mean(dim=0, keepdim=True)
                 )
-                psi0 = self.model.log_mi
-                target_log_MI, fixed_effects_loss = optimize_fixed_effects(
+                psi0 = torch.cat([self.model.log_mi, self.model.surv_coeffs], dim=-1)
+                target_fixed_effects, fixed_effects_loss = optimize_fixed_effects(
                     loss_fn=objective_fun,
                     psi0=psi0,
-                    lr=1e-2,
-                    nb_iter=self.config.optim_max_iter,
-                    eps_grad=self.config.eps_grad,
+                    lr=self.config.fixed_effects_lr,
+                    nb_iter=self.config.fixed_effects_nb_iter,
+                    eps_grad=self.config.fixed_effects_grad_scale,
                 )
-                new_log_MI = stochastic_approximation(
+                target_log_mi = target_fixed_effects[: self.model.nb_mi]
+                new_log_mi = stochastic_approximation(
                     previous=self.model.log_mi,
-                    new=target_log_MI,
+                    new=target_log_mi,
                     learning_rate=self.scheduler.stochastic_approximation_rate,
                 )
 
-                self.model.update_log_mi(new_log_MI)
+                self.model.update_log_mi(new_log_mi)
+
+                target_surv_coeffs = target_fixed_effects[self.model.nb_mi :]
+                new_surv_coeffs = stochastic_approximation(
+                    previous=self.model.surv_coeffs,
+                    new=target_surv_coeffs,
+                    learning_rate=self.scheduler.stochastic_approximation_rate,
+                )
+
+                self.model.update_surv_coeffs(new_surv_coeffs)
 
         new_ebe = stochastic_approximation(
             previous=self.pop_estimates.ebe,
