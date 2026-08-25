@@ -3,7 +3,7 @@ from typing import Any
 
 import pandas as pd
 import torch
-from tqdm.notebook import tqdm
+from vpop_calibration.compatibility import tqdm
 
 from vpop_calibration.pynlme.fim.display import display_show_summary, show_table
 from vpop_calibration.pynlme.fim.standard_error import (
