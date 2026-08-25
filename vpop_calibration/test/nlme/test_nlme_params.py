@@ -78,6 +78,52 @@ def test_nlme_params(sample_nlme_params, obs_data):
     nlme_params.validate_data(obs_data)
 
 
+def test_duplicate_names():
+    input1 = {
+        "model_intrinsic": {"foo": {"prior": 10.0}},
+        "pdu": {
+            "foo": {
+                "prior": 10.0,
+                "prior_omega": 0.1,
+            },
+        },
+        "error_model": {
+            "out_1": {"error_type": "additive", "sigma": 0.1},
+        },
+    }
+
+    input2 = {
+        "pdu": {
+            "foo": {
+                "prior": 10.0,
+                "prior_omega": 0.1,
+            },
+        },
+        "error_model": {
+            "out_1": {"error_type": "additive", "sigma": 0.1},
+        },
+        "pdk": ["foo"],
+    }
+
+    input3 = {
+        "pdu": {
+            "pdu_1": {
+                "prior": 10.0,
+                "prior_omega": 0.1,
+                "covariates": {"foo": {"coef_name": "coef_foo_pdu1", "prior": 0.5}},
+            },
+        },
+        "error_model": {
+            "out_1": {"error_type": "additive", "sigma": 0.1},
+        },
+        "pdk": ["foo"],
+    }
+
+    for input in [input1, input2, input3]:
+        with pytest.raises(ValidationError):
+            _params = MixedEffectParameters.model_validate(input)
+
+
 def test_state_dict(sample_nlme_params):
     nlme_params = MixedEffectParameters.model_validate(sample_nlme_params)
     state_dict = nlme_params.get_state_dict()

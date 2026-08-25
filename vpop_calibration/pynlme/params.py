@@ -169,6 +169,24 @@ class MixedEffectParameters(BaseModel):
     surv_coeff_init: list[float] = []
     surv_coeff_names: list[str] = []
 
+    @model_validator(mode="after")
+    def check_param_uniqueness(self) -> Self:
+        unique_param_lists = [
+            self.pdu_names,
+            self.mi_names,
+            self.pdk,
+            self.covariate_coeff_names,
+            self.covariate_names,
+        ]
+        for i, params1 in enumerate(unique_param_lists):
+            for params2 in unique_param_lists[i + 1 :]:
+                intersect = set.intersection(set(params1), set(params2))
+                if intersect != set():
+                    raise ValueError(
+                        f"Some parameters are defined multiple times: {intersect}"
+                    )
+        return self
+
     @property
     def mi_names(self) -> list[str]:
         return list(self.model_intrinsic.keys())
