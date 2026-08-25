@@ -13,6 +13,7 @@ from vpop_calibration.pynlme.params import MixedEffectParameters
 from vpop_calibration.pynlme.model import StatisticalModel
 from vpop_calibration.saem.optimizer import PySaem
 from vpop_calibration.pynlme.diagnostics import ModelDiagnostics
+from vpop_calibration.utils import seed_everything
 
 
 class NlmeInterface:
@@ -25,6 +26,7 @@ class NlmeInterface:
         protocol_design: pd.DataFrame | None,
         categorical_attributes: pd.DataFrame | None,
     ):
+        seed_everything(config.seed)
         structural_model = StructuralSimwork(
             model=simwork_model,
             protocol_design=protocol_design,
