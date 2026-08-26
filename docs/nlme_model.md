@@ -8,7 +8,7 @@ Consider a data set $\bf{y}$ of longitudinal observations for $N$ individuals. F
 
 ```math
 y_{i,j} = f(\theta_i,t_{i,j}) + g(\theta_i, t_{i,j}, \sigma) \varepsilon_{i,j}, \\
-\varepsilon \sim  \mathcal{N}(0,1)
+\varepsilon_{i,j} \sim  \mathcal{N}(0,1)
 ```
 
 The observations $y_{i,j}$ may be vector-valued, in the case where multiple outcomes are measured.
@@ -116,7 +116,8 @@ If the selected model is additive, the NLME predictions are written as:
 
 ```math
 y_{i,j} = f(\theta_i, t_{i,j}) + \sigma \varepsilon_{i,j}, \\
-\mathbf{E}[y_{i,j} | \theta_i] = f(\theta_i, t_{i,j}), Var[y_{i,j} | \theta_i] = \sigma^2,
+\mathbf{E}[y_{i,j} | \theta_i] = f(\theta_i, t_{i,j})\\
+ Var[y_{i,j} | \theta_i] = \sigma^2,
 ```
 
 #### Proportional
@@ -125,7 +126,8 @@ If the selected error model is proportional, the NLME predictions are written as
 
 ```math
 y_{i,j} = f(\theta_i, t_{i,j}) (1 + \sigma \varepsilon_{i,j}), \\
-\mathbf{E}[y_{i,j}|\theta_i] = f(\theta_i, t_{i,j}), Var[y_{i,j} | \theta_i] = (\sigma f(\theta_i, t_{i,j}))^2
+\mathbf{E}[y_{i,j}|\theta_i] = f(\theta_i, t_{i,j}) \\
+ Var[y_{i,j} | \theta_i] = (\sigma f(\theta_i, t_{i,j}))^2
 ```
 
 > [!NOTE]
