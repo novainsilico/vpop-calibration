@@ -1,1 +1,1532 @@
-{"coreVersion":"35.29.0","modelCore":{"bioReactionSet":[],"odeSet":[{"odeVar":"PSA","odeRhs":{"tag":"BinaryNode","contents":["Minus",{"tag":"BinaryNode","contents":["Div",{"tag":"BinaryNode","contents":["Times",{"tag":"Var","contents":{"contents":"p","tag":"Constituent"}},{"tag":"BinaryNode","contents":["Plus",{"tag":"Var","contents":{"contents":"S","tag":"Constituent"}},{"tag":"Var","contents":{"contents":"R","tag":"Constituent"}}]}]},{"tag":"Var","contents":{"contents":"substance_count","tag":"Unit"}}]},{"tag":"BinaryNode","contents":["Times",{"tag":"Var","contents":{"contents":"delta","tag":"Constituent"}},{"tag":"Var","contents":{"contents":"PSA","tag":"Constituent"}}]}]},"odeName":"dPSAdt","odeNumber":"","odeRef":"https://doi.org/10.1111/biom.12537","odeDesc":"","tags":[],"odeFilter":null,"odePhenomena":[]},{"odeVar":"R","odeRhs":{"tag":"BinaryNode","contents":["Minus",{"tag":"BinaryNode","contents":["Plus",{"tag":"BinaryNode","contents":["Times",{"tag":"BinaryNode","contents":["Times",{"tag":"Var","contents":{"contents":"alpha","tag":"Constituent"}},{"tag":"BinaryNode","contents":["Minus",{"tag":"Const","contents":1.0},{"tag":"BinaryNode","contents":["Div",{"tag":"BinaryNode","contents":["Plus",{"tag":"Var","contents":{"contents":"S","tag":"Constituent"}},{"tag":"Var","contents":{"contents":"R","tag":"Constituent"}}]},{"tag":"Var","contents":{"contents":"Nmax","tag":"Constituent"}}]}]}]},{"tag":"Var","contents":{"contents":"R","tag":"Constituent"}}]},{"tag":"BinaryNode","contents":["Times",{"tag":"Var","contents":{"contents":"g","tag":"Constituent"}},{"tag":"BinaryNode","contents":["Minus",{"tag":"Var","contents":{"contents":"S","tag":"Constituent"}},{"tag":"Var","contents":{"contents":"R","tag":"Constituent"}}]}]}]},{"tag":"BinaryNode","contents":["Times",{"tag":"Var","contents":{"contents":"d","tag":"Constituent"}},{"tag":"Var","contents":{"contents":"R","tag":"Constituent"}}]}]},"odeName":"dRdt","odeNumber":"","odeRef":"https://doi.org/10.1111/biom.12537","odeDesc":"","tags":[],"odeFilter":null,"odePhenomena":[]},{"odeVar":"S","odeRhs":{"tag":"BinaryNode","contents":["Minus",{"tag":"BinaryNode","contents":["Plus",{"tag":"BinaryNode","contents":["Times",{"tag":"BinaryNode","contents":["Times",{"tag":"BinaryNode","contents":["Times",{"tag":"Var","contents":{"contents":"alpha","tag":"Constituent"}},{"tag":"Var","contents":{"contents":"treatment_effect","tag":"Constituent"}}]},{"tag":"BinaryNode","contents":["Minus",{"tag":"Const","contents":1.0},{"tag":"BinaryNode","contents":["Div",{"tag":"BinaryNode","contents":["Plus",{"tag":"Var","contents":{"contents":"S","tag":"Constituent"}},{"tag":"Var","contents":{"contents":"R","tag":"Constituent"}}]},{"tag":"Var","contents":{"contents":"Nmax","tag":"Constituent"}}]}]}]},{"tag":"Var","contents":{"contents":"S","tag":"Constituent"}}]},{"tag":"BinaryNode","contents":["Times",{"tag":"Var","contents":{"contents":"g","tag":"Constituent"}},{"tag":"BinaryNode","contents":["Minus",{"tag":"Var","contents":{"contents":"R","tag":"Constituent"}},{"tag":"Var","contents":{"contents":"S","tag":"Constituent"}}]}]}]},{"tag":"BinaryNode","contents":["Times",{"tag":"Var","contents":{"contents":"d","tag":"Constituent"}},{"tag":"Var","contents":{"contents":"S","tag":"Constituent"}}]}]},"odeName":"dSdt","odeNumber":"","odeRef":"https://doi.org/10.1111/biom.12537","odeDesc":"","tags":[],"odeFilter":null,"odePhenomena":[]},{"odeVar":"cumulative_hazard","odeRhs":{"tag":"Var","contents":{"contents":"instantaneous_hazard","tag":"Constituent"}},"odeName":"dSurvivaldt","odeNumber":"","odeRef":"","odeDesc":"","tags":[],"odeFilter":null,"odePhenomena":[]}]},"modelParams":[{"_Iname":"Nmax","_Idescription":"","_Ivalue":{"tag":"Const","contents":100.0},"_Iunit":"substance_count / mL","_Itags":[{"key":"s::to-calibrate"}],"_IisConstant":false,"_Iscale":{"tag":"Const","contents":1.0},"_Itolerance":1.0},{"_Iname":"PSA","_Idescription":"","_Ivalue":{"tag":"Var","contents":{"contents":"PSA_baseline","tag":"Constituent"}},"_Iunit":"nanog / mL","_Itags":[],"_IisConstant":false,"_Iscale":{"tag":"Const","contents":1.0},"_Itolerance":1.0},{"_Iname":"PSA_baseline","_Idescription":"","_Ivalue":{"tag":"Const","contents":10.0},"_Iunit":"nanog / mL","_Itags":[{"key":"i::vpop"}],"_IisConstant":false,"_Iscale":{"tag":"Const","contents":1.0},"_Itolerance":1.0},{"_Iname":"R","_Idescription":"","_Ivalue":{"tag":"BinaryNode","contents":["Div",{"tag":"Var","contents":{"contents":"baseline_total_cells","tag":"Constituent"}},{"tag":"BinaryNode","contents":["Plus",{"tag":"Const","contents":1.0},{"tag":"Var","contents":{"contents":"baseline_ratio_S_R","tag":"Constituent"}}]}]},"_Iunit":"substance_count / mL","_Iuri":"https://doi.org/10.1111/biom.12537","_Itags":[],"_IisConstant":false,"_Iscale":{"tag":"Const","contents":1.0},"_Itolerance":1.0},{"_Iname":"R_E","_Idescription":"","_Ivalue":{"tag":"Const","contents":0.5},"_Iunit":"dimensionless","_Itags":[{"key":"s::to-calibrate"}],"_IisConstant":false,"_Iscale":{"tag":"Const","contents":1.0},"_Itolerance":1.0},{"_Iname":"S","_Idescription":"","_Ivalue":{"tag":"BinaryNode","contents":["Div",{"tag":"BinaryNode","contents":["Times",{"tag":"Var","contents":{"contents":"baseline_total_cells","tag":"Constituent"}},{"tag":"Var","contents":{"contents":"baseline_ratio_S_R","tag":"Constituent"}}]},{"tag":"BinaryNode","contents":["Plus",{"tag":"Const","contents":1.0},{"tag":"Var","contents":{"contents":"baseline_ratio_S_R","tag":"Constituent"}}]}]},"_Iunit":"substance_count / mL","_Iuri":"https://doi.org/10.1111/biom.12537","_Itags":[],"_IisConstant":false,"_Iscale":{"tag":"Const","contents":1.0},"_Itolerance":1.0},{"_Iname":"alpha","_Idescription":"","_Ivalue":{"tag":"Const","contents":0.5},"_Iunit":"1 / day","_Itags":[{"key":"s::to-calibrate"}],"_IisConstant":false,"_Iscale":{"tag":"Const","contents":1.0},"_Itolerance":1.0},{"_Iname":"baseline_hazard","_Idescription":"","_Ivalue":{"tag":"BinaryNode","contents":["Times",{"tag":"BinaryNode","contents":["Times",{"tag":"BinaryNode","contents":["Div",{"tag":"Var","contents":{"contents":"k_weibull","tag":"Constituent"}},{"tag":"Var","contents":{"contents":"lambda_weibull","tag":"Constituent"}}]},{"tag":"BinaryNode","contents":["Pow",{"tag":"BinaryNode","contents":["Div",{"tag":"Var","contents":{"contents":"time_under_treatment","tag":"Constituent"}},{"tag":"Var","contents":{"contents":"lambda_weibull","tag":"Constituent"}}]},{"tag":"BinaryNode","contents":["Minus",{"tag":"Var","contents":{"contents":"k_weibull","tag":"Constituent"}},{"tag":"Const","contents":1.0}]}]}]},{"tag":"UnaryNode","contents":["Exp",{"tag":"UnaryNode","contents":["Neg",{"tag":"BinaryNode","contents":["Pow",{"tag":"BinaryNode","contents":["Div",{"tag":"Var","contents":{"contents":"time_under_treatment","tag":"Constituent"}},{"tag":"Var","contents":{"contents":"lambda_weibull","tag":"Constituent"}}]},{"tag":"Var","contents":{"contents":"k_weibull","tag":"Constituent"}}]}]}]}]},"_Iunit":"1 / day","_Itags":[],"_IisConstant":false,"_Iscale":{"tag":"Const","contents":1.0},"_Itolerance":1.0},{"_Iname":"baseline_log_ratio_S_R","_Idescription":"","_Ivalue":{"tag":"Const","contents":5.0},"_Iunit":"dimensionless","_Itags":[{"key":"s::to-calibrate"}],"_IisConstant":false,"_Iscale":{"tag":"Const","contents":1.0},"_Itolerance":1.0},{"_Iname":"baseline_ratio_S_R","_Idescription":"","_Ivalue":{"tag":"UnaryNode","contents":["Exp",{"tag":"Var","contents":{"contents":"baseline_log_ratio_S_R","tag":"Constituent"}}]},"_Iunit":"dimensionless","_Itags":[],"_IisConstant":false,"_Iscale":{"tag":"Const","contents":1.0},"_Itolerance":1.0},{"_Iname":"baseline_total_cells","_Idescription":"","_Ivalue":{"tag":"BinaryNode","contents":["Times",{"tag":"BinaryNode","contents":["Times",{"tag":"BinaryNode","contents":["Div",{"tag":"Var","contents":{"contents":"delta","tag":"Constituent"}},{"tag":"Var","contents":{"contents":"p","tag":"Constituent"}}]},{"tag":"Var","contents":{"contents":"PSA_baseline","tag":"Constituent"}}]},{"tag":"Var","contents":{"contents":"substance_count","tag":"Unit"}}]},"_Iunit":"substance_count / mL","_Itags":[],"_IisConstant":false,"_Iscale":{"tag":"Const","contents":1.0},"_Itolerance":1.0},{"_Iname":"beta1_survival","_Idescription":"","_Ivalue":{"tag":"Const","contents":0.0},"_Iunit":"dimensionless","_Itags":[{"key":"s::to-calibrate"}],"_IisConstant":false,"_Iscale":{"tag":"Const","contents":1.0},"_Itolerance":1.0},{"_Iname":"beta2_survival","_Idescription":"","_Ivalue":{"tag":"Const","contents":0.0},"_Iunit":"dimensionless","_Itags":[{"key":"s::to-calibrate"}],"_IisConstant":false,"_Iscale":{"tag":"Const","contents":1.0},"_Itolerance":1.0},{"_Iname":"cumulative_hazard","_Idescription":"","_Ivalue":{"tag":"Const","contents":0.0},"_Iunit":"dimensionless","_Itags":[{"key":"output"}],"_IisConstant":false,"_Iscale":{"tag":"Const","contents":1.0},"_Itolerance":1.0},{"_Iname":"d","_Idescription":"","_Ivalue":{"tag":"BinaryNode","contents":["Times",{"tag":"Var","contents":{"contents":"R_E","tag":"Constituent"}},{"tag":"Var","contents":{"contents":"alpha","tag":"Constituent"}}]},"_Iunit":"1 / day","_Iuri":"https://doi.org/10.1111/biom.12537","_Itags":[],"_IisConstant":false,"_Iscale":{"tag":"Const","contents":1.0},"_Itolerance":1.0},{"_Iname":"delta","_Idescription":"","_Ivalue":{"tag":"Const","contents":0.23},"_Iunit":"1 / day","_Iuri":"https://doi.org/10.1111/biom.12537","_Itags":[{"key":"s::arbitrary"}],"_IisConstant":false,"_Iscale":{"tag":"Const","contents":1.0},"_Itolerance":1.0},{"_Iname":"epsilon","_Idescription":"","_Ivalue":{"tag":"Const","contents":0.5},"_Iunit":"dimensionless","_Itags":[{"key":"s::to-calibrate"}],"_IisConstant":false,"_Iscale":{"tag":"Const","contents":1.0},"_Itolerance":1.0},{"_Iname":"g","_Idescription":"","_Ivalue":{"tag":"Const","contents":1.0e-7},"_Iunit":"1 / day","_Iuri":"https://doi.org/10.1111/biom.12537","_Itags":[{"key":"s::arbitrary"}],"_IisConstant":false,"_Iscale":{"tag":"Const","contents":1.0},"_Itolerance":1.0},{"_Iname":"instantaneous_hazard","_Idescription":"","_Ivalue":{"tag":"BinaryNode","contents":["Times",{"tag":"Var","contents":{"contents":"baseline_hazard","tag":"Constituent"}},{"tag":"UnaryNode","contents":["Exp",{"tag":"BinaryNode","contents":["Plus",{"tag":"BinaryNode","contents":["Times",{"tag":"Var","contents":{"contents":"beta1_survival","tag":"Constituent"}},{"tag":"UnaryNode","contents":["Log",{"tag":"BinaryNode","contents":["Times",{"tag":"Var","contents":{"contents":"S","tag":"Constituent"}},{"tag":"Var","contents":{"contents":"mL / substance_count","tag":"Unit"}}]}]}]},{"tag":"BinaryNode","contents":["Times",{"tag":"Var","contents":{"contents":"beta2_survival","tag":"Constituent"}},{"tag":"UnaryNode","contents":["Log",{"tag":"BinaryNode","contents":["Times",{"tag":"Var","contents":{"contents":"R","tag":"Constituent"}},{"tag":"Var","contents":{"contents":"mL / substance_count","tag":"Unit"}}]}]}]}]}]}]},"_Iunit":"1 / day","_Itags":[],"_IisConstant":false,"_Iscale":{"tag":"Const","contents":1.0},"_Itolerance":1.0},{"_Iname":"k_weibull","_Idescription":"","_Ivalue":{"tag":"Const","contents":1.2},"_Iunit":"dimensionless","_Itags":[{"key":"s::to-calibrate"}],"_IisConstant":false,"_Iscale":{"tag":"Const","contents":1.0},"_Itolerance":1.0},{"_Iname":"lambda_weibull","_Idescription":"","_Ivalue":{"tag":"Const","contents":800.0},"_Iunit":"day","_Itags":[{"key":"s::to-calibrate"}],"_IisConstant":false,"_Iscale":{"tag":"Const","contents":1.0},"_Itolerance":1.0},{"_Iname":"log_hazard","_Idescription":"","_Ivalue":{"tag":"UnaryNode","contents":["Log",{"tag":"BinaryNode","contents":["Times",{"tag":"Var","contents":{"contents":"instantaneous_hazard","tag":"Constituent"}},{"tag":"Var","contents":{"contents":"day","tag":"Unit"}}]}]},"_Iunit":"dimensionless","_Itags":[{"key":"output"}],"_IisConstant":false,"_Iscale":{"tag":"Const","contents":1.0},"_Itolerance":1.0},{"_Iname":"log_psa","_Idescription":"","_Ivalue":{"tag":"UnaryNode","contents":["Log",{"tag":"BinaryNode","contents":["Plus",{"tag":"BinaryNode","contents":["Div",{"tag":"Var","contents":{"contents":"PSA","tag":"Constituent"}},{"tag":"Var","contents":{"contents":"nanog / mL","tag":"Unit"}}]},{"tag":"Const","contents":1.0}]}]},"_Iunit":"dimensionless","_Itags":[{"key":"output"}],"_IisConstant":false,"_Iscale":{"tag":"Const","contents":1.0},"_Itolerance":1.0},{"_Iname":"p","_Idescription":"","_Ivalue":{"tag":"Const","contents":20.0},"_Iunit":"nanog / day","_Iuri":"https://doi.org/10.1111/biom.12537","_Itags":[{"key":"s::arbitrary"}],"_IisConstant":false,"_Iscale":{"tag":"Const","contents":1.0},"_Itolerance":1.0},{"_Iname":"time","_Idescription":"Defines the simulation time parameter.","_Ivalue":{"tag":"Var","contents":{"contents":"time","tag":"Constituent"}},"_Iunit":"s","_Itags":[],"_IisConstant":false,"_Iscale":{"tag":"Const","contents":1.0},"_Itolerance":1.0},{"_Iname":"time_under_treatment","_Idescription":"","_Ivalue":{"tag":"BinaryNode","contents":["Max",{"tag":"BinaryNode","contents":["Minus",{"tag":"Var","contents":{"contents":"time","tag":"Constituent"}},{"tag":"Var","contents":{"contents":"treatment_start","tag":"Constituent"}}]},{"tag":"BinaryNode","contents":["Times",{"tag":"Const","contents":1.0e-3},{"tag":"Var","contents":{"contents":"day","tag":"Unit"}}]}]},"_Iunit":"day","_Itags":[],"_IisConstant":false,"_Iscale":{"tag":"Const","contents":1.0},"_Itolerance":1.0},{"_Iname":"treatment_effect","_Idescription":"","_Ivalue":{"tag":"CondNode","contents":[{"tag":"Comp","contents":["GrTE",{"tag":"Var","contents":{"contents":"time","tag":"Constituent"}},{"tag":"Var","contents":{"contents":"treatment_start","tag":"Constituent"}}]},{"tag":"CondNode","contents":[{"tag":"Comp","contents":["LsT",{"tag":"Var","contents":{"contents":"time","tag":"Constituent"}},{"tag":"Var","contents":{"contents":"treatment_end","tag":"Constituent"}}]},{"tag":"Var","contents":{"contents":"epsilon","tag":"Constituent"}},{"tag":"Const","contents":0.0}]},{"tag":"Const","contents":0.0}]},"_Iunit":"dimensionless","_Itags":[],"_IisConstant":false,"_Iscale":{"tag":"Const","contents":1.0},"_Itolerance":1.0},{"_Iname":"treatment_end","_Idescription":"","_Ivalue":{"tag":"Const","contents":50.0},"_Iunit":"day","_Itags":[{"key":"i::vpop"}],"_IisConstant":false,"_Iscale":{"tag":"Const","contents":1.0},"_Itolerance":1.0},{"_Iname":"treatment_start","_Idescription":"","_Ivalue":{"tag":"Const","contents":10.0},"_Iunit":"day","_Itags":[{"key":"i::vpop"}],"_IisConstant":false,"_Iscale":{"tag":"Const","contents":1.0},"_Itolerance":1.0}],"compartments":[],"species":[],"events":[],"algebraicRules":[],"modelName":"unnamedModel","baselineChecks":[],"categoricalParams":[],"immutableIds":{"013aef80-4dbd-4b06-81fc-fe9640d0c3e0":"cumulative_hazard","025f8da8-9687-436c-8991-1d5f71d78b13":"log_hazard","02f208f0-c09f-4137-af91-5e02dceac16b":"dPSAdt","083f07d2-cb06-47b0-bde0-ae9cba3c4908":"PSA","0c04686e-54d2-4df5-87a0-6d17b3cdd79d":"S","0d9304ff-e68a-4ac6-8ff5-bf006cbc5388":"beta1_survival","0ee87b71-0692-47c3-8c12-7eebd83e39d6":"PSA_baseline","0f27d1de-a779-4eed-8c17-3749717d214c":"baseline_hazard","118acbe2-8724-4c2f-b95c-6af94dd6b9a8":"treatment_effect","121fb8fa-f67b-411b-8015-109a60f7fd80":"baseline_total_cells","1913f53e-aac0-4f69-8aaf-b5b9c3e78a2b":"alpha","1c4699ec-dcb9-40db-9053-a9a0a508437c":"log_psa","276e2eef-4880-4011-bd19-b41d94f77e52":"baseline_ratio_S_R","29fc678e-2726-4f75-936e-105370c7e4c1":"baseline_log_ratio_S_R","3131b1ef-b786-4b63-9103-9f4b72a7ab34":"g","3a7336e0-4eab-468e-9a76-ffdfddc7d58e":"instantaneous_hazard","3cae1986-dc3f-4820-8712-d7dedca45833":"dSdt","408ea83a-a11b-49b8-877d-1f77c73f9108":"Nmax","4501fd65-b945-46b8-bfab-38594d8c2a9d":"epsilon","47ae6c82-6a92-4d55-b0e1-0f765f95cd74":"treatment_end","51ba639f-d7fd-462d-80a8-4a32622ed0c5":"beta2_survival","531ce6ea-fa80-4a2d-bf6f-79776606696f":"time","6a07618b-f286-4f86-96ca-9db51ee5562d":"delta","746b49da-2e0c-43cc-9852-ff1cb58d940e":"k_weibull","83175aa2-d9fb-4106-93ce-2c9bde35c09c":"R_E","9b354286-fa93-478f-9bf5-68f64b7f2d7c":"time_under_treatment","bc6e18a6-22da-43e5-8c92-78e03e6d881e":"R","c76f52dd-7730-4526-ad22-3c70af96f6fc":"p","ce03e591-e114-441a-a2bb-2b1a1dbb51a2":"lambda_weibull","e8a55092-1915-425d-aab8-91e9f5cc6002":"dSurvivaldt","f1de0f3b-7eff-43a4-89a6-f3f1df0bfaf5":"treatment_start","fb4e458a-3981-4419-b770-e07380fc7dd6":"d","fcad6d84-2059-43af-a49e-4981087a3707":"dRdt"},"customTags":[],"mergeConflicts":{"direct":{"algebraicRules":[],"baselineChecks":[],"categoricalParams":[],"compartments":[],"customTags":[],"events":[],"modelCore":{"bioReactionSet":[],"odeSet":[]},"modelParams":[],"species":[]},"indirect":{"algebraicRules":[],"baselineChecks":[],"categoricalParams":[],"compartments":[],"customTags":[],"events":[],"modelCore":{"bioReactionSet":[],"odeSet":[]},"modelParams":[],"species":[]}}}
+{
+    "coreVersion": "35.29.0",
+    "modelCore": {
+        "bioReactionSet": [],
+        "odeSet": [
+            {
+                "odeVar": "PSA",
+                "odeRhs": {
+                    "tag": "BinaryNode",
+                    "contents": [
+                        "Minus",
+                        {
+                            "tag": "BinaryNode",
+                            "contents": [
+                                "Div",
+                                {
+                                    "tag": "BinaryNode",
+                                    "contents": [
+                                        "Times",
+                                        {
+                                            "tag": "Var",
+                                            "contents": {
+                                                "contents": "p",
+                                                "tag": "Constituent"
+                                            }
+                                        },
+                                        {
+                                            "tag": "BinaryNode",
+                                            "contents": [
+                                                "Plus",
+                                                {
+                                                    "tag": "Var",
+                                                    "contents": {
+                                                        "contents": "S",
+                                                        "tag": "Constituent"
+                                                    }
+                                                },
+                                                {
+                                                    "tag": "Var",
+                                                    "contents": {
+                                                        "contents": "R",
+                                                        "tag": "Constituent"
+                                                    }
+                                                }
+                                            ]
+                                        }
+                                    ]
+                                },
+                                {
+                                    "tag": "Var",
+                                    "contents": {
+                                        "contents": "substance_count",
+                                        "tag": "Unit"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "tag": "BinaryNode",
+                            "contents": [
+                                "Times",
+                                {
+                                    "tag": "Var",
+                                    "contents": {
+                                        "contents": "delta",
+                                        "tag": "Constituent"
+                                    }
+                                },
+                                {
+                                    "tag": "Var",
+                                    "contents": {
+                                        "contents": "PSA",
+                                        "tag": "Constituent"
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                "odeName": "dPSAdt",
+                "odeNumber": "",
+                "odeRef": "https://doi.org/10.1111/biom.12537",
+                "odeDesc": "",
+                "tags": [],
+                "odeFilter": null,
+                "odePhenomena": []
+            },
+            {
+                "odeVar": "R",
+                "odeRhs": {
+                    "tag": "BinaryNode",
+                    "contents": [
+                        "Minus",
+                        {
+                            "tag": "BinaryNode",
+                            "contents": [
+                                "Plus",
+                                {
+                                    "tag": "BinaryNode",
+                                    "contents": [
+                                        "Times",
+                                        {
+                                            "tag": "BinaryNode",
+                                            "contents": [
+                                                "Times",
+                                                {
+                                                    "tag": "Var",
+                                                    "contents": {
+                                                        "contents": "alpha",
+                                                        "tag": "Constituent"
+                                                    }
+                                                },
+                                                {
+                                                    "tag": "BinaryNode",
+                                                    "contents": [
+                                                        "Minus",
+                                                        {
+                                                            "tag": "Const",
+                                                            "contents": 1.0
+                                                        },
+                                                        {
+                                                            "tag": "BinaryNode",
+                                                            "contents": [
+                                                                "Div",
+                                                                {
+                                                                    "tag": "BinaryNode",
+                                                                    "contents": [
+                                                                        "Plus",
+                                                                        {
+                                                                            "tag": "Var",
+                                                                            "contents": {
+                                                                                "contents": "S",
+                                                                                "tag": "Constituent"
+                                                                            }
+                                                                        },
+                                                                        {
+                                                                            "tag": "Var",
+                                                                            "contents": {
+                                                                                "contents": "R",
+                                                                                "tag": "Constituent"
+                                                                            }
+                                                                        }
+                                                                    ]
+                                                                },
+                                                                {
+                                                                    "tag": "Var",
+                                                                    "contents": {
+                                                                        "contents": "Nmax",
+                                                                        "tag": "Constituent"
+                                                                    }
+                                                                }
+                                                            ]
+                                                        }
+                                                    ]
+                                                }
+                                            ]
+                                        },
+                                        {
+                                            "tag": "Var",
+                                            "contents": {
+                                                "contents": "R",
+                                                "tag": "Constituent"
+                                            }
+                                        }
+                                    ]
+                                },
+                                {
+                                    "tag": "BinaryNode",
+                                    "contents": [
+                                        "Times",
+                                        {
+                                            "tag": "Var",
+                                            "contents": {
+                                                "contents": "g",
+                                                "tag": "Constituent"
+                                            }
+                                        },
+                                        {
+                                            "tag": "BinaryNode",
+                                            "contents": [
+                                                "Minus",
+                                                {
+                                                    "tag": "Var",
+                                                    "contents": {
+                                                        "contents": "S",
+                                                        "tag": "Constituent"
+                                                    }
+                                                },
+                                                {
+                                                    "tag": "Var",
+                                                    "contents": {
+                                                        "contents": "R",
+                                                        "tag": "Constituent"
+                                                    }
+                                                }
+                                            ]
+                                        }
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "tag": "BinaryNode",
+                            "contents": [
+                                "Times",
+                                {
+                                    "tag": "Var",
+                                    "contents": {
+                                        "contents": "d",
+                                        "tag": "Constituent"
+                                    }
+                                },
+                                {
+                                    "tag": "Var",
+                                    "contents": {
+                                        "contents": "R",
+                                        "tag": "Constituent"
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                "odeName": "dRdt",
+                "odeNumber": "",
+                "odeRef": "https://doi.org/10.1111/biom.12537",
+                "odeDesc": "",
+                "tags": [],
+                "odeFilter": null,
+                "odePhenomena": []
+            },
+            {
+                "odeVar": "S",
+                "odeRhs": {
+                    "tag": "BinaryNode",
+                    "contents": [
+                        "Minus",
+                        {
+                            "tag": "BinaryNode",
+                            "contents": [
+                                "Plus",
+                                {
+                                    "tag": "BinaryNode",
+                                    "contents": [
+                                        "Times",
+                                        {
+                                            "tag": "BinaryNode",
+                                            "contents": [
+                                                "Times",
+                                                {
+                                                    "tag": "BinaryNode",
+                                                    "contents": [
+                                                        "Times",
+                                                        {
+                                                            "tag": "Var",
+                                                            "contents": {
+                                                                "contents": "alpha",
+                                                                "tag": "Constituent"
+                                                            }
+                                                        },
+                                                        {
+                                                            "tag": "Var",
+                                                            "contents": {
+                                                                "contents": "treatment_effect",
+                                                                "tag": "Constituent"
+                                                            }
+                                                        }
+                                                    ]
+                                                },
+                                                {
+                                                    "tag": "BinaryNode",
+                                                    "contents": [
+                                                        "Minus",
+                                                        {
+                                                            "tag": "Const",
+                                                            "contents": 1.0
+                                                        },
+                                                        {
+                                                            "tag": "BinaryNode",
+                                                            "contents": [
+                                                                "Div",
+                                                                {
+                                                                    "tag": "BinaryNode",
+                                                                    "contents": [
+                                                                        "Plus",
+                                                                        {
+                                                                            "tag": "Var",
+                                                                            "contents": {
+                                                                                "contents": "S",
+                                                                                "tag": "Constituent"
+                                                                            }
+                                                                        },
+                                                                        {
+                                                                            "tag": "Var",
+                                                                            "contents": {
+                                                                                "contents": "R",
+                                                                                "tag": "Constituent"
+                                                                            }
+                                                                        }
+                                                                    ]
+                                                                },
+                                                                {
+                                                                    "tag": "Var",
+                                                                    "contents": {
+                                                                        "contents": "Nmax",
+                                                                        "tag": "Constituent"
+                                                                    }
+                                                                }
+                                                            ]
+                                                        }
+                                                    ]
+                                                }
+                                            ]
+                                        },
+                                        {
+                                            "tag": "Var",
+                                            "contents": {
+                                                "contents": "S",
+                                                "tag": "Constituent"
+                                            }
+                                        }
+                                    ]
+                                },
+                                {
+                                    "tag": "BinaryNode",
+                                    "contents": [
+                                        "Times",
+                                        {
+                                            "tag": "Var",
+                                            "contents": {
+                                                "contents": "g",
+                                                "tag": "Constituent"
+                                            }
+                                        },
+                                        {
+                                            "tag": "BinaryNode",
+                                            "contents": [
+                                                "Minus",
+                                                {
+                                                    "tag": "Var",
+                                                    "contents": {
+                                                        "contents": "R",
+                                                        "tag": "Constituent"
+                                                    }
+                                                },
+                                                {
+                                                    "tag": "Var",
+                                                    "contents": {
+                                                        "contents": "S",
+                                                        "tag": "Constituent"
+                                                    }
+                                                }
+                                            ]
+                                        }
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "tag": "BinaryNode",
+                            "contents": [
+                                "Times",
+                                {
+                                    "tag": "Var",
+                                    "contents": {
+                                        "contents": "d",
+                                        "tag": "Constituent"
+                                    }
+                                },
+                                {
+                                    "tag": "Var",
+                                    "contents": {
+                                        "contents": "S",
+                                        "tag": "Constituent"
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                "odeName": "dSdt",
+                "odeNumber": "",
+                "odeRef": "https://doi.org/10.1111/biom.12537",
+                "odeDesc": "",
+                "tags": [],
+                "odeFilter": null,
+                "odePhenomena": []
+            },
+            {
+                "odeVar": "cumulative_hazard",
+                "odeRhs": {
+                    "tag": "Var",
+                    "contents": {
+                        "contents": "instantaneous_hazard",
+                        "tag": "Constituent"
+                    }
+                },
+                "odeName": "dSurvivaldt",
+                "odeNumber": "",
+                "odeRef": "",
+                "odeDesc": "",
+                "tags": [],
+                "odeFilter": null,
+                "odePhenomena": []
+            }
+        ]
+    },
+    "modelParams": [
+        {
+            "_Iname": "Nmax",
+            "_Idescription": "",
+            "_Ivalue": {
+                "tag": "Const",
+                "contents": 100.0
+            },
+            "_Iunit": "substance_count / mL",
+            "_Itags": [
+                {
+                    "key": "s::to-calibrate"
+                }
+            ],
+            "_IisConstant": false,
+            "_Iscale": {
+                "tag": "Const",
+                "contents": 1.0
+            },
+            "_Itolerance": 1.0
+        },
+        {
+            "_Iname": "PSA",
+            "_Idescription": "",
+            "_Ivalue": {
+                "tag": "Var",
+                "contents": {
+                    "contents": "PSA_baseline",
+                    "tag": "Constituent"
+                }
+            },
+            "_Iunit": "nanog / mL",
+            "_Itags": [],
+            "_IisConstant": false,
+            "_Iscale": {
+                "tag": "Const",
+                "contents": 1.0
+            },
+            "_Itolerance": 1.0
+        },
+        {
+            "_Iname": "PSA_baseline",
+            "_Idescription": "",
+            "_Ivalue": {
+                "tag": "Const",
+                "contents": 10.0
+            },
+            "_Iunit": "nanog / mL",
+            "_Itags": [
+                {
+                    "key": "i::vpop"
+                }
+            ],
+            "_IisConstant": false,
+            "_Iscale": {
+                "tag": "Const",
+                "contents": 1.0
+            },
+            "_Itolerance": 1.0
+        },
+        {
+            "_Iname": "R",
+            "_Idescription": "",
+            "_Ivalue": {
+                "tag": "BinaryNode",
+                "contents": [
+                    "Div",
+                    {
+                        "tag": "Var",
+                        "contents": {
+                            "contents": "baseline_total_cells",
+                            "tag": "Constituent"
+                        }
+                    },
+                    {
+                        "tag": "BinaryNode",
+                        "contents": [
+                            "Plus",
+                            {
+                                "tag": "Const",
+                                "contents": 1.0
+                            },
+                            {
+                                "tag": "Var",
+                                "contents": {
+                                    "contents": "baseline_ratio_S_R",
+                                    "tag": "Constituent"
+                                }
+                            }
+                        ]
+                    }
+                ]
+            },
+            "_Iunit": "substance_count / mL",
+            "_Iuri": "https://doi.org/10.1111/biom.12537",
+            "_Itags": [],
+            "_IisConstant": false,
+            "_Iscale": {
+                "tag": "Const",
+                "contents": 1.0
+            },
+            "_Itolerance": 1.0
+        },
+        {
+            "_Iname": "R_E",
+            "_Idescription": "",
+            "_Ivalue": {
+                "tag": "Const",
+                "contents": 0.5
+            },
+            "_Iunit": "dimensionless",
+            "_Itags": [
+                {
+                    "key": "s::to-calibrate"
+                }
+            ],
+            "_IisConstant": false,
+            "_Iscale": {
+                "tag": "Const",
+                "contents": 1.0
+            },
+            "_Itolerance": 1.0
+        },
+        {
+            "_Iname": "S",
+            "_Idescription": "",
+            "_Ivalue": {
+                "tag": "BinaryNode",
+                "contents": [
+                    "Div",
+                    {
+                        "tag": "BinaryNode",
+                        "contents": [
+                            "Times",
+                            {
+                                "tag": "Var",
+                                "contents": {
+                                    "contents": "baseline_total_cells",
+                                    "tag": "Constituent"
+                                }
+                            },
+                            {
+                                "tag": "Var",
+                                "contents": {
+                                    "contents": "baseline_ratio_S_R",
+                                    "tag": "Constituent"
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "BinaryNode",
+                        "contents": [
+                            "Plus",
+                            {
+                                "tag": "Const",
+                                "contents": 1.0
+                            },
+                            {
+                                "tag": "Var",
+                                "contents": {
+                                    "contents": "baseline_ratio_S_R",
+                                    "tag": "Constituent"
+                                }
+                            }
+                        ]
+                    }
+                ]
+            },
+            "_Iunit": "substance_count / mL",
+            "_Iuri": "https://doi.org/10.1111/biom.12537",
+            "_Itags": [],
+            "_IisConstant": false,
+            "_Iscale": {
+                "tag": "Const",
+                "contents": 1.0
+            },
+            "_Itolerance": 1.0
+        },
+        {
+            "_Iname": "alpha",
+            "_Idescription": "",
+            "_Ivalue": {
+                "tag": "Const",
+                "contents": 0.5
+            },
+            "_Iunit": "1 / day",
+            "_Itags": [
+                {
+                    "key": "s::to-calibrate"
+                }
+            ],
+            "_IisConstant": false,
+            "_Iscale": {
+                "tag": "Const",
+                "contents": 1.0
+            },
+            "_Itolerance": 1.0
+        },
+        {
+            "_Iname": "baseline_hazard",
+            "_Idescription": "",
+            "_Ivalue": {
+                "tag": "BinaryNode",
+                "contents": [
+                    "Times",
+                    {
+                        "tag": "BinaryNode",
+                        "contents": [
+                            "Times",
+                            {
+                                "tag": "BinaryNode",
+                                "contents": [
+                                    "Div",
+                                    {
+                                        "tag": "Var",
+                                        "contents": {
+                                            "contents": "k_weibull",
+                                            "tag": "Constituent"
+                                        }
+                                    },
+                                    {
+                                        "tag": "Var",
+                                        "contents": {
+                                            "contents": "lambda_weibull",
+                                            "tag": "Constituent"
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "BinaryNode",
+                                "contents": [
+                                    "Pow",
+                                    {
+                                        "tag": "BinaryNode",
+                                        "contents": [
+                                            "Div",
+                                            {
+                                                "tag": "Var",
+                                                "contents": {
+                                                    "contents": "time_under_treatment",
+                                                    "tag": "Constituent"
+                                                }
+                                            },
+                                            {
+                                                "tag": "Var",
+                                                "contents": {
+                                                    "contents": "lambda_weibull",
+                                                    "tag": "Constituent"
+                                                }
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "BinaryNode",
+                                        "contents": [
+                                            "Minus",
+                                            {
+                                                "tag": "Var",
+                                                "contents": {
+                                                    "contents": "k_weibull",
+                                                    "tag": "Constituent"
+                                                }
+                                            },
+                                            {
+                                                "tag": "Const",
+                                                "contents": 1.0
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "UnaryNode",
+                        "contents": [
+                            "Exp",
+                            {
+                                "tag": "UnaryNode",
+                                "contents": [
+                                    "Neg",
+                                    {
+                                        "tag": "BinaryNode",
+                                        "contents": [
+                                            "Pow",
+                                            {
+                                                "tag": "BinaryNode",
+                                                "contents": [
+                                                    "Div",
+                                                    {
+                                                        "tag": "Var",
+                                                        "contents": {
+                                                            "contents": "time_under_treatment",
+                                                            "tag": "Constituent"
+                                                        }
+                                                    },
+                                                    {
+                                                        "tag": "Var",
+                                                        "contents": {
+                                                            "contents": "lambda_weibull",
+                                                            "tag": "Constituent"
+                                                        }
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "tag": "Var",
+                                                "contents": {
+                                                    "contents": "k_weibull",
+                                                    "tag": "Constituent"
+                                                }
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            },
+            "_Iunit": "1 / day",
+            "_Itags": [],
+            "_IisConstant": false,
+            "_Iscale": {
+                "tag": "Const",
+                "contents": 1.0
+            },
+            "_Itolerance": 1.0
+        },
+        {
+            "_Iname": "baseline_log_ratio_S_R",
+            "_Idescription": "",
+            "_Ivalue": {
+                "tag": "Const",
+                "contents": 5.0
+            },
+            "_Iunit": "dimensionless",
+            "_Itags": [
+                {
+                    "key": "s::to-calibrate"
+                }
+            ],
+            "_IisConstant": false,
+            "_Iscale": {
+                "tag": "Const",
+                "contents": 1.0
+            },
+            "_Itolerance": 1.0
+        },
+        {
+            "_Iname": "baseline_ratio_S_R",
+            "_Idescription": "",
+            "_Ivalue": {
+                "tag": "UnaryNode",
+                "contents": [
+                    "Exp",
+                    {
+                        "tag": "Var",
+                        "contents": {
+                            "contents": "baseline_log_ratio_S_R",
+                            "tag": "Constituent"
+                        }
+                    }
+                ]
+            },
+            "_Iunit": "dimensionless",
+            "_Itags": [],
+            "_IisConstant": false,
+            "_Iscale": {
+                "tag": "Const",
+                "contents": 1.0
+            },
+            "_Itolerance": 1.0
+        },
+        {
+            "_Iname": "baseline_total_cells",
+            "_Idescription": "",
+            "_Ivalue": {
+                "tag": "BinaryNode",
+                "contents": [
+                    "Times",
+                    {
+                        "tag": "BinaryNode",
+                        "contents": [
+                            "Times",
+                            {
+                                "tag": "BinaryNode",
+                                "contents": [
+                                    "Div",
+                                    {
+                                        "tag": "Var",
+                                        "contents": {
+                                            "contents": "delta",
+                                            "tag": "Constituent"
+                                        }
+                                    },
+                                    {
+                                        "tag": "Var",
+                                        "contents": {
+                                            "contents": "p",
+                                            "tag": "Constituent"
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "Var",
+                                "contents": {
+                                    "contents": "PSA_baseline",
+                                    "tag": "Constituent"
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "Var",
+                        "contents": {
+                            "contents": "substance_count",
+                            "tag": "Unit"
+                        }
+                    }
+                ]
+            },
+            "_Iunit": "substance_count / mL",
+            "_Itags": [],
+            "_IisConstant": false,
+            "_Iscale": {
+                "tag": "Const",
+                "contents": 1.0
+            },
+            "_Itolerance": 1.0
+        },
+        {
+            "_Iname": "beta1_survival",
+            "_Idescription": "",
+            "_Ivalue": {
+                "tag": "Const",
+                "contents": 0.0
+            },
+            "_Iunit": "dimensionless",
+            "_Itags": [
+                {
+                    "key": "s::to-calibrate"
+                }
+            ],
+            "_IisConstant": false,
+            "_Iscale": {
+                "tag": "Const",
+                "contents": 1.0
+            },
+            "_Itolerance": 1.0
+        },
+        {
+            "_Iname": "beta2_survival",
+            "_Idescription": "",
+            "_Ivalue": {
+                "tag": "Const",
+                "contents": 0.0
+            },
+            "_Iunit": "dimensionless",
+            "_Itags": [
+                {
+                    "key": "s::to-calibrate"
+                }
+            ],
+            "_IisConstant": false,
+            "_Iscale": {
+                "tag": "Const",
+                "contents": 1.0
+            },
+            "_Itolerance": 1.0
+        },
+        {
+            "_Iname": "cumulative_hazard",
+            "_Idescription": "",
+            "_Ivalue": {
+                "tag": "Const",
+                "contents": 0.0
+            },
+            "_Iunit": "dimensionless",
+            "_Itags": [
+                {
+                    "key": "output"
+                }
+            ],
+            "_IisConstant": false,
+            "_Iscale": {
+                "tag": "Const",
+                "contents": 1.0
+            },
+            "_Itolerance": 1.0
+        },
+        {
+            "_Iname": "d",
+            "_Idescription": "",
+            "_Ivalue": {
+                "tag": "BinaryNode",
+                "contents": [
+                    "Times",
+                    {
+                        "tag": "Var",
+                        "contents": {
+                            "contents": "R_E",
+                            "tag": "Constituent"
+                        }
+                    },
+                    {
+                        "tag": "Var",
+                        "contents": {
+                            "contents": "alpha",
+                            "tag": "Constituent"
+                        }
+                    }
+                ]
+            },
+            "_Iunit": "1 / day",
+            "_Iuri": "https://doi.org/10.1111/biom.12537",
+            "_Itags": [],
+            "_IisConstant": false,
+            "_Iscale": {
+                "tag": "Const",
+                "contents": 1.0
+            },
+            "_Itolerance": 1.0
+        },
+        {
+            "_Iname": "delta",
+            "_Idescription": "",
+            "_Ivalue": {
+                "tag": "Const",
+                "contents": 0.23
+            },
+            "_Iunit": "1 / day",
+            "_Iuri": "https://doi.org/10.1111/biom.12537",
+            "_Itags": [
+                {
+                    "key": "s::arbitrary"
+                }
+            ],
+            "_IisConstant": false,
+            "_Iscale": {
+                "tag": "Const",
+                "contents": 1.0
+            },
+            "_Itolerance": 1.0
+        },
+        {
+            "_Iname": "epsilon",
+            "_Idescription": "",
+            "_Ivalue": {
+                "tag": "Const",
+                "contents": 0.5
+            },
+            "_Iunit": "dimensionless",
+            "_Itags": [
+                {
+                    "key": "s::to-calibrate"
+                }
+            ],
+            "_IisConstant": false,
+            "_Iscale": {
+                "tag": "Const",
+                "contents": 1.0
+            },
+            "_Itolerance": 1.0
+        },
+        {
+            "_Iname": "g",
+            "_Idescription": "",
+            "_Ivalue": {
+                "tag": "Const",
+                "contents": 1.0e-7
+            },
+            "_Iunit": "1 / day",
+            "_Iuri": "https://doi.org/10.1111/biom.12537",
+            "_Itags": [
+                {
+                    "key": "s::arbitrary"
+                }
+            ],
+            "_IisConstant": false,
+            "_Iscale": {
+                "tag": "Const",
+                "contents": 1.0
+            },
+            "_Itolerance": 1.0
+        },
+        {
+            "_Iname": "instantaneous_hazard",
+            "_Idescription": "",
+            "_Ivalue": {
+                "tag": "BinaryNode",
+                "contents": [
+                    "Times",
+                    {
+                        "tag": "Var",
+                        "contents": {
+                            "contents": "baseline_hazard",
+                            "tag": "Constituent"
+                        }
+                    },
+                    {
+                        "tag": "UnaryNode",
+                        "contents": [
+                            "Exp",
+                            {
+                                "tag": "BinaryNode",
+                                "contents": [
+                                    "Plus",
+                                    {
+                                        "tag": "BinaryNode",
+                                        "contents": [
+                                            "Times",
+                                            {
+                                                "tag": "Var",
+                                                "contents": {
+                                                    "contents": "beta1_survival",
+                                                    "tag": "Constituent"
+                                                }
+                                            },
+                                            {
+                                                "tag": "UnaryNode",
+                                                "contents": [
+                                                    "Log",
+                                                    {
+                                                        "tag": "BinaryNode",
+                                                        "contents": [
+                                                            "Times",
+                                                            {
+                                                                "tag": "Var",
+                                                                "contents": {
+                                                                    "contents": "S",
+                                                                    "tag": "Constituent"
+                                                                }
+                                                            },
+                                                            {
+                                                                "tag": "Var",
+                                                                "contents": {
+                                                                    "contents": "mL / substance_count",
+                                                                    "tag": "Unit"
+                                                                }
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "tag": "BinaryNode",
+                                        "contents": [
+                                            "Times",
+                                            {
+                                                "tag": "Var",
+                                                "contents": {
+                                                    "contents": "beta2_survival",
+                                                    "tag": "Constituent"
+                                                }
+                                            },
+                                            {
+                                                "tag": "UnaryNode",
+                                                "contents": [
+                                                    "Log",
+                                                    {
+                                                        "tag": "BinaryNode",
+                                                        "contents": [
+                                                            "Times",
+                                                            {
+                                                                "tag": "Var",
+                                                                "contents": {
+                                                                    "contents": "R",
+                                                                    "tag": "Constituent"
+                                                                }
+                                                            },
+                                                            {
+                                                                "tag": "Var",
+                                                                "contents": {
+                                                                    "contents": "mL / substance_count",
+                                                                    "tag": "Unit"
+                                                                }
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            },
+            "_Iunit": "1 / day",
+            "_Itags": [],
+            "_IisConstant": false,
+            "_Iscale": {
+                "tag": "Const",
+                "contents": 1.0
+            },
+            "_Itolerance": 1.0
+        },
+        {
+            "_Iname": "k_weibull",
+            "_Idescription": "",
+            "_Ivalue": {
+                "tag": "Const",
+                "contents": 1.2
+            },
+            "_Iunit": "dimensionless",
+            "_Itags": [
+                {
+                    "key": "s::to-calibrate"
+                }
+            ],
+            "_IisConstant": false,
+            "_Iscale": {
+                "tag": "Const",
+                "contents": 1.0
+            },
+            "_Itolerance": 1.0
+        },
+        {
+            "_Iname": "lambda_weibull",
+            "_Idescription": "",
+            "_Ivalue": {
+                "tag": "Const",
+                "contents": 800.0
+            },
+            "_Iunit": "day",
+            "_Itags": [
+                {
+                    "key": "s::to-calibrate"
+                }
+            ],
+            "_IisConstant": false,
+            "_Iscale": {
+                "tag": "Const",
+                "contents": 1.0
+            },
+            "_Itolerance": 1.0
+        },
+        {
+            "_Iname": "log_hazard",
+            "_Idescription": "",
+            "_Ivalue": {
+                "tag": "UnaryNode",
+                "contents": [
+                    "Log",
+                    {
+                        "tag": "BinaryNode",
+                        "contents": [
+                            "Times",
+                            {
+                                "tag": "Var",
+                                "contents": {
+                                    "contents": "instantaneous_hazard",
+                                    "tag": "Constituent"
+                                }
+                            },
+                            {
+                                "tag": "Var",
+                                "contents": {
+                                    "contents": "day",
+                                    "tag": "Unit"
+                                }
+                            }
+                        ]
+                    }
+                ]
+            },
+            "_Iunit": "dimensionless",
+            "_Itags": [
+                {
+                    "key": "output"
+                }
+            ],
+            "_IisConstant": false,
+            "_Iscale": {
+                "tag": "Const",
+                "contents": 1.0
+            },
+            "_Itolerance": 1.0
+        },
+        {
+            "_Iname": "log_psa",
+            "_Idescription": "",
+            "_Ivalue": {
+                "tag": "UnaryNode",
+                "contents": [
+                    "Log",
+                    {
+                        "tag": "BinaryNode",
+                        "contents": [
+                            "Plus",
+                            {
+                                "tag": "BinaryNode",
+                                "contents": [
+                                    "Div",
+                                    {
+                                        "tag": "Var",
+                                        "contents": {
+                                            "contents": "PSA",
+                                            "tag": "Constituent"
+                                        }
+                                    },
+                                    {
+                                        "tag": "Var",
+                                        "contents": {
+                                            "contents": "nanog / mL",
+                                            "tag": "Unit"
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "Const",
+                                "contents": 1.0
+                            }
+                        ]
+                    }
+                ]
+            },
+            "_Iunit": "dimensionless",
+            "_Itags": [
+                {
+                    "key": "output"
+                }
+            ],
+            "_IisConstant": false,
+            "_Iscale": {
+                "tag": "Const",
+                "contents": 1.0
+            },
+            "_Itolerance": 1.0
+        },
+        {
+            "_Iname": "p",
+            "_Idescription": "",
+            "_Ivalue": {
+                "tag": "Const",
+                "contents": 20.0
+            },
+            "_Iunit": "nanog / day",
+            "_Iuri": "https://doi.org/10.1111/biom.12537",
+            "_Itags": [
+                {
+                    "key": "s::arbitrary"
+                }
+            ],
+            "_IisConstant": false,
+            "_Iscale": {
+                "tag": "Const",
+                "contents": 1.0
+            },
+            "_Itolerance": 1.0
+        },
+        {
+            "_Iname": "time",
+            "_Idescription": "Defines the simulation time parameter.",
+            "_Ivalue": {
+                "tag": "Var",
+                "contents": {
+                    "contents": "time",
+                    "tag": "Constituent"
+                }
+            },
+            "_Iunit": "s",
+            "_Itags": [],
+            "_IisConstant": false,
+            "_Iscale": {
+                "tag": "Const",
+                "contents": 1.0
+            },
+            "_Itolerance": 1.0
+        },
+        {
+            "_Iname": "time_under_treatment",
+            "_Idescription": "",
+            "_Ivalue": {
+                "tag": "BinaryNode",
+                "contents": [
+                    "Max",
+                    {
+                        "tag": "BinaryNode",
+                        "contents": [
+                            "Minus",
+                            {
+                                "tag": "Var",
+                                "contents": {
+                                    "contents": "time",
+                                    "tag": "Constituent"
+                                }
+                            },
+                            {
+                                "tag": "Var",
+                                "contents": {
+                                    "contents": "treatment_start",
+                                    "tag": "Constituent"
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "BinaryNode",
+                        "contents": [
+                            "Times",
+                            {
+                                "tag": "Const",
+                                "contents": 1.0e-3
+                            },
+                            {
+                                "tag": "Var",
+                                "contents": {
+                                    "contents": "day",
+                                    "tag": "Unit"
+                                }
+                            }
+                        ]
+                    }
+                ]
+            },
+            "_Iunit": "day",
+            "_Itags": [],
+            "_IisConstant": false,
+            "_Iscale": {
+                "tag": "Const",
+                "contents": 1.0
+            },
+            "_Itolerance": 1.0
+        },
+        {
+            "_Iname": "treatment_effect",
+            "_Idescription": "",
+            "_Ivalue": {
+                "tag": "CondNode",
+                "contents": [
+                    {
+                        "tag": "Comp",
+                        "contents": [
+                            "GrTE",
+                            {
+                                "tag": "Var",
+                                "contents": {
+                                    "contents": "time",
+                                    "tag": "Constituent"
+                                }
+                            },
+                            {
+                                "tag": "Var",
+                                "contents": {
+                                    "contents": "treatment_start",
+                                    "tag": "Constituent"
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "CondNode",
+                        "contents": [
+                            {
+                                "tag": "Comp",
+                                "contents": [
+                                    "LsT",
+                                    {
+                                        "tag": "Var",
+                                        "contents": {
+                                            "contents": "time",
+                                            "tag": "Constituent"
+                                        }
+                                    },
+                                    {
+                                        "tag": "Var",
+                                        "contents": {
+                                            "contents": "treatment_end",
+                                            "tag": "Constituent"
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                "tag": "Var",
+                                "contents": {
+                                    "contents": "epsilon",
+                                    "tag": "Constituent"
+                                }
+                            },
+                            {
+                                "tag": "Const",
+                                "contents": 0.0
+                            }
+                        ]
+                    },
+                    {
+                        "tag": "Const",
+                        "contents": 0.0
+                    }
+                ]
+            },
+            "_Iunit": "dimensionless",
+            "_Itags": [],
+            "_IisConstant": false,
+            "_Iscale": {
+                "tag": "Const",
+                "contents": 1.0
+            },
+            "_Itolerance": 1.0
+        },
+        {
+            "_Iname": "treatment_end",
+            "_Idescription": "",
+            "_Ivalue": {
+                "tag": "Const",
+                "contents": 50.0
+            },
+            "_Iunit": "day",
+            "_Itags": [
+                {
+                    "key": "i::vpop"
+                }
+            ],
+            "_IisConstant": false,
+            "_Iscale": {
+                "tag": "Const",
+                "contents": 1.0
+            },
+            "_Itolerance": 1.0
+        },
+        {
+            "_Iname": "treatment_start",
+            "_Idescription": "",
+            "_Ivalue": {
+                "tag": "Const",
+                "contents": 10.0
+            },
+            "_Iunit": "day",
+            "_Itags": [
+                {
+                    "key": "i::vpop"
+                }
+            ],
+            "_IisConstant": false,
+            "_Iscale": {
+                "tag": "Const",
+                "contents": 1.0
+            },
+            "_Itolerance": 1.0
+        }
+    ],
+    "compartments": [],
+    "species": [],
+    "events": [],
+    "algebraicRules": [],
+    "modelName": "unnamedModel",
+    "baselineChecks": [],
+    "categoricalParams": [],
+    "immutableIds": {
+        "013aef80-4dbd-4b06-81fc-fe9640d0c3e0": "cumulative_hazard",
+        "025f8da8-9687-436c-8991-1d5f71d78b13": "log_hazard",
+        "02f208f0-c09f-4137-af91-5e02dceac16b": "dPSAdt",
+        "083f07d2-cb06-47b0-bde0-ae9cba3c4908": "PSA",
+        "0c04686e-54d2-4df5-87a0-6d17b3cdd79d": "S",
+        "0d9304ff-e68a-4ac6-8ff5-bf006cbc5388": "beta1_survival",
+        "0ee87b71-0692-47c3-8c12-7eebd83e39d6": "PSA_baseline",
+        "0f27d1de-a779-4eed-8c17-3749717d214c": "baseline_hazard",
+        "118acbe2-8724-4c2f-b95c-6af94dd6b9a8": "treatment_effect",
+        "121fb8fa-f67b-411b-8015-109a60f7fd80": "baseline_total_cells",
+        "1913f53e-aac0-4f69-8aaf-b5b9c3e78a2b": "alpha",
+        "1c4699ec-dcb9-40db-9053-a9a0a508437c": "log_psa",
+        "276e2eef-4880-4011-bd19-b41d94f77e52": "baseline_ratio_S_R",
+        "29fc678e-2726-4f75-936e-105370c7e4c1": "baseline_log_ratio_S_R",
+        "3131b1ef-b786-4b63-9103-9f4b72a7ab34": "g",
+        "3a7336e0-4eab-468e-9a76-ffdfddc7d58e": "instantaneous_hazard",
+        "3cae1986-dc3f-4820-8712-d7dedca45833": "dSdt",
+        "408ea83a-a11b-49b8-877d-1f77c73f9108": "Nmax",
+        "4501fd65-b945-46b8-bfab-38594d8c2a9d": "epsilon",
+        "47ae6c82-6a92-4d55-b0e1-0f765f95cd74": "treatment_end",
+        "51ba639f-d7fd-462d-80a8-4a32622ed0c5": "beta2_survival",
+        "531ce6ea-fa80-4a2d-bf6f-79776606696f": "time",
+        "6a07618b-f286-4f86-96ca-9db51ee5562d": "delta",
+        "746b49da-2e0c-43cc-9852-ff1cb58d940e": "k_weibull",
+        "83175aa2-d9fb-4106-93ce-2c9bde35c09c": "R_E",
+        "9b354286-fa93-478f-9bf5-68f64b7f2d7c": "time_under_treatment",
+        "bc6e18a6-22da-43e5-8c92-78e03e6d881e": "R",
+        "c76f52dd-7730-4526-ad22-3c70af96f6fc": "p",
+        "ce03e591-e114-441a-a2bb-2b1a1dbb51a2": "lambda_weibull",
+        "e8a55092-1915-425d-aab8-91e9f5cc6002": "dSurvivaldt",
+        "f1de0f3b-7eff-43a4-89a6-f3f1df0bfaf5": "treatment_start",
+        "fb4e458a-3981-4419-b770-e07380fc7dd6": "d",
+        "fcad6d84-2059-43af-a49e-4981087a3707": "dRdt"
+    },
+    "customTags": [],
+    "mergeConflicts": {
+        "direct": {
+            "algebraicRules": [],
+            "baselineChecks": [],
+            "categoricalParams": [],
+            "compartments": [],
+            "customTags": [],
+            "events": [],
+            "modelCore": {
+                "bioReactionSet": [],
+                "odeSet": []
+            },
+            "modelParams": [],
+            "species": []
+        },
+        "indirect": {
+            "algebraicRules": [],
+            "baselineChecks": [],
+            "categoricalParams": [],
+            "compartments": [],
+            "customTags": [],
+            "events": [],
+            "modelCore": {
+                "bioReactionSet": [],
+                "odeSet": []
+            },
+            "modelParams": [],
+            "species": []
+        }
+    }
+}
