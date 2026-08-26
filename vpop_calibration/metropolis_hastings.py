@@ -145,3 +145,47 @@ def mh_step(
     )
 
     return new_state
+
+
+def refresh_mh_state(
+    nlme_model: StatisticalModel,
+    current_state: MetropolisHastingsState,
+) -> MetropolisHastingsState:
+    """Recenter random effects and refresh cached values after an SAEM M-step.
+
+    Preserve the sampled individual Gaussian parameters ``psi`` by recomputing
+    ``etas = psi - X @ beta`` using the updated population coefficients. Then
+    reevaluate predictions and log probabilities under the current model, so
+    the next Metropolis-Hastings transition compares both states under the
+    same population parameters.
+
+    Call after all population-parameter updates and before constructing the
+    iteration summary or starting the next E-step. No refresh is needed during
+    burn-in, when population parameters remain fixed. This helper performs no
+    sampling or acceptance decision and preserves the proposal step size.
+
+    Args:
+        nlme_model: Statistical model with all M-step updates already applied.
+        current_state: State from the preceding E-step. Its ``gaussian_params``
+            have shape ``(nb_chains, nb_patients, nb_pdu)`` and are retained as
+            the individual samples to carry into the next iteration.
+
+    Returns:
+        A new state with recentered etas and reevaluated Gaussian parameters,
+        predictions, and log probabilities. ``complete_likelihood`` is rebuilt
+        as minus twice the log probabilities averaged over chains and summed
+        over patients. The supplied state is not modified; assign the returned
+        state back to the optimizer.
+    """
+    new_mu = nlme_model.full_design_matrix @ nlme_model.population_betas
+    new_etas = current_state.gaussian_params - new_mu.unsqueeze(0)
+    proposal = nlme_model.log_posterior_etas_all_patients(new_etas)
+
+    return MetropolisHastingsState(
+        etas=new_etas,
+        gaussian_params=proposal.gaussian_params,
+        prediction=proposal.predictions,
+        log_prob=proposal.log_posterior,
+        step_size=current_state.step_size,
+        complete_likelihood=-2 * proposal.log_posterior.mean(dim=0).sum(dim=0),
+    )

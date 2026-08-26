@@ -10,7 +10,7 @@ from vpop_calibration.config import smoke_test
 
 
 def theoretical_pdf(
-    x: np.ndarray, mu: float, omega: float, const: Constraint
+    x: np.ndarray, mu: float, prior_std: float, const: Constraint
 ) -> np.ndarray:
     pdf = np.zeros_like(x)
 
@@ -19,7 +19,7 @@ def theoretical_pdf(
         x_valid = x[mask]
         phi = np.log(x_valid - const.shift)
         derivative = 1.0 / (x_valid - const.shift)
-        pdf[mask] = stats.norm.pdf(phi, loc=mu, scale=omega) * derivative
+        pdf[mask] = stats.norm.pdf(phi, loc=mu, scale=prior_std) * derivative
 
     elif const.transform == "logit":
         mask = (x > const.shift) & (x < const.shift + const.scale)
@@ -27,7 +27,7 @@ def theoretical_pdf(
         shifted_x = (x_valid - const.shift) / const.scale
         phi = np.log(shifted_x / (1.0 - shifted_x))
         derivative = 1.0 / (const.scale * shifted_x * (1.0 - shifted_x))
-        pdf[mask] = stats.norm.pdf(phi, loc=mu, scale=omega) * derivative
+        pdf[mask] = stats.norm.pdf(phi, loc=mu, scale=prior_std) * derivative
 
     else:
         raise NotImplementedError(
@@ -49,9 +49,11 @@ class PriorVisualizer:
         fig, axes = self._setup_grid(len(pdu_dict))
         for ax, (name, pdu) in zip(axes, pdu_dict.items()):
             mu, omega = pdu.transformed_prior, pdu.prior_omega
+            # omega is the variance of the PDU log prior
+            prior_std = np.sqrt(omega)
             x_grid = self._make_x_grid(
-                phi_min=mu - 3.5 * omega,
-                phi_max=mu + 3.5 * omega,
+                phi_min=mu - 3.5 * prior_std,
+                phi_max=mu + 3.5 * prior_std,
                 constraint=pdu.constraint,
                 log_scale=log_scale,
             )
@@ -59,7 +61,7 @@ class PriorVisualizer:
                 ax,
                 x_grid,
                 mu,
-                omega,
+                prior_std,
                 pdu.constraint,
                 color="steelblue",
                 label=f"Initial prior: {pdu.prior:.1f}",
@@ -104,13 +106,13 @@ class PriorVisualizer:
         ax,
         x_grid: np.ndarray,
         mu: float,
-        omega: float,
+        prior_std: float,
         constraint: Constraint,
         color: str,
         label: str,
         log_scale: bool,
     ) -> None:
-        y = theoretical_pdf(x_grid, mu, omega, constraint)
+        y = theoretical_pdf(x_grid, mu, prior_std, constraint)
         if log_scale:
             y = y * x_grid * np.log(10)
         ax.plot(x_grid, y, color=color, label=label)

@@ -9,7 +9,11 @@ from vpop_calibration.pynlme.model import StatisticalModel
 from vpop_calibration.saem.scheduler import SaemScheduler
 from vpop_calibration.saem.estimates import PopEstimates, IterSummary, check_convergence
 from vpop_calibration.saem.config import SaemConfigDict
-from vpop_calibration.metropolis_hastings import MetropolisHastingsState, mh_step
+from vpop_calibration.metropolis_hastings import (
+    MetropolisHastingsState,
+    mh_step,
+    refresh_mh_state,
+)
 from vpop_calibration.saem.m_step import MStepState
 from vpop_calibration.saem.utils import (
     simulated_annealing,
@@ -159,7 +163,7 @@ class PySaem:
         try:
             for progress in self.optimization_stream():
                 # Push history
-                row = progress.to_pandas().reset_index().to_dict(orient="records")[0]
+                row = progress.to_pandas().to_dict(orient="records")[0]
                 for k, v in row.items():
                     history_dict[k].append(v)
                 # Logging
@@ -313,7 +317,9 @@ class PySaem:
             new=self.mh_state.gaussian_params.mean(dim=0),
             learning_rate=self.scheduler.stochastic_approximation_rate,
         )
-
+        # Update the MH state (etas, log_prob, predictions, complete_likelihood)
+        if self.scheduler.phase != "burnin":
+            self.mh_state = refresh_mh_state(self.model, self.mh_state)
         # Update population estimates and check for early convergence
         new_estimates = PopEstimates(
             beta=self.model.population_betas,
@@ -344,9 +350,9 @@ class PySaem:
     ) -> Callable:
         """Build the objective function to be optimized for model intrinsic parameters estimation."""
 
-        assert gaussian_params.shape[0] == 1, (
-            "Ensure to average the gaussian parameters before building the fixed effects objective function"
-        )
+        assert (
+            gaussian_params.shape[0] == 1
+        ), "Ensure to average the gaussian parameters before building the fixed effects objective function"
 
         def fixed_effects_objective_function(fixed_effects: torch.Tensor):
             # Assemble the patient parameters
