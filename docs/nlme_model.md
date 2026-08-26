@@ -8,7 +8,7 @@ Consider a data set $\bf{y}$ of longitudinal observations for $N$ individuals. F
 
 ```math
 y_{i,j} = f(\theta_i,t_{i,j}) + g(\theta_i, t_{i,j}, \sigma) \varepsilon_{i,j}, \\
-\varepsilon \sim  \mathcal{N}(0,1)
+\varepsilon_{i,j} \sim  \mathcal{N}(0,1)
 ```
 
 The observations $y_{i,j}$ may be vector-valued, in the case where multiple outcomes are measured.
@@ -21,17 +21,12 @@ The structural model inputs are population parameters which follow a certain dis
 
 The structural model $f$ represents the simulation model. It deterministically maps patient descriptors and observation time to model outcomes.
 
-> [!TIP] Implementation:
-> The `StructuralModel` class is implemented to interface with different types of simulation models. It is implemented in [structural_model.py](../vpop_calibration/structural_model.py)
+For the moment, four instances can be used:
 
-For the moment, two instances can be used:
-
-```python
-# From a gaussian process model
-struct_model_gp = StructuralGp(myGP)
-# From an ODE model
-struct_model_ode = StructuralOdeModel(ode_model, protocol_design, initial_conditions)
-```
+1. `StructuralAnalytical`: an analytical model
+2. `StructuralGp`: a Gaussian process surrogate
+3. `StructuralSbml`: an SBML model, will be solved using the roadrunner[^roadrunner] library
+4. `StructuralSiwork`: a simwork model (loaded from a CM.json file), will use a simwork executable for solving
 
 ### Patient descriptors
 
@@ -47,15 +42,15 @@ The patient descriptors $\theta_i$ are divided in 4 groups:
 The PDUs are assumed to follow a multivariate log-normal distribution
 
 ```math
-\log \phi_i = \beta X_i + \eta_i, \\
-\eta \sim \mathcal{N}(0, \Omega)
+\log \phi_i = X_i\beta + \eta_i, \\
+\eta_i \sim \mathcal{N}(0, \Omega)
 ```
 
 where $\beta$ is the vector of population parameters, containing the means and the covariate coefficients, and $X_i$ is the design matrix of individual $i$, containing the covariate values.
 
 ##### Covariates
 
-Considering that $n_{PDU}$ PDU parameters are described, and for each PDU $k$, the covariates $c_{k,1}, \dots, c_{k,n_k}$ have an influence, the total number of $\beta$ values is $n_\beta = \sum_{k=1}^{n_{PDU}} n_k$. For each covariate $c_{k,j}$ which has an influence on PDU $k$, the associated covariation coefficient is denoted as $\rho_{c_{k,j} \rightarrow \mu_k}$ (coefficient of the influence of $c_{k,j}$ on $\mu_k$). The vector of fixed effects $\beta$ and the design matrices $X_i$ are thus formulated as:
+Considering that $n_{PDU}$ PDU parameters are described, and for each PDU $k$, the covariates $c_{k,1}, \dots, c_{k,n_k}$ have an influence, the total number of $\beta$ values is $n_\beta = n_{PDU} + \sum_{k=1}^{n_{PDU}} n_k$. For each covariate $c_{k,j}$ which has an influence on PDU $k$, the associated covariation coefficient is denoted as $\rho_{c_{k,j} \rightarrow \mu_k}$ (coefficient of the influence of $c_{k,j}$ on $\mu_k$). The vector of fixed effects $\beta$ and the design matrices $X_i$ are thus formulated as:
 
 ```math
 \beta = \begin{pmatrix}
@@ -116,7 +111,8 @@ If the selected model is additive, the NLME predictions are written as:
 
 ```math
 y_{i,j} = f(\theta_i, t_{i,j}) + \sigma \varepsilon_{i,j}, \\
-\mathbf{E}[y_{i,j} | \theta_i] = f(\theta_i, t_{i,j}), Var[y_{i,j} | \theta_i] = \sigma^2,
+\mathbf{E}[y_{i,j} | \theta_i] = f(\theta_i, t_{i,j})\\
+ Var[y_{i,j} | \theta_i] = \sigma^2,
 ```
 
 #### Proportional
@@ -125,7 +121,8 @@ If the selected error model is proportional, the NLME predictions are written as
 
 ```math
 y_{i,j} = f(\theta_i, t_{i,j}) (1 + \sigma \varepsilon_{i,j}), \\
-\mathbf{E}[y_{i,j}|\theta_i] = f(\theta_i, t_{i,j}), Var[y_{i,j} | \theta_i] = (\sigma f(\theta_i, t_{i,j}))^2
+\mathbf{E}[y_{i,j}|\theta_i] = f(\theta_i, t_{i,j}) \\
+ Var[y_{i,j} | \theta_i] = (\sigma f(\theta_i, t_{i,j}))^2
 ```
 
 > [!NOTE]
@@ -133,53 +130,72 @@ y_{i,j} = f(\theta_i, t_{i,j}) (1 + \sigma \varepsilon_{i,j}), \\
 
 ## Likelihood maximization
 
-Optimizing an NLME model with respect to an observation data set can be expressed as a maximum likelihood problem. In fact this formulation only applies to the framework of optimizing the PDU distributions, and handling MI (fixed effects) is a specific issue. We assume now that all parameters are PDUs ($\theta_i = \phi_i$).
+We now define the different likelihoods associated with the NLME paradigm. These definitions will be useful to understand the [SAEM-specific documentation](./saem_implementation.md).
 
-### Total likelihood formulation
+For the sake of simplicity, we assume in the following that all parameters are PDUs ($\theta_i = \phi_i$).
 
-The objective is to maximimze the total log-likelihood of observations, with respect to the (NLME) model parameters. The full list of parameters is hereby denoted as $\Theta$ and contains:
+### Observed- and complete-data likelihoods
+
+The objective is to maximize the observed data likelihood, with respect to the (NLME) model parameters. The full list of parameters is hereby denoted as $\Theta$ and contains:
 
 - $\beta$ (list of population parameters),
 - $\Omega$ (covariance matrix of individual random effects),
 - $\sigma^2$ (residual variance), one per model output.
 
-The objective that we wish to maximize is the log-likelihood of NLME model parameters given observations $\mathbf{y}$:
+
+Under the assumption that patients observations are independent, the **observed-data** log-likelihood reads:
+```math
+
+\ell(\Theta;\mathbf y)
+=\sum_i\log\int_{\eta_i}
+p(\mathbf y_i\mid\eta_i;\beta, \sigma^2)
+p(\eta_i\mid\Omega)\,d\eta_i.
+```
+Because this integral is difficult to compute, the SAEM algorithm instead uses the **complete-data** log-likelihood:
 
 ```math
-\begin{align*}
-LL(\Theta ; \mathbf{y}) &= \sum_i \log p(y_i; \Theta) = \sum_i \log p(y_i | \theta_i ; \sigma) p(\theta_i | \Theta) \\
-&= \sum_i \log p (y_i | \theta_i; \sigma) + \sum_i \log p(\theta_i | \beta, \Omega)
-\end{align*}
+\ell_c (\Theta; \mathbf y, \eta)
+=\sum_i\left[
+\log p(\mathbf y_i\mid\eta_i;\beta, \sigma^2)
++\log p(\eta_i\mid\Omega)
+\right].
 ```
 
-This expression assumes that all patients are independent.
+Under suitable conditions, iteratively maximizing the conditional expectation of $\ell_c$ (by a succession of E- and M- steps) converges towards a stationary point of the observed-data likelihood.
+
+The two contributions to the complete-data log-likelihood are detailed below.
 
 ### Likelihood of observations
 
-For an individual patient $i$, the likelihood of the individual parameters $\theta_i$ given the observation $y_i$ is expressed as
+The first contribution is the sum over all patients of the log-likelihood of the individual observations $\mathbf y_i$ given the individual parameters $\eta_i$.
+For a given patient $i$, the log-likelihood reads:
 
 ```math
-\log p(y_i | \theta_i; \sigma) = -\frac{1}{2} \sum_{j=1}^{m_i} \Big(  \log (2\pi g(\theta_i, t_{i,j}, \sigma)^2) + \frac{(f(\theta_i, t_{i,j}) - y_{i,j})^2}{g(\theta_i, t_{i,j}, \sigma)^2} \Big)
+\log p(\mathbf y_i | \eta_i; \beta, \sigma^2) = -\frac{1}{2} \sum_{j=1}^{m_i} \Big(  \log (2\pi g(\eta_i,\beta, t_{i,j}, \sigma^2)^2) + \frac{(f(\eta_i, \beta, t_{i,j}) - y_{i,j})^2}{g(\eta_i, \beta, t_{i,j}, \sigma^2)^2} \Big)
 ```
+and quantifies how plausible this patient's observations are given the population parameters and this patient's random effects.
 
 > [!TIP]
-> This is implemented in the `NlmeModel` class, as the method `log_likelihood_observation` - see [nlme.py](../vpop_calibration/nlme.py)
+> see [log_likelihood_observation()](../vpop_calibration/pynlme/residuals.py)
 
-### Likelihood of individual parameters
+Under additive noise assumption (most common case), this is
+```math
+\log p(\mathbf y_i | \eta_i; \beta, \sigma^2) = -\frac{1}{2} \sum_{j=1}^{m_i} \Big(  \log (2\pi \sigma^2) + \frac{(f(\eta_i, \beta, t_{i,j}) - y_{i,j})^2}{\sigma^2} \Big)
+```
+which is just the usual residual-sum-of-squares term scaled by $\sigma^2$ plus a penalty term on $\sigma^2$.
 
-The total likelihood balances the likelihood of observations (data) with that of individual parameters (patient descriptors). This second contribution can be expressed as
+### Random-effects prior density
+
+The second contribution is
 
 ```math
-\log \theta_i = \beta X_i +\eta_i, \eta_i \sim \mathcal{N}(0, \Omega)
+\log p(\eta_i | \Omega) = -\frac{1}{2} (n_{PDU}  \log(2 \pi) + \log|\Omega| + \eta_i^T \Omega^{-1} \eta_i)
 ```
-
-allows to write their contribution to the likelihood as
-
-```math
-\log p(\theta_i | \Theta) = \log p(\eta_i | \Omega) = -\frac{1}{2} (n_{PDU}  \log(2 \pi) + \log|\Omega| + \eta_i^T \Omega^{-1} \eta_i)
-```
+and quantifies how plausible the individual deviations $\eta_i$ are under the current population distribution.
 
 > [!TIP]
-> This is implemented in the `NlmeModel` class, as the method `_log_prior_etas` - see [nlme.py](../vpop_calibration/nlme.py)
+> This is implemented in the `StatisticalModel` class, as the method `log_prior_etas()` - see [model.py](../vpop_calibration/pynlme/model.py)
 
 [^Lindstrom90]: Lindstrom, M. J., & Bates, D. M. (1990). Nonlinear Mixed Effects Models for Repeated Measures Data. Biometrics, 46(3), 673–687. https://doi.org/10.2307/2532087
+
+[^roadrunner]: https://pypi.org/project/roadrunner/

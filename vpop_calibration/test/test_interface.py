@@ -102,5 +102,5 @@ def test_save_load(sample_inputs, tmp_path):
 
     assert (
         nlme_model.statistical_model.input_params
-        == nlme_model.statistical_model.input_params
+        == new_nlme_model.statistical_model.input_params
     )
