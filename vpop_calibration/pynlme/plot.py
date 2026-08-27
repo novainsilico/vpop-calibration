@@ -8,7 +8,7 @@ from sklearn.metrics import r2_score
 import random as rand
 import scipy.stats as stats
 import pandera.pandas as pa
-
+from lifelines import KaplanMeierFitter
 
 from vpop_calibration.pynlme.diagnostics import (
     ModelDiagnostics,
@@ -928,3 +928,47 @@ class PlottingUtility:
 
         plt.close(fig1)
         plt.close(fig2)
+
+    def predicted_vs_observed_survival(self, facet_width: int = 8, facet_height: int = 6):
+
+        if self.model_diag.predicted_survival is None:
+            self.model_diag.compute_predicted_survival()
+
+        assert self.model_diag.predicted_survival is not None
+        pred_df = self.model_diag.predicted_survival
+        
+        times = pred_df["time"].to_numpy(dtype=float)
+        median_surv = pred_df["q_0.5"].to_numpy(dtype=float)
+        lower_surv = pred_df["q_0.05"].to_numpy(dtype=float)
+        upper_surv = pred_df["q_0.95"].to_numpy(dtype=float)
+
+        df_obs = self.model_diag.model.data.full_obs.to_pandas()
+        assert self.model_diag.model.data.full_obs.survival_outputs is not None
+        log_hazard_name = self.model_diag.model.data.full_obs.survival_outputs.log_hazard
+        df_events = df_obs[df_obs["output_name"] == log_hazard_name]
+
+        fig, ax = plt.subplots(figsize=(facet_width, facet_height))
+        ax.set_facecolor("#fdfdfd")
+        ax.grid(True, linestyle="--", alpha=0.6)
+
+        kmf = KaplanMeierFitter()
+        kmf.fit(
+            durations=df_events["time"].values, 
+            event_observed=df_events["value"].values, 
+            label="Observed"
+        )
+        kmf.plot_survival_function(ax=ax, linewidth=2, color="#2c3e50")
+        ax.plot(times, median_surv, label="Predicted Median", color="#e74c3c", linewidth=2)
+        ax.fill_between(times, lower_surv, upper_surv, color="#e74c3c", alpha=0.2, label="90% CI")
+
+        ax.set_xlabel("Time", fontsize=12)
+        ax.set_ylabel("Survival Probability", fontsize=12)
+        ax.set_title("Survival Visual Predictions")
+        ax.legend(loc="upper right", frameon=True, facecolor="white", framealpha=0.9)
+
+        if not smoke_test:
+            plt.tight_layout()
+            plt.show()
+
+        plt.close(fig)
+

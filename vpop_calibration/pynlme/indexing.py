@@ -103,7 +103,6 @@ class SurvivalOutputs(NamedTuple):
     log_hazard: str
     cumulative_hazard: str
 
-
 class ObservationsDataSet(BaseModel):
     obs_index: DataIndex
     obs_values: torch.Tensor
@@ -145,3 +144,43 @@ class ObservationsDataSet(BaseModel):
             df_long["predicted_value"] = prediction.squeeze(0).detach().cpu().numpy()
 
         return df_long
+
+def generate_survival_time_grid(dataset: ObservationsDataSet) -> DataIndex:
+    """Generate a time grid DataIndex for all patients across all global timepoints."""
+    if dataset.survival_outputs is None:
+        raise ValueError("Cannot generate survival time grid: dataset has no survival_outputs.")
+    
+    df_obs = dataset.to_pandas()
+
+    times = dataset.obs_index.time.ref_values
+    patients = dataset.obs_index.id.ref_values
+    cumulative_hazard_name = dataset.survival_outputs.cumulative_hazard
+
+    patient_info = df_obs.drop_duplicates(subset=["id"]).set_index("id")
+    grid_records = []
+    for pid in patients:
+        prot = patient_info.loc[pid, "protocol_arm"]
+        task = patient_info.loc[pid, "task"] if "task" in patient_info.columns else "survival"
+
+        for t in times:
+            grid_records.append({
+                "id": pid,
+                "time": t,
+                "output_name": cumulative_hazard_name,
+                "protocol_arm": prot,
+                "task": task,
+                "value": 0.0
+            })
+
+    grid_df = pd.DataFrame(grid_records)
+    grid_df = ObsDataSchema.validate(grid_df)
+    raw_time_grid = DataIndex.from_dataframe(grid_df)
+    time_grid_index = raw_time_grid.remap_observation_index(
+        new_patient_ids=dataset.obs_index.id.ref_values,
+        new_output_names=dataset.obs_index.output_name.ref_values,
+        new_protocol_arms=dataset.obs_index.protocol_arm.ref_values,
+        new_tasks=dataset.obs_index.task.ref_values,
+        new_times=dataset.obs_index.time.ref_values,
+    )
+
+    return time_grid_index

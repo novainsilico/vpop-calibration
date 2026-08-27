@@ -20,6 +20,7 @@ matplotlib = { version = ">=3.10.7,<4.0.0", optional = true}
 libroadrunner = { version = ">=2.9.2,<3.0.0", optional = true}
 tqdm = { version = ">=4.67.1,<5.0.0", optional = true}
 plotnine = { version = "^0.15.1", optional = true}
+lifelines = {version = "^0.30.3", extras = ["full"]}
 
 [tool.poetry.extras]
 full = ["gpytorch", "matplotlib", "libroadrunner", "tqdm", "plotnine"]

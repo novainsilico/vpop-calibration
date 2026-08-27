@@ -14,6 +14,7 @@ from vpop_calibration.pynlme.conditional_distribution import (
     ConditionalDistributionSampler,
 )
 from vpop_calibration.pynlme.importance_sampling import ImportanceSampler
+from vpop_calibration.pynlme.indexing import generate_survival_time_grid
 
 ResidualType = Literal["pwres", "iwres", "npde"]
 
@@ -43,6 +44,7 @@ class ModelDiagnostics:
         )
         self.shrinkage: torch.Tensor | None = None
         self.vpc: pd.DataFrame | None = None
+        self.predicted_survival: pd.DataFrame | None = None
 
     def get_state_dict(self) -> dict[str, Any]:
         state_dict = {
@@ -399,3 +401,43 @@ class ModelDiagnostics:
             conditional_samples=self.sampler.total_samples
         )
         self.importance_sampler.compute_likelihood(nb_samples=nb_proposal_samples)
+
+    
+    def compute_predicted_survival(self, quantiles: list[float] = [0.05, 0.5, 0.95]) -> None:
+        if not hasattr(self.sampler, "samples"):
+            self.sample_conditional_distribution()
+
+        time_grid_index = generate_survival_time_grid(self.model.data.full_obs)
+
+        etas = self.sampler.total_samples.eta_samples
+        
+        gaussian_params = self.model.convert_etas_to_gaussian_all_patients(etas)
+        
+        physical_params = self.model.convert_gaussian_to_physical(
+            psi=gaussian_params, 
+            log_mi=self.model.log_mi, 
+            surv_coeffs=self.model.surv_coeffs
+        )
+        
+        thetas = self.model.convert_physical_to_thetas_all_patients(physical_params)
+        
+        inputs = self.model.convert_thetas_to_model_parameters_all_patients(thetas)
+
+        pred_mean, _ = self.model._predict(inputs=inputs, pred_index=time_grid_index)
+
+        nb_samples = pred_mean.shape[0]
+        nb_patients = self.model.nb_patients
+        nb_times = len(time_grid_index.time.ref_values)
+
+        cumulative_hazards = pred_mean.view(nb_samples, nb_patients, nb_times)
+        survival_probabilities = torch.exp(-cumulative_hazards)
+
+        population_survival = survival_probabilities.mean(dim=1).detach().cpu().numpy()
+
+        df_records = {"time": time_grid_index.time.ref_values}
+        for q in quantiles:
+            df_records[f"q_{q}"] = np.quantile(population_survival, q, axis=0).tolist()
+
+        self.predicted_survival = pd.DataFrame(df_records)
+
+            
