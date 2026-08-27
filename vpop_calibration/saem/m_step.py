@@ -2,7 +2,8 @@ import torch
 from typing import NamedTuple, Any
 
 
-from vpop_calibration.saem.utils import stochastic_approximation, clamp_eigen_values
+from vpop_calibration.saem.utils import clamp_eigen_values
+from vpop_calibration.utils import stochastic_approximation
 from vpop_calibration.config import device, default_dtype
 
 

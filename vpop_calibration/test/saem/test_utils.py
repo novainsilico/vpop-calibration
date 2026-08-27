@@ -1,10 +1,10 @@
 from vpop_calibration.saem.utils import (
     cov_to_corr,
     simulated_annealing,
-    stochastic_approximation,
     covariance_matrix_simulated_annealing,
     clamp_eigen_values,
 )
+from vpop_calibration.utils import stochastic_approximation
 
 import torch
 

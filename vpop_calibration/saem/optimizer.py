@@ -12,9 +12,9 @@ from vpop_calibration.metropolis_hastings import MetropolisHastingsState, mh_ste
 from vpop_calibration.saem.m_step import MStepState
 from vpop_calibration.saem.utils import (
     simulated_annealing,
-    stochastic_approximation,
     covariance_matrix_simulated_annealing,
 )
+from vpop_calibration.utils import stochastic_approximation
 from vpop_calibration.pynlme.residuals import (
     log_likelihood_observation,
     ResidualErrorEstimates,
@@ -85,7 +85,7 @@ class PySaem:
         )
         self.pop_estimates = PopEstimates(
             beta=self.model.population_betas,
-            omega=self.model.omega_pop,
+            omega_lower_chol=self.model.omega_pop_lower_chol,
             ebe=output.gaussian_params.mean(dim=0),
             sigma=self.model.residual_var,
             complete_likelihood=init_likelihood,
@@ -260,14 +260,18 @@ class PySaem:
             self.model.update_betas(mstep_proposal.beta)
             # Applying simulated annealing to omega, if in learning phase
             if self.scheduler.phase == "learning":
+                current_omega = (
+                    self.model.omega_pop_lower_chol @ self.model.omega_pop_lower_chol.T
+                )
                 new_omega = covariance_matrix_simulated_annealing(
-                    current_omega=self.model.omega_pop,
+                    current_omega=current_omega,
                     target_omega=mstep_proposal.omega,
                     factor=self.config.annealing_factor,
                 )
             else:
                 new_omega = mstep_proposal.omega
-            self.model.update_omega(new_omega)
+            new_omega_lower_chol = torch.linalg.cholesky(new_omega)
+            self.model.update_omega(new_omega_lower_chol)
 
             # 3. Update fixed effects MIs
             if self.model.nb_mi + self.model.nb_surv_coeffs > 0:
@@ -309,7 +313,7 @@ class PySaem:
         # Update population estimates and check for early convergence
         new_estimates = PopEstimates(
             beta=self.model.population_betas,
-            omega=self.model.omega_pop,
+            omega_lower_chol=self.model.omega_pop_lower_chol,
             ebe=new_ebe,
             sigma=self.model.residual_var,
             model_intrinsic=self.model.log_mi,

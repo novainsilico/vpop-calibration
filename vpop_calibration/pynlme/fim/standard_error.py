@@ -3,14 +3,13 @@ import torch
 
 def invert_fim(fim: torch.Tensor) -> torch.Tensor:
     """Invert the observed FIM to get the covariance matrix of the estimates."""
-    eigvals = torch.linalg.eigvalsh(fim)
-    min_eig = eigvals.min()
-    tol = eigvals.abs().max() * fim.shape[-1] * torch.finfo(fim.dtype).eps
+    chol, info = torch.linalg.cholesky_ex(fim)
+    if info.sum() == 0:
+        inverse = torch.cholesky_inverse(chol)
+    else:
+        inverse = torch.linalg.pinv(fim)
 
-    if min_eig > tol:
-        chol = torch.linalg.cholesky(fim)
-        return torch.cholesky_inverse(chol)
-    return torch.linalg.pinv(fim)
+    return inverse
 
 
 def compute_standard_errors(covariance_matrix: torch.Tensor) -> torch.Tensor:

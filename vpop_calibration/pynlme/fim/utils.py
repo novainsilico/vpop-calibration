@@ -17,13 +17,13 @@ def matrix_dataframe(matrix: torch.Tensor, names: Sequence[str]) -> pd.DataFrame
 
 
 def history_dataframe(
-    variance_history: Sequence[Sequence[float]], names: Sequence[str]
+    variance_history: np.ndarray, names: Sequence[str]
 ) -> pd.DataFrame:
     """Standard error history along the stochastic approximation iterations."""
     if not variance_history:
         return pd.DataFrame()
 
-    df = pd.DataFrame(pd.DataFrame(variance_history, columns=list(names)))
+    df = pd.DataFrame(variance_history, columns=list(names))
     df = df.clip(lower=0) ** 0.5
     df.insert(0, "iteration", range(1, len(df) + 1))
     return df
@@ -55,15 +55,7 @@ def summary_dataframe(
     names: list[str],
 ) -> pd.DataFrame:
 
-    keep_indices = [
-        i
-        for i, name in enumerate(names)
-        if not (
-            "omega" in name.lower()
-            or "residual" in name.lower()
-            or "sigma" in name.lower()
-        )
-    ]
+    keep_indices = [i for i, name in enumerate(names) if ("omega" not in name.lower())]
 
     filtered_names = [names[i] for i in keep_indices]
     filtered_est = estimates[keep_indices].detach().cpu().numpy()

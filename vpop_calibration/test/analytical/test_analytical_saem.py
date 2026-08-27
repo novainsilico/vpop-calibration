@@ -41,7 +41,7 @@ def obs_data(np_rng) -> pd.DataFrame:
     patients = {
         "id": ["p1", "p2"],
         "foo": [0.0, 5.0],
-        "pdk_1": [0.0, 0.0],
+        "pdk_1": [0.123, 0.456],
         "protocol_arm": protocol_arms,
     }
     outputs = ["out_1", "out_2", "out_3"]
@@ -79,4 +79,4 @@ def test_analytical_saem(sample_nlme_params, obs_data, struct_model):
         input_params=sample_nlme_params,
     )
     nlme_model.optimizer.run()
-    nlme_model.diagnostics.sample_conditional_distribution()
+    nlme_model.diagnostics.sample_conditional_distribution(compute_fim=True)

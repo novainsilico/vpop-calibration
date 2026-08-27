@@ -1,173 +1,130 @@
 import torch
-from typing import Literal, overload
-from vpop_calibration.config import device
+from vpop_calibration.config import device, default_dtype
 from vpop_calibration.pynlme.model import StatisticalModel
 from vpop_calibration.pynlme.residuals import log_likelihood_observation
-from vpop_calibration.pynlme.fim.parametrization import unflatten
 from vpop_calibration.pynlme.fim.state import FimComponents
 
 
-def predict_detached(
-    model: StatisticalModel, log_mi: torch.Tensor, gaussian_params: torch.Tensor
-) -> torch.Tensor:
-    """Model predictions for the given parameters, detached from the autograd graph."""
-    preds_list = []
-
-    for c in range(gaussian_params.shape[0]):
-        physical = model.convert_gaussian_to_physical(gaussian_params[c], log_mi, model.surv_coeffs)
-        thetas = model.convert_physical_to_thetas_all_patients(physical)
-        inputs = model.convert_thetas_to_model_parameters_all_patients(thetas)
-        predictions, _ = model.predict_all_patients(inputs)
-        preds_list.append(predictions)
-
-    return torch.stack(preds_list, dim=0).detach()
-
-
-def complete_log_likelihood(
+def complete_log_likelihood_function(
     model: StatisticalModel,
-    flat: torch.Tensor,
-    predictions: torch.Tensor,
-    gaussian_params: torch.Tensor,
+    theta_batch: torch.Tensor,
+    etas: torch.Tensor,
 ) -> torch.Tensor:
-    """log-likelihood, summed over patients, per MCMC chain."""
-    params = unflatten(flat, model)
-    nb_chains = gaussian_params.shape[0]
+    """log-likelihood, summed over patients, for each batch of population parameters."""
+    assert theta_batch.dim() == 2
+    log_lik_stack = []
+    for theta_flat in theta_batch:
+        params = model.unflatten(theta_flat)
+        predictions = model.predict_from_pop_params(params=params, etas=etas)
+        nb_pdu = params.omega_lower_chol.shape[0]
 
-    log_lik_chains = []
-    mu = model.full_design_matrix @ params.beta
-
-    for c in range(nb_chains):
         log_lik_obs = log_likelihood_observation(
             observations=model.data.full_obs,
-            predictions=predictions[c],
-            residual_error=params.residual_var,
+            predictions=predictions,
+            residual_error=params.res_var,
             min_variance=model.config.residual_min_variance,
         )
-        log_lik_psi = torch.distributions.MultivariateNormal(
-            loc=mu, covariance_matrix=params.omega
-        ).log_prob(gaussian_params[c])
-        log_lik_chains.append((log_lik_obs + log_lik_psi).sum())
-    return torch.stack(log_lik_chains)
 
+        log_lik_etas = torch.distributions.MultivariateNormal(
+            loc=torch.zeros(nb_pdu, device=device, dtype=default_dtype),
+            scale_tril=params.omega_lower_chol,
+        ).log_prob(etas)
+        log_lik_complete = log_lik_obs + log_lik_etas
+        log_lik_stack.append(log_lik_complete.sum())
 
-def analytic_score_and_hessian(
-    model: StatisticalModel,
-    flat: torch.Tensor,
-    predictions: torch.Tensor,
-    gaussian_params: torch.Tensor,
-) -> tuple[torch.Tensor, torch.Tensor]:
-    """Per-chain scores and mean hessian obtained by autograd."""
-    theta = flat.clone().requires_grad_(True)
-    scores = torch.stack(
-        [
-            torch.autograd.grad(
-                complete_log_likelihood(
-                    model,
-                    theta,
-                    predictions[c : c + 1],
-                    gaussian_params[c : c + 1],
-                ).sum(),
-                theta,
-            )[0]
-            for c in range(gaussian_params.shape[0])
-        ]
-    )
-    hessian = torch.autograd.functional.hessian(
-        lambda t: complete_log_likelihood(
-            model, t, predictions, gaussian_params
-        ).mean(),
-        flat,
-    )
-    assert isinstance(hessian, torch.Tensor)
-    return scores, hessian
-
-
-def model_intrinsic_finite_differences(
-    model: StatisticalModel,
-    flat: torch.Tensor,
-    gaussian_params: torch.Tensor,
-    base_predictions: torch.Tensor,
-    eps: float,
-) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-    theta = flat.clone().requires_grad_(True)
-    log_mi0 = flat[model.mi_location]
-    h = eps * torch.clamp(log_mi0.abs(), min=1.0)
-    e = torch.eye(model.nb_mi, device=device, dtype=flat.dtype) * h
-
-    @overload
-    def perturb_log_likelihood(
-        step: torch.Tensor, compute_grad: Literal[False] = False
-    ) -> torch.Tensor: ...
-    @overload
-    def perturb_log_likelihood(
-        step: torch.Tensor, compute_grad: Literal[True]
-    ) -> tuple[torch.Tensor, torch.Tensor]: ...
-
-    def perturb_log_likelihood(step: torch.Tensor, compute_grad: bool = False):
-        preds = predict_detached(model, log_mi0 + step, gaussian_params)
-        ll_step = complete_log_likelihood(model, flat, preds, gaussian_params)
-
-        if not compute_grad:
-            return ll_step
-
-        grad_step = torch.autograd.grad(
-            complete_log_likelihood(model, theta, preds, gaussian_params).mean(),
-            theta,
-        )[0]
-        return ll_step, grad_step
-
-    ll_0 = complete_log_likelihood(model, flat, base_predictions, gaussian_params)
-    plus = [perturb_log_likelihood(e[k], compute_grad=True) for k in range(model.nb_mi)]
-    minus = [
-        perturb_log_likelihood(-e[k], compute_grad=True) for k in range(model.nb_mi)
-    ]
-    ll_p = torch.stack([p[0] for p in plus])
-    ll_m = torch.stack([m[0] for m in minus])
-
-    mi_scores = (ll_p - ll_m) / (2 * h.unsqueeze(1))
-    cross = torch.stack(
-        [(plus[k][1] - minus[k][1]) / (2 * h[k]) for k in range(model.nb_mi)],
-        dim=1,
-    )
-
-    mi_hessian = torch.diag((ll_p - 2 * ll_0 + ll_m).mean(dim=1) / h**2)
-    for i, j in zip(*torch.triu_indices(model.nb_mi, model.nb_mi, offset=1)):
-        mi_hessian[i, j] = mi_hessian[j, i] = (
-            perturb_log_likelihood(e[i] + e[j])
-            - perturb_log_likelihood(e[i] - e[j])
-            - perturb_log_likelihood(-e[i] + e[j])
-            + perturb_log_likelihood(-e[i] - e[j])
-        ).mean() / (4 * h[i] * h[j])
-
-    return mi_scores, mi_hessian, cross
+    return torch.stack(log_lik_stack)
 
 
 def compute_fim_components(
     model: StatisticalModel,
-    flat: torch.Tensor,
-    gaussian_params: torch.Tensor,
-    eps: float = 1e-3,
+    theta_flat: torch.Tensor,
+    etas: torch.Tensor,
+    eps: float,
 ) -> FimComponents:
-    """autograd on (beta, omega, sigma),finite differences on the model-intrinsic parameters."""
-    nb_chains = gaussian_params.shape[0]
-    predictions = predict_detached(model, flat[model.mi_location], gaussian_params)
-    scores, hessian = analytic_score_and_hessian(
-        model, flat, predictions, gaussian_params
+
+    assert etas.shape[0] == 1, (
+        "Can only compute FIM components for one sample of the latent variables"
     )
 
-    if model.nb_mi > 0:
-        mi = model.mi_location
-        mi_scores, mi_hessian, cross = model_intrinsic_finite_differences(
-            model, flat, gaussian_params, predictions, eps
-        )
-        scores, hessian = scores.clone(), hessian.clone()
-        scores[:, mi] = mi_scores.transpose(0, 1)
-        hessian[:, mi] = cross
-        hessian[mi, :] = cross.transpose(0, 1)
-        hessian[mi, mi] = mi_hessian
+    theta_detached = theta_flat.detach()
+    h = eps * theta_flat.abs().clamp(min=1.0)
+    nb_params = theta_flat.numel()
+
+    # Total batch size: 1 base + 2n single perts + 2n(n-1) cross perts
+    nb_cross_pairs = nb_params * (nb_params - 1) // 2
+    total_batch_size = 1 + 2 * nb_params + 4 * nb_cross_pairs
+
+    theta_batch = theta_detached.unsqueeze(0).repeat(total_batch_size, 1)
+
+    # Track perturbation indices
+    # Start with single perturbations
+    plus_indices = torch.zeros(nb_params, dtype=torch.long, device=device)
+    minus_indices = torch.zeros(nb_params, dtype=torch.long, device=device)
+
+    cursor = 1
+    for i in range(nb_params):
+        # f(theta + h_i)
+        theta_batch[cursor, i] += h[i]
+        plus_indices[i] = cursor
+        cursor += 1
+
+        # f(theta - h_i)
+        theta_batch[cursor, i] -= h[i]
+        minus_indices[i] = cursor
+        cursor += 1
+
+    # Add cross-perturbations (for hessian)
+    pair_offsets = {}
+    for i in range(nb_params):
+        for j in range(i + 1, nb_params):
+            pair_offsets[(i, j)] = cursor
+            # ++, +-, -+, --
+            theta_batch[cursor + 0, i] += h[i]
+            theta_batch[cursor + 0, j] += h[j]
+            theta_batch[cursor + 1, i] += h[i]
+            theta_batch[cursor + 1, j] -= h[j]
+            theta_batch[cursor + 2, i] -= h[i]
+            theta_batch[cursor + 2, j] += h[j]
+            theta_batch[cursor + 3, i] -= h[i]
+            theta_batch[cursor + 3, j] -= h[j]
+            cursor += 4
+
+    # Evaluate the log likelihood over all batched perturbations
+    ll = complete_log_likelihood_function(
+        model=model, theta_batch=theta_batch, etas=etas
+    )
+
+    # Compute the score (gradient) with central differences
+    f_0 = ll[0]
+    f_plus = ll[plus_indices]
+    f_minus = ll[minus_indices]
+
+    score = (f_plus - f_minus) / (2 * h)
+
+    # Assemble the hessian matrix from finite differences
+
+    hessian = torch.zeros((nb_params, nb_params), device=device, dtype=default_dtype)
+
+    # Diagonal elements H_ii
+    for i in range(nb_params):
+        hessian[i, i] = (f_plus[i] - 2 * f_0 + f_minus[i]) / (h[i] ** 2)
+
+    # Off-diagonal elements H_ij
+    for i in range(nb_params):
+        for j in range(i + 1, nb_params):
+            idx = pair_offsets[(i, j)]
+            f_pp, f_pm, f_mp, f_mm = (
+                ll[idx],
+                ll[idx + 1],
+                ll[idx + 2],
+                ll[idx + 3],
+            )
+            h_ij = (f_pp - f_pm - f_mp + f_mm) / (4 * h[i] * h[j])
+            hessian[i, j] = h_ij
+            hessian[j, i] = h_ij
 
     return FimComponents(
-        score=scores.mean(dim=0),
+        score=score,
         hessian=hessian,
-        score_outer_product=scores.transpose(0, 1) @ scores / nb_chains,
+        score_outer_product=torch.outer(score, score),
     )

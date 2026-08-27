@@ -1,7 +1,8 @@
 from typing import Any, NamedTuple
 import torch
 from vpop_calibration.config import default_dtype, device
-from vpop_calibration.pynlme.fim.standard_error import invert_fim
+from vpop_calibration.utils import stochastic_approximation
+import numpy as np
 
 
 class FimComponents(NamedTuple):
@@ -9,16 +10,8 @@ class FimComponents(NamedTuple):
     hessian: torch.Tensor
     score_outer_product: torch.Tensor
 
-
-class FimState(NamedTuple):
-    score: torch.Tensor
-    hessian: torch.Tensor
-    score_outer_product: torch.Tensor
-    variance_history: tuple[tuple[float, ...], ...] = ()
-    nb_samples: int = 0
-
     @classmethod
-    def initialize(cls, nb_params: int) -> "FimState":
+    def initialize(cls, nb_params: int) -> "FimComponents":
         return cls(
             score=torch.zeros(nb_params, device=device, dtype=default_dtype),
             hessian=torch.zeros(
@@ -27,79 +20,145 @@ class FimState(NamedTuple):
             score_outer_product=torch.zeros(
                 (nb_params, nb_params), device=device, dtype=default_dtype
             ),
-            nb_samples=0,
-            variance_history=(),
         )
 
     @property
+    def cov_scores(self) -> torch.Tensor:
+        return self.score_outer_product - torch.outer(self.score, self.score)
+
+    @property
     def fim(self) -> torch.Tensor:
-        fim = -(
-            self.hessian
-            + self.score_outer_product
-            - torch.outer(self.score, self.score)
-        )
-        return 0.5 * (fim + fim.transpose(-1, -2))
-
-    def accumulate(
-        self,
-        statistics: FimComponents,
-        nb_new: int = 1,
-        max_history: int | None = None,
-        alpha: float = 0.7,
-    ) -> "FimState":
-        total = self.nb_samples + nb_new
-
-        iteration_actuelle = total / nb_new
-        weight = 1.0 / (iteration_actuelle**alpha)
-
-        def running_mean(previous: torch.Tensor, new: torch.Tensor) -> torch.Tensor:
-            return previous + weight * (new - previous)
-
-        updated = self._replace(
-            score=running_mean(self.score, statistics.score),
-            hessian=running_mean(self.hessian, statistics.hessian),
-            score_outer_product=running_mean(
-                self.score_outer_product, statistics.score_outer_product
-            ),
-            nb_samples=total,
-        )
-
-        inv_fim = invert_fim(updated.fim)
-        variances = torch.diagonal(inv_fim).tolist()
-
-        new_history = self.variance_history + (tuple(variances),)
-        if max_history is not None:
-            new_history = new_history[-max_history:]
-
-        return updated._replace(variance_history=new_history)
+        fim = -(self.hessian + self.cov_scores)
+        return 0.5 * (fim + fim.T)
 
     def get_state_dict(self) -> dict[str, Any]:
-        return {
-            "score": self.score.detach().cpu().numpy().tolist(),
-            "hessian": self.hessian.detach().cpu().numpy().tolist(),
-            "score_outer_product": self.score_outer_product.detach()
-            .cpu()
-            .numpy()
-            .tolist(),
-            "nb_samples": self.nb_samples,
-            "variance_history": [list(x) for x in self.variance_history],
+        state_dict = {
+            k: v.detach().cpu().numpy().tolist() for k, v in self._asdict().items()
         }
+        return state_dict
 
     @classmethod
-    def from_state_dict(cls, state_dict: dict[str, Any]) -> "FimState":
-        def as_tensor(key: str) -> torch.Tensor:
-            return torch.as_tensor(state_dict[key], device=device, dtype=default_dtype)
-
-        var_history = tuple(tuple(x) for x in state_dict.get("variance_history", []))
+    def from_state_dict(cls, state_dict: dict[str, Any]) -> "FimComponents":
         return cls(
-            score=as_tensor("score"),
-            hessian=as_tensor("hessian"),
-            score_outer_product=as_tensor("score_outer_product"),
-            nb_samples=state_dict.get("nb_samples", len(var_history)),
-            variance_history=var_history,
+            **{
+                k: torch.as_tensor(v, device=device, dtype=default_dtype)
+                for k, v in state_dict.items()
+            },
         )
 
     def __eq__(self, other) -> bool:
         for field in ("score", "hessian", "score_outer_product"):
             torch.testing.assert_close(getattr(self, field), getattr(other, field))
-        return self.nb_samples == other.nb_samples
+        return True
+
+
+class FimState(NamedTuple):
+    running_average: FimComponents
+    nb_params: int
+    nb_burnin: int
+    history_size: int
+    fim_diagonal_history: np.ndarray
+    learning_rate_decay_exponent: float
+    nb_iters: int = 0
+    nb_samples: int = 0
+
+    @classmethod
+    def initialize(
+        cls,
+        nb_params: int,
+        nb_burnin: int,
+        history_size: int,
+        learning_rate_decay_exponent: float,
+    ) -> "FimState":
+        init_components = FimComponents.initialize(nb_params=nb_params)
+        init_history = np.zeros((0, nb_params))
+        return cls(
+            running_average=init_components,
+            nb_params=nb_params,
+            nb_burnin=nb_burnin,
+            history_size=history_size,
+            fim_diagonal_history=init_history,
+            learning_rate_decay_exponent=learning_rate_decay_exponent,
+        )
+
+    @property
+    def fim(self) -> torch.Tensor | None:
+        if self.nb_iters < self.nb_burnin:
+            print("Warning: the FIM burn-in is not over, the FIM is undefined")
+            return None
+        else:
+            return self.running_average.fim
+
+    def accumulate(
+        self,
+        statistics: FimComponents,
+    ) -> "FimState":
+        """Given new estimates of the FIM components, accumulate the running average and update the state."""
+        nb_iters = self.nb_iters + 1
+        if nb_iters > self.nb_burnin:
+            nb_samples = self.nb_samples + 1
+            learning_rate = 1.0 / (
+                (nb_iters - self.nb_burnin) ** self.learning_rate_decay_exponent
+            )
+
+            new_components = FimComponents(
+                score=stochastic_approximation(
+                    previous=self.running_average.score,
+                    new=statistics.score,
+                    learning_rate=learning_rate,
+                ),
+                hessian=stochastic_approximation(
+                    previous=self.running_average.hessian,
+                    new=statistics.hessian,
+                    learning_rate=learning_rate,
+                ),
+                score_outer_product=stochastic_approximation(
+                    previous=self.running_average.score_outer_product,
+                    new=statistics.score_outer_product,
+                    learning_rate=learning_rate,
+                ),
+            )
+
+            diagonal_fim = torch.diag(new_components.fim)
+            new_history = np.vstack((self.fim_diagonal_history, diagonal_fim))
+            clamped_history = new_history[-self.history_size :,]
+            new_state = FimState(
+                running_average=new_components,
+                nb_params=self.nb_params,
+                nb_burnin=self.nb_burnin,
+                history_size=self.history_size,
+                fim_diagonal_history=clamped_history,
+                nb_iters=nb_iters,
+                nb_samples=nb_samples,
+                learning_rate_decay_exponent=self.learning_rate_decay_exponent,
+            )
+        else:
+            new_state = self._replace(running_average=statistics, nb_iters=nb_iters)
+        return new_state
+
+    def get_state_dict(self) -> dict[str, Any]:
+        return {
+            "running_average": self.running_average.get_state_dict(),
+            "nb_samples": self.nb_samples,
+            "nb_burnin": self.nb_burnin,
+            "nb_iters": self.nb_iters,
+            "nb_params": self.nb_params,
+            "history_size": self.history_size,
+            "learning_rate_decay_exponent": self.learning_rate_decay_exponent,
+            "fim_diagonal_history": self.fim_diagonal_history.tolist(),
+        }
+
+    @classmethod
+    def from_state_dict(cls, state_dict: dict[str, Any]) -> "FimState":
+        running_average = FimComponents.from_state_dict(state_dict["running_average"])
+        variance_history = np.asarray(state_dict["fim_diagonal_history"])
+        return cls(
+            running_average=running_average,
+            nb_params=state_dict["nb_params"],
+            nb_burnin=state_dict["nb_burnin"],
+            nb_samples=state_dict["nb_samples"],
+            nb_iters=state_dict["nb_iters"],
+            history_size=state_dict["history_size"],
+            learning_rate_decay_exponent=state_dict["learning_rate_decay_exponent"],
+            fim_diagonal_history=variance_history,
+        )

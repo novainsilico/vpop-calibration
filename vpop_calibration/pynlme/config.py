@@ -11,6 +11,10 @@ class NlmeConfigDict(NamedTuple):
 
     importance_sampling_df: float = 5.0
 
+    fim_burn_in: int = 50
+    fim_accumulation_decay_power: float = 0.7
+    fim_finite_differences_eps: float = 1e-2
+
     def get_state_dict(self) -> dict[str, Any]:
         return {k: v for k, v in self._asdict().items()}
 

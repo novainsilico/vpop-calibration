@@ -34,3 +34,23 @@ def reproducible_uuid4(seed=None):
     if seed is not None:
         random.seed(seed)
     return uuid.UUID(int=random.getrandbits(128), version=4)
+
+
+def stochastic_approximation(
+    previous: torch.Tensor, new: torch.Tensor, learning_rate: float
+) -> torch.Tensor:
+    """Perform stochastic approximation
+
+    Args:
+        previous (torch.Tensor): The current value of the tensor
+        new (torch.Tensor): The target value of the tensor
+
+    Returns:
+        torch.Tensor: (1 - learning_rate) * previous + learning_rate * new
+    """
+    assert previous.shape == new.shape, (
+        f"Wrong shape in stochastic approximation: {previous.shape}, {new.shape}"
+    )
+
+    stochastic_approx = (1 - learning_rate) * previous + learning_rate * new
+    return stochastic_approx

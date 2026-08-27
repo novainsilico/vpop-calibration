@@ -1,5 +1,5 @@
 import torch
-from typing import NamedTuple, Callable, Any
+from typing import NamedTuple, Any
 import pandas as pd
 
 from vpop_calibration.structural_model.base import StructuralModel
@@ -23,7 +23,7 @@ class LogPosteriorPrediction(NamedTuple):
 
 class NlmeModelState(NamedTuple):
     beta: torch.Tensor
-    omega: torch.Tensor
+    omega_lower_chol: torch.Tensor
     log_mi: torch.Tensor
     res_var: ResidualErrorEstimates
     surv_coeffs: torch.Tensor
@@ -50,7 +50,13 @@ class NlmeModelState(NamedTuple):
         return instance
 
     def __eq__(self, other) -> bool:
-        compared_attributes = ["beta", "omega", "log_mi", "res_var", "surv_coeffs"]
+        compared_attributes = [
+            "beta",
+            "omega_lower_chol",
+            "log_mi",
+            "res_var",
+            "surv_coeffs",
+        ]
 
         for elem in compared_attributes:
             torch.testing.assert_close(getattr(self, elem), getattr(other, elem))
@@ -83,7 +89,7 @@ class StatisticalModel:
         if smoke_test:
             # Override with test config
             self.config = self.config._replace(
-                progress_bar=False, live_plot=False, max_samples=10
+                progress_bar=False, live_plot=False, max_samples=10, fim_burn_in=1
             )
 
         # -- Attributes initialization
@@ -137,7 +143,6 @@ class StatisticalModel:
         # This applies to output names, protocol arms and tasks
         # The ordering coming from the structural model takes precedence.
         self.output_names = self.structural_model.output_names
-        self.nb_outputs = len(self.output_names)
         self.protocol_arms = self.structural_model.protocol_arms
         self.nb_protocols = len(self.protocol_arms)
         self.task_names = self.structural_model.task_names
@@ -154,11 +159,13 @@ class StatisticalModel:
         init_beta = torch.as_tensor(
             self.input_params.beta_init, device=device, dtype=default_dtype
         )
-        init_omega = torch.diag(
-            torch.as_tensor(
-                self.input_params.omega_init,
-                device=device,
-                dtype=default_dtype,
+        init_omega_lower_chol = torch.diag(
+            torch.sqrt(
+                torch.as_tensor(
+                    self.input_params.omega_init,
+                    device=device,
+                    dtype=default_dtype,
+                )
             )
         )
         init_mi = torch.as_tensor(
@@ -177,7 +184,7 @@ class StatisticalModel:
 
         init_params = NlmeModelState(
             beta=init_beta,
-            omega=init_omega,
+            omega_lower_chol=init_omega_lower_chol,
             log_mi=init_mi,
             res_var=init_sigma,
             surv_coeffs=init_surv_coeffs,
@@ -209,8 +216,8 @@ class StatisticalModel:
 
     @property
     def omega_indices(self) -> torch.Tensor:
-        """Indices of the lower triangular part of the Omega matrix."""
-        return torch.tril_indices(self.nb_pdu, self.nb_pdu, device=device)
+        """Indices of the lower triangular part of the Omega matrix (off-diagonal)."""
+        return torch.tril_indices(self.nb_pdu, self.nb_pdu, offset=-1, device=device)
 
     def get_state_dict(self) -> dict[str, Any]:
         state_dict = {
@@ -289,22 +296,29 @@ class StatisticalModel:
             [self.design_matrices[p] for p in self.patients]
         ).to(device)
 
-    def update_omega(self, omega: torch.Tensor) -> None:
+    def update_omega(self, omega_lower_chol: torch.Tensor) -> None:
         """Update the covariance matrix of the NLME model and the distribution of random effects."""
 
         if hasattr(self, "omega_pop"):
-            expected_shape = self.omega_pop.shape
+            expected_shape = self.omega_pop_lower_chol.shape
         else:
             expected_shape = (self.nb_pdu, self.nb_pdu)
-        assert omega.shape == expected_shape, (
-            f"Wrong shape in omega update: {omega.shape}, expected: {expected_shape}"
+        assert omega_lower_chol.shape == expected_shape, (
+            f"Wrong shape in omega update: {omega_lower_chol.shape}, expected: {expected_shape}"
+        )
+        torch.testing.assert_close(
+            torch.tril(omega_lower_chol),
+            omega_lower_chol,
+            msg="Expected triangular matrix in `update_omega`",
         )
 
-        self.omega_pop = omega
-        self.omega_pop_lower_chol = torch.linalg.cholesky(self.omega_pop).to(device)
-        self.eta_distribution = torch.distributions.MultivariateNormal(
+        self.omega_pop_lower_chol = omega_lower_chol
+
+    @property
+    def eta_distribution(self) -> torch.distributions.Distribution:
+        return torch.distributions.MultivariateNormal(
             loc=torch.zeros(self.nb_pdu, device=device),
-            covariance_matrix=self.omega_pop,
+            scale_tril=self.omega_pop_lower_chol,
         )
 
     def update_res_var(self, residual_var: ResidualErrorEstimates) -> None:
@@ -362,7 +376,7 @@ class StatisticalModel:
             res_var (torch.Tensor): The residual error variance per output
         """
         self.current_params = pop_params
-        self.update_omega(pop_params.omega)
+        self.update_omega(pop_params.omega_lower_chol)
         self.update_betas(pop_params.beta)
         self.update_log_mi(pop_params.log_mi)
         self.update_res_var(pop_params.res_var)
@@ -401,14 +415,19 @@ class StatisticalModel:
 
     # --- Parameter transformation methods
     # @torch.compile
-    def _etas_to_gaussian(
-        self, etas: torch.Tensor, design_matrix: torch.Tensor
+    def etas_to_gaussian(
+        self,
+        etas: torch.Tensor,
+        design_matrix: torch.Tensor,
+        population_betas: torch.Tensor,
     ) -> torch.Tensor:
         """Atomic method to combine random effects and a design matrix into gaussian parameters."""
         nb_samples = etas.shape[0]
 
+        assert population_betas.shape == (self.nb_betas,)
+
         expanded_design_matrix = design_matrix.expand(nb_samples, -1, -1, -1)
-        gaussian_params = expanded_design_matrix @ self.population_betas + etas
+        gaussian_params = expanded_design_matrix @ population_betas + etas
         return gaussian_params
 
     # @torch.compile
@@ -426,8 +445,10 @@ class StatisticalModel:
             f"Wrong shape of etas passed to `transform_etas_to_gaussian`: {etas.shape}"
         )
 
-        gaussian_params = self._etas_to_gaussian(
-            etas=etas, design_matrix=self.full_design_matrix
+        gaussian_params = self.etas_to_gaussian(
+            etas=etas,
+            design_matrix=self.full_design_matrix,
+            population_betas=self.population_betas,
         )
 
         return gaussian_params
@@ -653,56 +674,6 @@ class StatisticalModel:
             predictions=pred,
         )
 
-    def single_patient_likelihood_factory(
-        self, id: str
-    ) -> Callable[[torch.Tensor], LogPosteriorPrediction]:
-        observations = self.data.individual_observations[id]
-        time_steps = torch.as_tensor(
-            observations.obs_index.time.ref_values, device=device, dtype=default_dtype
-        )
-        design_matrix = self.design_matrices[id].unsqueeze(0)
-        pdk = self.data.patients_pdk[id]
-
-        def log_posterior_etas_single_patient(
-            etas: torch.Tensor,
-        ) -> LogPosteriorPrediction:
-            nb_samples = etas.shape[0]
-            assert etas.shape[1] == 1
-            assert etas.shape[2] == self.nb_pdu
-
-            gaussian_params = self._etas_to_gaussian(
-                etas=etas, design_matrix=design_matrix
-            )
-            physical_params = self.convert_gaussian_to_physical(
-                psi=gaussian_params, log_mi=self.log_mi, surv_coeffs=self.surv_coeffs
-            )
-            thetas = self._combine_physical_pdk(
-                physical_params=physical_params, pdk=pdk
-            )
-            inputs = self._combine_thetas_and_time(theta=thetas, time=time_steps)
-            pred, _ = self._predict(inputs=inputs, pred_index=observations.obs_index)
-
-            log_prior = self.log_prior_etas(etas)
-            assert log_prior.shape == (nb_samples, 1)
-
-            log_likelihood_obs = log_likelihood_observation(
-                observations=observations,
-                predictions=pred,
-                residual_error=self.residual_var,
-                min_variance=self.config.residual_min_variance,
-            )
-            assert log_likelihood_obs.shape == (nb_samples, 1)
-
-            log_posterior = log_likelihood_obs + log_prior
-
-            return LogPosteriorPrediction(
-                log_posterior=log_posterior,
-                gaussian_params=gaussian_params,
-                predictions=pred,
-            )
-
-        return log_posterior_etas_single_patient
-
     def convert_theta_to_dataframe(self, theta: torch.Tensor) -> pd.DataFrame:
         assert theta.shape[0] == 1, "Cannot convert batched parameters to dataframe."
         vpop = pd.DataFrame(
@@ -711,3 +682,117 @@ class StatisticalModel:
         vpop["id"] = self.patients
 
         return vpop
+
+    @property
+    def sigma_mask(self) -> torch.Tensor:
+        return torch.cat(
+            (self.residual_var.additive_output, self.residual_var.proportional_output)
+        )
+
+    @property
+    def flat_parameter_names(self) -> list[str]:
+        """Generate the names of the parameters present in the FIM flat vector."""
+        names = []
+        names += self.beta_names
+        names += [f"omega_log_diag_{pdu}" for pdu in self.pdu_names]
+        names += [
+            f"omega_{self.pdu_names[i]}_{self.pdu_names[j]}"
+            for i, j in zip(*self.omega_indices.tolist())
+        ]
+        names += self.mi_names
+        names += self.surv_coeff_names
+        sigma_names = [
+            f"{component}_{output}"
+            for component in ("sigma_add", "sigma_prop")
+            for output in self.output_names
+        ]
+        names += [
+            name
+            for name, active in zip(sigma_names, self.sigma_mask.tolist())
+            if active
+        ]
+        return names
+
+    def flatten(self) -> torch.Tensor:
+        """Current population parameters, as a flat vector."""
+        blocks = [
+            self.population_betas,
+            torch.log(torch.diag(self.omega_pop_lower_chol)),
+            self.omega_pop_lower_chol[self.omega_indices[0], self.omega_indices[1]],
+            self.log_mi,
+            self.surv_coeffs,
+            torch.cat((self.residual_var.sigma_add, self.residual_var.sigma_prop))[
+                self.sigma_mask
+            ],
+        ]
+        return torch.cat(
+            [block.detach().flatten().to(default_dtype) for block in blocks]
+        )
+
+    def unflatten(self, theta: torch.Tensor) -> NlmeModelState:
+        """Rebuild the model parameters from the flat vector, keeping the autograd graph."""
+        assert theta.dim() == 1, "Cannot unflatten batch population parameters."
+        cursor = 0
+
+        beta = theta[cursor : cursor + self.nb_betas]
+        cursor += self.nb_betas
+
+        omega_log_diag = theta[cursor : cursor + self.nb_pdu]
+        omega_lower_chol = torch.diagflat(torch.exp(omega_log_diag))
+        cursor += self.nb_pdu
+
+        nb_omega_off_diag = self.omega_indices.shape[1]
+        if nb_omega_off_diag > 0:
+            omega_lower_chol = omega_lower_chol.index_put(
+                (self.omega_indices[0, :], self.omega_indices[1, :]),
+                theta[cursor : cursor + nb_omega_off_diag],
+            )
+
+        cursor += nb_omega_off_diag
+
+        if self.nb_mi == 0:
+            log_mi = torch.empty(0, device=device, dtype=default_dtype)
+        else:
+            log_mi = theta[cursor : cursor + self.nb_mi]
+        cursor += self.nb_mi
+
+        if self.nb_surv_coeffs == 0:
+            surv_coefs = torch.empty(0, device=device, dtype=default_dtype)
+        else:
+            surv_coefs = theta[cursor : cursor + self.nb_surv_coeffs]
+        cursor += self.nb_surv_coeffs
+        idx = self.sigma_mask.nonzero(as_tuple=True)[0]
+        full_sigma = torch.zeros(
+            2 * self.input_params.nb_outputs, device=device, dtype=default_dtype
+        ).index_put((idx,), theta[cursor:])
+        sigma_add, sigma_prop = full_sigma.chunk(2)
+
+        return NlmeModelState(
+            beta=beta,
+            omega_lower_chol=omega_lower_chol,
+            log_mi=log_mi,
+            surv_coeffs=surv_coefs,
+            res_var=self.residual_var._replace(
+                sigma_add=sigma_add, sigma_prop=sigma_prop
+            ),
+        )
+
+    def predict_from_pop_params(
+        self,
+        params: NlmeModelState,
+        etas: torch.Tensor,
+    ) -> torch.Tensor:
+        """Model predictions for the given populatoin parameters and latent variable samples, detached from the autograd graph"""
+        gaussian_params = self.etas_to_gaussian(
+            etas=etas,
+            design_matrix=self.full_design_matrix,
+            population_betas=params.beta,
+        )
+        physical = self.convert_gaussian_to_physical(
+            psi=gaussian_params, log_mi=params.log_mi, surv_coeffs=params.surv_coeffs
+        )
+        thetas = self.convert_physical_to_thetas_all_patients(physical)
+        inputs = self.convert_thetas_to_model_parameters_all_patients(thetas)
+        predictions, _ = self.predict_all_patients(inputs)
+
+        return predictions.detach()

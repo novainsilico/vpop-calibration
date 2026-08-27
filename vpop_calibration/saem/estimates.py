@@ -8,7 +8,7 @@ from vpop_calibration.pynlme.residuals import ResidualErrorEstimates
 
 class PopEstimates(NamedTuple):
     beta: torch.Tensor
-    omega: torch.Tensor
+    omega_lower_chol: torch.Tensor
     ebe: torch.Tensor
     sigma: ResidualErrorEstimates
     model_intrinsic: torch.Tensor
@@ -39,7 +39,7 @@ class PopEstimates(NamedTuple):
     def __eq__(self, other) -> bool:
         compared_attributes = [
             "beta",
-            "omega",
+            "omega_lower_chol",
             "ebe",
             "sigma",
             "model_intrinsic",
@@ -59,7 +59,13 @@ def check_convergence(
     prev_est: PopEstimates, current_est: PopEstimates, threshold: float
 ):
     """Checks for convergence based on the relative change in parameters."""
-    variables_to_check = ["beta", "omega", "ebe", "model_intrinsic", "surv_coeffs"]
+    variables_to_check = [
+        "beta",
+        "omega_lower_chol",
+        "ebe",
+        "model_intrinsic",
+        "surv_coeffs",
+    ]
     compared_pairs = [
         (current_est._asdict()[name], prev_est._asdict()[name])
         for name in variables_to_check
@@ -81,7 +87,7 @@ def check_convergence(
 class IterSummary(NamedTuple):
     iteration: int
     mu: dict[str, float]
-    omega: dict[str, float]
+    omega_diag: dict[str, float]
     model_intrinsic: dict[str, float]
     surv_coeffs: dict[str, float]
     cov: dict[str, float]
@@ -93,7 +99,7 @@ class IterSummary(NamedTuple):
     def headers(self) -> list[tuple[dict, str]]:
         header_tuples = [
             (self.mu, "mu_"),
-            (self.omega, "omega_"),
+            (self.omega_diag, "omega_"),
             (self.model_intrinsic, ""),
             (self.surv_coeffs, ""),
             (self.cov, ""),
@@ -117,7 +123,8 @@ class IterSummary(NamedTuple):
             pdu: estimates.beta[beta_names.index(pdu)].item() for pdu in pdu_names
         }
         omega_dict: dict[str, float] = {
-            pdu: estimates.omega[i, i].item() for i, pdu in enumerate(pdu_names)
+            pdu: estimates.omega_lower_chol[i, i].item()
+            for i, pdu in enumerate(pdu_names)
         }
         mi_dict: dict[str, float] = {
             mi: estimates.model_intrinsic[i].item() for i, mi in enumerate(mi_names)
@@ -145,7 +152,7 @@ class IterSummary(NamedTuple):
         return IterSummary(
             iteration=iteration,
             mu=mu_dict,
-            omega=omega_dict,
+            omega_diag=omega_dict,
             model_intrinsic=mi_dict,
             cov=cov_dict,
             sigma=sigma_dict,
@@ -160,7 +167,7 @@ class IterSummary(NamedTuple):
         else:
             header = ""
         out_str_list = [f"{self.iteration:<{width}}"]
-        for d in [self.mu, self.omega, self.model_intrinsic, self.cov, self.sigma]:
+        for d in [self.mu, self.omega_diag, self.model_intrinsic, self.cov, self.sigma]:
             if d:
                 out_str_list.append(dict_values_to_str(d, width))
         out_str = header + ", ".join(out_str_list)

@@ -68,13 +68,11 @@ class ModelDiagnostics:
     def sample_conditional_distribution(
         self,
         nb_samples: int = 100,
-        compute_fim: bool | None = None,
-        fim_burn_in: int = 50,
+        compute_fim: bool = False,
     ) -> None:
         self.sampler.run_sampler(
             nb_samples=nb_samples,
             compute_fim=compute_fim,
-            fim_burn_in=fim_burn_in,
         )
 
     def compute_iwres(self) -> None:
@@ -313,7 +311,7 @@ class ModelDiagnostics:
         map_etas = self.sampler.map.eta_samples.squeeze(0)
 
         eta_sd = torch.std(map_etas, dim=0, unbiased=True)
-        omega_sd = torch.sqrt(torch.diag(self.model.omega_pop))
+        omega_sd = torch.diag(self.model.omega_pop_lower_chol)
 
         shrinkage = 1 - eta_sd / omega_sd
 

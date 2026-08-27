@@ -83,13 +83,15 @@ def test_nlme_init(sample_nlme_params, obs_data, struct_model, tmp_path):
 
     # Ensure the initial omega matrix is diagonal with correct values
     torch.testing.assert_close(
-        nlme_model.omega_pop,
+        nlme_model.omega_pop_lower_chol,
         torch.diag(
-            torch.as_tensor(
-                [
-                    sample_nlme_params.pdu["pdu_1"].prior_omega,
-                    sample_nlme_params.pdu["pdu_2"].prior_omega,
-                ]
+            torch.sqrt(
+                torch.as_tensor(
+                    [
+                        sample_nlme_params.pdu["pdu_1"].prior_omega,
+                        sample_nlme_params.pdu["pdu_2"].prior_omega,
+                    ]
+                )
             )
         ),
     )

@@ -83,14 +83,13 @@ def test_diagnostics(sample_nlme_params, obs_data, struct_model):
         structural_model=struct_model, dataset=obs_data, input_params=sample_nlme_params
     )
     diagnostics = ModelDiagnostics(nlme_model)
-    diagnostics.sample_conditional_distribution(compute_fim=True, fim_burn_in=0)
+    diagnostics.sample_conditional_distribution(compute_fim=True)
     diagnostics.compute_iwres()
     diagnostics.compute_pwres()
     diagnostics.compute_npde()
     diagnostics.compute_shrinkage()
     diagnostics.compute_vpc()
     diagnostics.compute_log_likelihood_importance_sampling()
-    diagnostics.fim_estimator
     # Test the plotter in isolation
     plotter = PlottingUtility(diagnostics=diagnostics)
     plotter.map_estimates()

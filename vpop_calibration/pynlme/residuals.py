@@ -106,6 +106,20 @@ class ResidualErrorEstimates(NamedTuple):
             }
         )
 
+    def __eq__(self, other) -> bool:
+        compared_attributes = [
+            "sigma_add",
+            "sigma_prop",
+            "additive_output",
+            "proportional_output",
+        ]
+
+        for elem in compared_attributes:
+            torch.testing.assert_close(
+                getattr(self, elem), getattr(other, elem), equal_nan=True
+            )
+        return True
+
 
 # @torch.compile
 def calculate_residuals(
