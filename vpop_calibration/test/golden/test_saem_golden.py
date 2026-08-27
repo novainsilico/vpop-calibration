@@ -93,13 +93,17 @@ def test_saem_golden(sample_nlme_params, obs_data, struct_model, golden, request
             actual,
             expected,
             ignore_type_in_groups=[(tuple, list), (float, np.float64)],
-            exclude_paths=["root['optimizer']['fim_estimator']"],
+            exclude_paths=["root['diagnostics']['sampler']['fim_estimator']"],
             math_epsilon=1e-16,
         )
         assert diff_strict == {}
 
-        actual_fim = actual.get("optimizer", {}).get("fim_estimator", {})
-        expected_fim = expected.get("optimizer", {}).get("fim_estimator", {})
+        actual_fim = (
+            actual.get("diagnostics", {}).get("sampler", {}).get("fim_estimator", {})
+        )
+        expected_fim = (
+            expected.get("diagnostics", {}).get("sampler", {}).get("fim_estimator", {})
+        )
 
         diff_fim = DeepDiff(
             actual_fim,
