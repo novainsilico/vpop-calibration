@@ -9,3 +9,10 @@ desktop_get_open_file_name
 [439349:0828/152047.900108:ERROR:ui/gl/init/gl_factory.cc:102] Requested GL implementation (gl=none,angle=none) not found in allowed implementations: [(gl=egl-angle,angle=opengl),(gl=egl-angle,angle=opengles),(gl=egl-angle,angle=vulkan),(gl=egl-angle,angle=swiftshader)].
 [439349:0828/152047.900759:ERROR:components/viz/service/main/viz_main_impl.cc:189] Exiting GPU process due to errors during initialization
 desktop_get_open_file_name
+[628744:0902/104202.483043:ERROR:ui/gl/init/gl_factory.cc:102] Requested GL implementation (gl=none,angle=none) not found in allowed implementations: [(gl=egl-angle,angle=opengl),(gl=egl-angle,angle=opengles),(gl=egl-angle,angle=vulkan),(gl=egl-angle,angle=swiftshader)].
+[628744:0902/104202.483756:ERROR:components/viz/service/main/viz_main_impl.cc:189] Exiting GPU process due to errors during initialization
+[628793:0902/104202.671425:ERROR:ui/gl/init/gl_factory.cc:102] Requested GL implementation (gl=none,angle=none) not found in allowed implementations: [(gl=egl-angle,angle=opengl),(gl=egl-angle,angle=opengles),(gl=egl-angle,angle=vulkan),(gl=egl-angle,angle=swiftshader)].
+[628793:0902/104202.672130:ERROR:components/viz/service/main/viz_main_impl.cc:189] Exiting GPU process due to errors during initialization
+[628803:0902/104202.676804:ERROR:ui/gl/init/gl_factory.cc:102] Requested GL implementation (gl=none,angle=none) not found in allowed implementations: [(gl=egl-angle,angle=opengl),(gl=egl-angle,angle=opengles),(gl=egl-angle,angle=vulkan),(gl=egl-angle,angle=swiftshader)].
+[628803:0902/104202.678073:ERROR:components/viz/service/main/viz_main_impl.cc:189] Exiting GPU process due to errors during initialization
+desktop_get_open_file_name
