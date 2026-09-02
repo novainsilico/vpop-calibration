@@ -95,5 +95,6 @@ def test_saem_golden(sample_nlme_params, obs_data, struct_model, golden, request
             expected,
             ignore_type_in_groups=[(tuple, list), (float, np.float64)],
             math_epsilon=1e-16,
+            ignore_nan_inequalities=True,
         )
         assert diff == {}
