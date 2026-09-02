@@ -1,0 +1,11 @@
+[181177:0827/164012.499554:ERROR:ui/gl/init/gl_factory.cc:102] Requested GL implementation (gl=none,angle=none) not found in allowed implementations: [(gl=egl-angle,angle=opengl),(gl=egl-angle,angle=opengles),(gl=egl-angle,angle=vulkan),(gl=egl-angle,angle=swiftshader)].
+[181177:0827/164012.501824:ERROR:components/viz/service/main/viz_main_impl.cc:189] Exiting GPU process due to errors during initialization
+[181234:0827/164012.798436:ERROR:ui/gl/init/gl_factory.cc:102] Requested GL implementation (gl=none,angle=none) not found in allowed implementations: [(gl=egl-angle,angle=opengl),(gl=egl-angle,angle=opengles),(gl=egl-angle,angle=vulkan),(gl=egl-angle,angle=swiftshader)].
+[181234:0827/164012.799094:ERROR:components/viz/service/main/viz_main_impl.cc:189] Exiting GPU process due to errors during initialization
+[181243:0827/164012.808193:ERROR:ui/gl/init/gl_factory.cc:102] Requested GL implementation (gl=none,angle=none) not found in allowed implementations: [(gl=egl-angle,angle=opengl),(gl=egl-angle,angle=opengles),(gl=egl-angle,angle=vulkan),(gl=egl-angle,angle=swiftshader)].
+[181243:0827/164012.809888:ERROR:components/viz/service/main/viz_main_impl.cc:189] Exiting GPU process due to errors during initialization
+[181227:0827/164012.914544:ERROR:cc/raster/one_copy_raster_buffer_provider.cc:298] Creation of StagingBuffer's SharedImage failed.
+desktop_get_open_file_name
+[439349:0828/152047.900108:ERROR:ui/gl/init/gl_factory.cc:102] Requested GL implementation (gl=none,angle=none) not found in allowed implementations: [(gl=egl-angle,angle=opengl),(gl=egl-angle,angle=opengles),(gl=egl-angle,angle=vulkan),(gl=egl-angle,angle=swiftshader)].
+[439349:0828/152047.900759:ERROR:components/viz/service/main/viz_main_impl.cc:189] Exiting GPU process due to errors during initialization
+desktop_get_open_file_name
