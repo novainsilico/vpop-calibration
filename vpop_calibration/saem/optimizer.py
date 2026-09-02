@@ -156,7 +156,7 @@ class PySaem:
         try:
             for progress in self.optimization_stream():
                 # Push history
-                self.history = pd.concat([self.history, progress.to_pandas()])
+                self.history = pd.concat([self.history, progress.to_pandas()],ignore_index=True)
                 # Logging
                 if self.config.logging:
                     if (progress.iteration % self.config.logging_frequency == 0) or (
