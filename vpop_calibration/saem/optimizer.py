@@ -4,6 +4,7 @@ from vpop_calibration.compatibility import tqdm
 from typing import Callable, Any
 import pandas as pd
 
+from collections import defaultdict
 from vpop_calibration.pynlme.model import StatisticalModel
 from vpop_calibration.saem.scheduler import SaemScheduler
 from vpop_calibration.saem.estimates import PopEstimates, IterSummary, check_convergence
@@ -153,10 +154,14 @@ class PySaem:
             self.init_state()
         else:
             print(f"Resuming at iteration {self.scheduler.iteration}:")
+
+        history_dict = defaultdict(list, self.history.to_dict(orient="list"))
         try:
             for progress in self.optimization_stream():
                 # Push history
-                self.history = pd.concat([self.history, progress.to_pandas()],ignore_index=True)
+                row = progress.to_pandas().reset_index().to_dict(orient="records")[0]
+                for k, v in row.items():
+                    history_dict[k].append(v)
                 # Logging
                 if self.config.logging:
                     if (progress.iteration % self.config.logging_frequency == 0) or (
@@ -168,7 +173,7 @@ class PySaem:
                     if (progress.iteration % self.config.plot_frames == 0) or (
                         progress.iteration == self.scheduler.nb_iter_tot - 1
                     ):
-                        self.plot_history()
+                        self.plot_history(history_dict)
 
             if self.config.live_plot:
                 self.plot.close()
@@ -179,6 +184,9 @@ class PySaem:
             if self.config.live_plot:
                 self.plot.close()
                 delattr(self, "plot")
+        finally:
+            if history_dict:
+                self.history = pd.DataFrame(history_dict)
 
     def optimization_stream(self):
         for _ in tqdm(
@@ -393,13 +401,14 @@ class PySaem:
         else:
             self.consecutive_converged_iters = 0
 
-    def plot_history(self):
+    def plot_history(self, history_data=None):
+        data = history_data if history_data is not None else self.history
         if not hasattr(self, "plot"):
             self.plot = OptimizerPlot(
-                self.history,
+                data,
                 nb_tot_iter=self.scheduler.nb_iter_tot,
                 facet_size=self.config.facet_size,
                 nb_cols=self.config.plot_columns,
             )
         else:
-            self.plot.update(self.history)
+            self.plot.update(data)
