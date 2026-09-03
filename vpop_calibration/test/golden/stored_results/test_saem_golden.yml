@@ -124,6 +124,12 @@ output:
       patience: 5
       iteration: 5
     history:
+      index:
+        0: 0
+        1: 0
+        2: 0
+        3: 0
+        4: 0
       iteration:
         0: 0
         1: 1
