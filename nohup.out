@@ -16,3 +16,8 @@ desktop_get_open_file_name
 [628803:0902/104202.676804:ERROR:ui/gl/init/gl_factory.cc:102] Requested GL implementation (gl=none,angle=none) not found in allowed implementations: [(gl=egl-angle,angle=opengl),(gl=egl-angle,angle=opengles),(gl=egl-angle,angle=vulkan),(gl=egl-angle,angle=swiftshader)].
 [628803:0902/104202.678073:ERROR:components/viz/service/main/viz_main_impl.cc:189] Exiting GPU process due to errors during initialization
 desktop_get_open_file_name
+[949448:0903/094420.828844:ERROR:ui/gl/init/gl_factory.cc:102] Requested GL implementation (gl=none,angle=none) not found in allowed implementations: [(gl=egl-angle,angle=opengl),(gl=egl-angle,angle=opengles),(gl=egl-angle,angle=vulkan),(gl=egl-angle,angle=swiftshader)].
+[949448:0903/094420.829615:ERROR:components/viz/service/main/viz_main_impl.cc:189] Exiting GPU process due to errors during initialization
+[949499:0903/094421.012411:ERROR:ui/gl/init/gl_factory.cc:102] Requested GL implementation (gl=none,angle=none) not found in allowed implementations: [(gl=egl-angle,angle=opengl),(gl=egl-angle,angle=opengles),(gl=egl-angle,angle=vulkan),(gl=egl-angle,angle=swiftshader)].
+[949499:0903/094421.013159:ERROR:components/viz/service/main/viz_main_impl.cc:189] Exiting GPU process due to errors during initialization
+[949352:0903/094553.057140:ERROR:content/browser/browser_main_loop.cc:286] GLib-GObject: ../gobject/gsignal.c:2700: instance '0x244402205300' has no handler with id '5367'
