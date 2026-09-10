@@ -3,7 +3,7 @@ from typing import NamedTuple, Literal, Any
 
 class SaemConfigDict(NamedTuple):
     ## Schedule
-    nb_iter_burnin: int = 0
+    nb_iter_burnin: int = 50
     nb_iter_learning: int = 100
     nb_iter_smoothing: int = 100
 
