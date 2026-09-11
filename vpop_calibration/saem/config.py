@@ -14,7 +14,7 @@ class SaemConfigDict(NamedTuple):
     init_step_adaptation: float = 0.5
 
     ## M-step parameters
-    # Stochastic-approximation learning rate decay power
+    # Stochastic-approximation learning rate decay power, should be in ]0.5, 1]
     learning_rate_power: float = 0.8
     # Simulated annealing factor
     annealing_factor: float = 0.95

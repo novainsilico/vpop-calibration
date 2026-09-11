@@ -48,7 +48,7 @@ The PDUs are assumed to follow a multivariate log-normal distribution
 
 ```math
 \log \phi_i = X_i\beta + \eta_i, \\
-\eta \sim \mathcal{N}(0, \Omega)
+\eta_i \sim \mathcal{N}(0, \Omega)
 ```
 
 where $\beta$ is the vector of population parameters, containing the means and the covariate coefficients, and $X_i$ is the design matrix of individual $i$, containing the covariate values.

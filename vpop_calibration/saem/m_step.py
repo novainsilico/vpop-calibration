@@ -106,12 +106,15 @@ class MStepState:
     def compute_outer_product(
         self, gaussian_params: torch.Tensor
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        """Compute the new outer product, given the gaussian parameters and the new linear estimator (beta)."""
-        # The outer product is computed on the centered residuals resulting from the new beta estimation. This can be expressed as
-        #     \frac{1}{nb_chains} \sum_{k=0}^{nb_chains} \sum_{i=0}^{nb_patients} (\Psi - \mu)^T (\Psi - \mu),
-        #     with \mu = X * \beta
-        #     and \beta is the solution to G * beta = cross_product
-        # Todo: make this tooltip part of the docstring
+        """Compute the new outer product, given the gaussian parameters and the new linear estimator (beta).
+        The outer product is computed on the centered residuals resulting from the new beta estimation. This can be expressed as
+        \frac{1}{nb_chains} \sum_{k=1}^{nb_chains} \sum_{i=1}^{nb_patients} (\Psi - \mu)^T (\Psi - \mu),
+        with \mu = X * \beta
+        and \beta is the solution to G * beta = cross_product
+
+        TODO: this is not textbook SAEM, it's not clear what motivated this eager beta update. Investigate whether
+        this yields better results in practice or whether it's an implementation error
+        """
 
         # Ensure the cross_product was updated first
         new_beta = (
