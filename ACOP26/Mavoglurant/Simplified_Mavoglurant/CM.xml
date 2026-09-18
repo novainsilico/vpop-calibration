@@ -1,0 +1,2461 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sbml xmlns="http://www.sbml.org/sbml/level3/version2/core" level="3" version="2">
+  <model id="unnamedModel" name="unnamedModel" timeUnits="second" extentUnits="mole">
+    <listOfUnitDefinitions>
+      <unitDefinition id="GramPerMilliGram">
+        <listOfUnits>
+          <unit kind="gram" exponent="1" scale="0" multiplier="1"/>
+          <unit kind="gram" exponent="-1" scale="-3" multiplier="1"/>
+        </listOfUnits>
+      </unitDefinition>
+      <unitDefinition id="GramPerMole">
+        <listOfUnits>
+          <unit kind="gram" exponent="1" scale="0" multiplier="1"/>
+          <unit kind="mole" exponent="-1" scale="0" multiplier="1"/>
+        </listOfUnits>
+      </unitDefinition>
+      <unitDefinition id="GramPerNanoGram">
+        <listOfUnits>
+          <unit kind="gram" exponent="1" scale="0" multiplier="1"/>
+          <unit kind="gram" exponent="-1" scale="-9" multiplier="1"/>
+        </listOfUnits>
+      </unitDefinition>
+      <unitDefinition id="HourPerSecond">
+        <listOfUnits>
+          <unit kind="second" exponent="1" scale="0" multiplier="3600"/>
+          <unit kind="second" exponent="-1" scale="0" multiplier="1"/>
+        </listOfUnits>
+      </unitDefinition>
+      <unitDefinition id="LiterPerHour">
+        <listOfUnits>
+          <unit kind="second" exponent="-1" scale="0" multiplier="3600"/>
+          <unit kind="litre" exponent="1" scale="0" multiplier="1"/>
+        </listOfUnits>
+      </unitDefinition>
+      <unitDefinition id="LiterPerKiloGram">
+        <listOfUnits>
+          <unit kind="gram" exponent="-1" scale="3" multiplier="1"/>
+          <unit kind="litre" exponent="1" scale="0" multiplier="1"/>
+        </listOfUnits>
+      </unitDefinition>
+      <unitDefinition id="MilliGram">
+        <listOfUnits>
+          <unit kind="gram" exponent="1" scale="-3" multiplier="1"/>
+        </listOfUnits>
+      </unitDefinition>
+      <unitDefinition id="MilliLiterPerNanoGram">
+        <listOfUnits>
+          <unit kind="gram" exponent="-1" scale="-9" multiplier="1"/>
+          <unit kind="litre" exponent="1" scale="-3" multiplier="1"/>
+        </listOfUnits>
+      </unitDefinition>
+      <unitDefinition id="NanoGram">
+        <listOfUnits>
+          <unit kind="gram" exponent="1" scale="-9" multiplier="1"/>
+        </listOfUnits>
+      </unitDefinition>
+      <unitDefinition id="NanoGramLiterPerMilliLiterPerMole">
+        <listOfUnits>
+          <unit kind="gram" exponent="1" scale="-9" multiplier="1"/>
+          <unit kind="litre" exponent="1" scale="0" multiplier="1"/>
+          <unit kind="litre" exponent="-1" scale="-3" multiplier="1"/>
+          <unit kind="mole" exponent="-1" scale="0" multiplier="1"/>
+        </listOfUnits>
+      </unitDefinition>
+      <unitDefinition id="NanoGramPerMilliLiter">
+        <listOfUnits>
+          <unit kind="gram" exponent="1" scale="-9" multiplier="1"/>
+          <unit kind="litre" exponent="-1" scale="-3" multiplier="1"/>
+        </listOfUnits>
+      </unitDefinition>
+      <unitDefinition id="PerKiloGram">
+        <listOfUnits>
+          <unit kind="gram" exponent="-1" scale="3" multiplier="1"/>
+        </listOfUnits>
+      </unitDefinition>
+    </listOfUnitDefinitions>
+    <listOfCompartments>
+      <compartment id="Adipose" spatialDimensions="3" units="litre" constant="false">
+        <annotation>
+          <jinko:metadata xmlns:jinko="https://jinko.ai">
+            <scale formula="1 * OneLiter"/>
+          </jinko:metadata>
+        </annotation>
+      </compartment>
+      <compartment id="Arterial__Blood" spatialDimensions="3" units="litre" constant="false">
+        <annotation>
+          <jinko:metadata xmlns:jinko="https://jinko.ai">
+            <scale formula="1 * OneLiter"/>
+          </jinko:metadata>
+        </annotation>
+      </compartment>
+      <compartment id="Bones" spatialDimensions="3" units="litre" constant="false">
+        <annotation>
+          <jinko:metadata xmlns:jinko="https://jinko.ai">
+            <scale formula="1 * OneLiter"/>
+          </jinko:metadata>
+        </annotation>
+      </compartment>
+      <compartment id="Brain" spatialDimensions="3" units="litre" constant="false">
+        <annotation>
+          <jinko:metadata xmlns:jinko="https://jinko.ai">
+            <scale formula="1 * OneLiter"/>
+          </jinko:metadata>
+        </annotation>
+      </compartment>
+      <compartment id="Gut" spatialDimensions="3" units="litre" constant="false">
+        <annotation>
+          <jinko:metadata xmlns:jinko="https://jinko.ai">
+            <scale formula="1 * OneLiter"/>
+          </jinko:metadata>
+        </annotation>
+      </compartment>
+      <compartment id="Heart" spatialDimensions="3" units="litre" constant="false">
+        <annotation>
+          <jinko:metadata xmlns:jinko="https://jinko.ai">
+            <scale formula="1 * OneLiter"/>
+          </jinko:metadata>
+        </annotation>
+      </compartment>
+      <compartment id="Kidneys" spatialDimensions="3" units="litre" constant="false">
+        <annotation>
+          <jinko:metadata xmlns:jinko="https://jinko.ai">
+            <scale formula="1 * OneLiter"/>
+          </jinko:metadata>
+        </annotation>
+      </compartment>
+      <compartment id="Liver" spatialDimensions="3" units="litre" constant="false">
+        <annotation>
+          <jinko:metadata xmlns:jinko="https://jinko.ai">
+            <scale formula="1 * OneLiter"/>
+          </jinko:metadata>
+        </annotation>
+      </compartment>
+      <compartment id="Lungs" spatialDimensions="3" units="litre" constant="false">
+        <annotation>
+          <jinko:metadata xmlns:jinko="https://jinko.ai">
+            <scale formula="1 * OneLiter"/>
+          </jinko:metadata>
+        </annotation>
+      </compartment>
+      <compartment id="Muscles" spatialDimensions="3" units="litre" constant="false">
+        <annotation>
+          <jinko:metadata xmlns:jinko="https://jinko.ai">
+            <scale formula="1 * OneLiter"/>
+          </jinko:metadata>
+        </annotation>
+      </compartment>
+      <compartment id="Pancreas" spatialDimensions="3" units="litre" constant="false">
+        <annotation>
+          <jinko:metadata xmlns:jinko="https://jinko.ai">
+            <scale formula="1 * OneLiter"/>
+          </jinko:metadata>
+        </annotation>
+      </compartment>
+      <compartment id="Rest__of__Body" spatialDimensions="3" units="litre" constant="false">
+        <annotation>
+          <jinko:metadata xmlns:jinko="https://jinko.ai">
+            <scale formula="1 * OneLiter"/>
+          </jinko:metadata>
+        </annotation>
+      </compartment>
+      <compartment id="Skin" spatialDimensions="3" units="litre" constant="false">
+        <annotation>
+          <jinko:metadata xmlns:jinko="https://jinko.ai">
+            <scale formula="1 * OneLiter"/>
+          </jinko:metadata>
+        </annotation>
+      </compartment>
+      <compartment id="Spleen" spatialDimensions="3" units="litre" constant="false">
+        <annotation>
+          <jinko:metadata xmlns:jinko="https://jinko.ai">
+            <scale formula="1 * OneLiter"/>
+          </jinko:metadata>
+        </annotation>
+      </compartment>
+      <compartment id="Stomach" spatialDimensions="3" units="litre" constant="false">
+        <annotation>
+          <jinko:metadata xmlns:jinko="https://jinko.ai">
+            <scale formula="1 * OneLiter"/>
+          </jinko:metadata>
+        </annotation>
+      </compartment>
+      <compartment id="Venous__Blood" spatialDimensions="3" units="litre" constant="false">
+        <annotation>
+          <jinko:metadata xmlns:jinko="https://jinko.ai">
+            <scale formula="1 * OneLiter"/>
+          </jinko:metadata>
+        </annotation>
+      </compartment>
+    </listOfCompartments>
+    <listOfSpecies>
+      <species id="A__Adipose" compartment="Adipose" substanceUnits="mole" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false">
+        <annotation>
+          <jinko:metadata xmlns:jinko="https://jinko.ai">
+            <scale formula="(1 * OneNanoGram / Masse__Molaire) * GramPerNanoGramP"/>
+          </jinko:metadata>
+        </annotation>
+      </species>
+      <species id="A__Arterial__Blood" compartment="Arterial__Blood" substanceUnits="mole" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false">
+        <annotation>
+          <jinko:metadata xmlns:jinko="https://jinko.ai">
+            <scale formula="(1 * OneNanoGram / Masse__Molaire) * GramPerNanoGramP"/>
+          </jinko:metadata>
+        </annotation>
+      </species>
+      <species id="A__Bones" compartment="Bones" substanceUnits="mole" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false">
+        <annotation>
+          <jinko:metadata xmlns:jinko="https://jinko.ai">
+            <scale formula="(1 * OneNanoGram / Masse__Molaire) * GramPerNanoGramP"/>
+          </jinko:metadata>
+        </annotation>
+      </species>
+      <species id="A__Brain" compartment="Brain" substanceUnits="mole" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false">
+        <annotation>
+          <jinko:metadata xmlns:jinko="https://jinko.ai">
+            <scale formula="(1 * OneNanoGram / Masse__Molaire) * GramPerNanoGramP"/>
+          </jinko:metadata>
+        </annotation>
+      </species>
+      <species id="A__Gut" compartment="Gut" substanceUnits="mole" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false">
+        <annotation>
+          <jinko:metadata xmlns:jinko="https://jinko.ai">
+            <scale formula="(1 * OneNanoGram / Masse__Molaire) * GramPerNanoGramP"/>
+          </jinko:metadata>
+        </annotation>
+      </species>
+      <species id="A__Heart" compartment="Heart" substanceUnits="mole" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false">
+        <annotation>
+          <jinko:metadata xmlns:jinko="https://jinko.ai">
+            <scale formula="(1 * OneNanoGram / Masse__Molaire) * GramPerNanoGramP"/>
+          </jinko:metadata>
+        </annotation>
+      </species>
+      <species id="A__Kidneys" compartment="Kidneys" substanceUnits="mole" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false">
+        <annotation>
+          <jinko:metadata xmlns:jinko="https://jinko.ai">
+            <scale formula="(1 * OneNanoGram / Masse__Molaire) * GramPerNanoGramP"/>
+          </jinko:metadata>
+        </annotation>
+      </species>
+      <species id="A__Liver" compartment="Liver" substanceUnits="mole" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false">
+        <annotation>
+          <jinko:metadata xmlns:jinko="https://jinko.ai">
+            <scale formula="(1 * OneNanoGram / Masse__Molaire) * GramPerNanoGramP"/>
+          </jinko:metadata>
+        </annotation>
+      </species>
+      <species id="A__Lungs" compartment="Lungs" substanceUnits="mole" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false">
+        <annotation>
+          <jinko:metadata xmlns:jinko="https://jinko.ai">
+            <scale formula="(1 * OneNanoGram / Masse__Molaire) * GramPerNanoGramP"/>
+          </jinko:metadata>
+        </annotation>
+      </species>
+      <species id="A__Muscles" compartment="Muscles" substanceUnits="mole" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false">
+        <annotation>
+          <jinko:metadata xmlns:jinko="https://jinko.ai">
+            <scale formula="(1 * OneNanoGram / Masse__Molaire) * GramPerNanoGramP"/>
+          </jinko:metadata>
+        </annotation>
+      </species>
+      <species id="A__Pancreas" compartment="Pancreas" substanceUnits="mole" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false">
+        <annotation>
+          <jinko:metadata xmlns:jinko="https://jinko.ai">
+            <scale formula="(1 * OneNanoGram / Masse__Molaire) * GramPerNanoGramP"/>
+          </jinko:metadata>
+        </annotation>
+      </species>
+      <species id="A__Rest__of__Body" compartment="Rest__of__Body" substanceUnits="mole" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false">
+        <annotation>
+          <jinko:metadata xmlns:jinko="https://jinko.ai">
+            <scale formula="(1 * OneNanoGram / Masse__Molaire) * GramPerNanoGramP"/>
+          </jinko:metadata>
+        </annotation>
+      </species>
+      <species id="A__Skin" compartment="Skin" substanceUnits="mole" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false">
+        <annotation>
+          <jinko:metadata xmlns:jinko="https://jinko.ai">
+            <scale formula="(1 * OneNanoGram / Masse__Molaire) * GramPerNanoGramP"/>
+          </jinko:metadata>
+        </annotation>
+      </species>
+      <species id="A__Spleen" compartment="Spleen" substanceUnits="mole" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false">
+        <annotation>
+          <jinko:metadata xmlns:jinko="https://jinko.ai">
+            <scale formula="(1 * OneNanoGram / Masse__Molaire) * GramPerNanoGramP"/>
+          </jinko:metadata>
+        </annotation>
+      </species>
+      <species id="A__Stomach" compartment="Stomach" substanceUnits="mole" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false">
+        <annotation>
+          <jinko:metadata xmlns:jinko="https://jinko.ai">
+            <scale formula="(1 * OneNanoGram / Masse__Molaire) * GramPerNanoGramP"/>
+          </jinko:metadata>
+        </annotation>
+      </species>
+      <species id="A__Venous__Blood" compartment="Venous__Blood" substanceUnits="mole" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false">
+        <annotation>
+          <jinko:metadata xmlns:jinko="https://jinko.ai">
+            <scale formula="(1 * OneMilliGram / Masse__Molaire) * GramPerMilliGramP"/>
+          </jinko:metadata>
+        </annotation>
+      </species>
+    </listOfSpecies>
+    <listOfParameters>
+      <parameter id="BP" value="0.61" units="dimensionless" constant="false">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>rapport sang/plasma</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="C15" units="NanoGramPerMilliLiter" constant="false">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>Concentration observe</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="CLint" value="1998" units="LiterPerHour" constant="false">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>Clairance intrinsque hpatique</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="CO" units="LiterPerHour" constant="false">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>Dbit cardiaque</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="Dose" value="50" units="MilliGram" constant="false"/>
+      <parameter id="GramPerMilliGramP" value="0.001" units="GramPerMilliGram" constant="true">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>An auxiliary parameter to handle unit conversions</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="GramPerNanoGramP" value="1e-09" units="GramPerNanoGram" constant="true">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>An auxiliary parameter to handle unit conversions</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="HourPerSecondP" value="0.000277777777777778" units="HourPerSecond" constant="true">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>An auxiliary parameter to handle unit conversions</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="KbAD" value="7.39" units="dimensionless" constant="false">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>Coefficient de partage tissu / sang du tissu adipeux</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="KbBO" value="1.03" units="dimensionless" constant="false">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>Coefficient de partage tissu / sang des os</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="KbBR" value="3" units="dimensionless" constant="false">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>coefficient de partage tissu/sang</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="KbGU" value="3.32876045846292" units="dimensionless" constant="false">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>Coefficient de partage tissu / sang de l&apos;Intestin</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="KbHT" value="3.06638701356528" units="dimensionless" constant="false">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>Coefficient de partage tissu / sang du Coeur</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="KbKI" value="3.73258118114834" units="dimensionless" constant="false">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>Coefficient de partage tissu / sang des Reins</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="KbLI" value="5.81476283441735" units="dimensionless" constant="false">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>Coefficient de partage tissu / sang du Foie</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="KbLU" value="2.30112929439894" units="dimensionless" constant="false">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>coefficient de partage tissu / sang des Poumons</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="KbMU" value="1.35" units="dimensionless" constant="false">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>Coefficient de partage tissu / sang des muscles</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="KbPA" value="1.38043684027313" units="dimensionless" constant="false">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>Coefficient de partage tissu /  sang du Pancras</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="KbRB" value="1.35" units="dimensionless" constant="false">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>Coefficient de partage tissu / sang du reste du corps</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="KbSK" value="0.592265656894337" units="dimensionless" constant="false">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>Coefficient de partage tissu / sang de la Peau</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="KbSP" value="1.38043684027313" units="dimensionless" constant="false">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>Coefficient de partage tissu / sang de la Rate</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="KbST" value="1.38043684027313" units="dimensionless" constant="false">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>Coefficient de partage tissu / sang de l&apos;Estomac</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="Masse__Molaire" value="313.397" units="GramPerMole" constant="false"/>
+      <parameter id="OneLiter" value="1" units="litre" constant="true">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>An auxiliary parameter to handle unit conversions</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="OneLiterPerHour" value="1" units="LiterPerHour" constant="true">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>An auxiliary parameter to handle unit conversions</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="OneLiterPerKiloGram" value="1" units="LiterPerKiloGram" constant="true">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>An auxiliary parameter to handle unit conversions</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="OneMilliGram" value="1" units="MilliGram" constant="true">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>An auxiliary parameter to handle unit conversions</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="OneMilliLiterPerNanoGram" value="1" units="MilliLiterPerNanoGram" constant="true">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>An auxiliary parameter to handle unit conversions</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="OneNanoGram" value="1" units="NanoGram" constant="true">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>An auxiliary parameter to handle unit conversions</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="OneNanoGramLiterPerMilliLiterPerMole" value="1" units="NanoGramLiterPerMilliLiterPerMole" constant="true">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>An auxiliary parameter to handle unit conversions</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="OnePerKiloGram" value="1" units="PerKiloGram" constant="true">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>An auxiliary parameter to handle unit conversions</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="QAD" units="LiterPerHour" constant="false">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>Dbit des Adipeux</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="QBO" units="LiterPerHour" constant="false">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>Dbit des Os</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="QBR" units="LiterPerHour" constant="false">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>Dbit du Cerveau</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="QGU" units="LiterPerHour" constant="false">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>Dbit de l&apos;Intestin</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="QHA" units="LiterPerHour" constant="false">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>Dbit de l&apos;artre hpatique</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="QHT" units="LiterPerHour" constant="false">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>Dbit du Coeur</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="QKI" units="LiterPerHour" constant="false">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>Dbit des Reins</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="QLI" units="LiterPerHour" constant="false">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>Dbit du Foie</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="QLU" units="LiterPerHour" constant="false">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>Dbit pulmonaire</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="QMU" units="LiterPerHour" constant="false">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>Dbit des Muscles</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="QPA" units="LiterPerHour" constant="false">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>Dbit du Pancras</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="QRB" units="LiterPerHour" constant="false">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>Dbit du reste du corps</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="QSK" units="LiterPerHour" constant="false">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>Dbit de la Peau</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="QSP" units="LiterPerHour" constant="false">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>Dbit de la Rate</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="QST" units="LiterPerHour" constant="false">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>Dbit de l&apos;estomac</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="S15" units="litre" constant="false">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>Volume du sang veineux</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="VAB" units="litre" constant="false">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>Volume du Sang artriel</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="VAD" units="litre" constant="false">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>Volume de l&apos;Adipeux</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="VBO" units="litre" constant="false">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>Volume de l&apos;Os</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="VBR" units="litre" constant="false">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>Volume du Cerveau</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="VGU" units="litre" constant="false">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>Volume de l&apos;Intestin</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="VHT" units="litre" constant="false">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>Volume du coeur</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="VKI" units="litre" constant="false">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>Volume des Reins</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="VLI" units="litre" constant="false">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>Volume du Foie</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="VLU" units="litre" constant="false">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>Volume des Poumons</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="VMU" units="litre" constant="false">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>Volume des Muscles</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="VPA" units="litre" constant="false">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>Volume du Pancras</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="VRB" units="litre" constant="false">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>Volume du Reste du corps</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="VSK" units="litre" constant="false">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>Volume de la Peau</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="VSP" units="litre" constant="false">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>Volume de la Rate</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="VST" units="litre" constant="false">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>Volume de l&apos;Estomac</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="VVB" units="litre" constant="false">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>Volume du sang Veineux</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="WT" value="82" units="kilogram" constant="false">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>Poids corporel</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="fub" units="dimensionless" constant="false">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>fraction libre sang</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="fup" value="0.028" units="dimensionless" constant="false">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>fraction libre plasma</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="logC15" units="dimensionless" constant="false"/>
+    </listOfParameters>
+    <listOfInitialAssignments>
+      <initialAssignment symbol="A__Adipose">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <apply>
+              <divide/>
+              <apply>
+                <times/>
+                <cn> 0 </cn>
+                <ci> OneNanoGram </ci>
+              </apply>
+              <ci> Masse__Molaire </ci>
+            </apply>
+            <ci> GramPerNanoGramP </ci>
+          </apply>
+        </math>
+      </initialAssignment>
+      <initialAssignment symbol="A__Arterial__Blood">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <apply>
+              <divide/>
+              <apply>
+                <times/>
+                <cn> 0 </cn>
+                <ci> OneNanoGram </ci>
+              </apply>
+              <ci> Masse__Molaire </ci>
+            </apply>
+            <ci> GramPerNanoGramP </ci>
+          </apply>
+        </math>
+      </initialAssignment>
+      <initialAssignment symbol="A__Bones">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <apply>
+              <divide/>
+              <apply>
+                <times/>
+                <cn> 0 </cn>
+                <ci> OneNanoGram </ci>
+              </apply>
+              <ci> Masse__Molaire </ci>
+            </apply>
+            <ci> GramPerNanoGramP </ci>
+          </apply>
+        </math>
+      </initialAssignment>
+      <initialAssignment symbol="A__Brain">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <apply>
+              <divide/>
+              <apply>
+                <times/>
+                <cn> 0 </cn>
+                <ci> OneNanoGram </ci>
+              </apply>
+              <ci> Masse__Molaire </ci>
+            </apply>
+            <ci> GramPerNanoGramP </ci>
+          </apply>
+        </math>
+      </initialAssignment>
+      <initialAssignment symbol="A__Gut">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <apply>
+              <divide/>
+              <apply>
+                <times/>
+                <cn> 0 </cn>
+                <ci> OneNanoGram </ci>
+              </apply>
+              <ci> Masse__Molaire </ci>
+            </apply>
+            <ci> GramPerNanoGramP </ci>
+          </apply>
+        </math>
+      </initialAssignment>
+      <initialAssignment symbol="A__Heart">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <apply>
+              <divide/>
+              <apply>
+                <times/>
+                <cn> 0 </cn>
+                <ci> OneNanoGram </ci>
+              </apply>
+              <ci> Masse__Molaire </ci>
+            </apply>
+            <ci> GramPerNanoGramP </ci>
+          </apply>
+        </math>
+      </initialAssignment>
+      <initialAssignment symbol="A__Kidneys">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <apply>
+              <divide/>
+              <apply>
+                <times/>
+                <cn> 0 </cn>
+                <ci> OneNanoGram </ci>
+              </apply>
+              <ci> Masse__Molaire </ci>
+            </apply>
+            <ci> GramPerNanoGramP </ci>
+          </apply>
+        </math>
+      </initialAssignment>
+      <initialAssignment symbol="A__Liver">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <apply>
+              <divide/>
+              <apply>
+                <times/>
+                <cn> 0 </cn>
+                <ci> OneNanoGram </ci>
+              </apply>
+              <ci> Masse__Molaire </ci>
+            </apply>
+            <ci> GramPerNanoGramP </ci>
+          </apply>
+        </math>
+      </initialAssignment>
+      <initialAssignment symbol="A__Lungs">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <apply>
+              <divide/>
+              <apply>
+                <times/>
+                <cn> 0 </cn>
+                <ci> OneNanoGram </ci>
+              </apply>
+              <ci> Masse__Molaire </ci>
+            </apply>
+            <ci> GramPerNanoGramP </ci>
+          </apply>
+        </math>
+      </initialAssignment>
+      <initialAssignment symbol="A__Muscles">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <apply>
+              <divide/>
+              <apply>
+                <times/>
+                <cn> 0 </cn>
+                <ci> OneNanoGram </ci>
+              </apply>
+              <ci> Masse__Molaire </ci>
+            </apply>
+            <ci> GramPerNanoGramP </ci>
+          </apply>
+        </math>
+      </initialAssignment>
+      <initialAssignment symbol="A__Pancreas">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <apply>
+              <divide/>
+              <apply>
+                <times/>
+                <cn> 0 </cn>
+                <ci> OneNanoGram </ci>
+              </apply>
+              <ci> Masse__Molaire </ci>
+            </apply>
+            <ci> GramPerNanoGramP </ci>
+          </apply>
+        </math>
+      </initialAssignment>
+      <initialAssignment symbol="A__Rest__of__Body">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <apply>
+              <divide/>
+              <apply>
+                <times/>
+                <cn> 0 </cn>
+                <ci> OneNanoGram </ci>
+              </apply>
+              <ci> Masse__Molaire </ci>
+            </apply>
+            <ci> GramPerNanoGramP </ci>
+          </apply>
+        </math>
+      </initialAssignment>
+      <initialAssignment symbol="A__Skin">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <apply>
+              <divide/>
+              <apply>
+                <times/>
+                <cn> 0 </cn>
+                <ci> OneNanoGram </ci>
+              </apply>
+              <ci> Masse__Molaire </ci>
+            </apply>
+            <ci> GramPerNanoGramP </ci>
+          </apply>
+        </math>
+      </initialAssignment>
+      <initialAssignment symbol="A__Spleen">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <apply>
+              <divide/>
+              <apply>
+                <times/>
+                <cn> 0 </cn>
+                <ci> OneNanoGram </ci>
+              </apply>
+              <ci> Masse__Molaire </ci>
+            </apply>
+            <ci> GramPerNanoGramP </ci>
+          </apply>
+        </math>
+      </initialAssignment>
+      <initialAssignment symbol="A__Stomach">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <apply>
+              <divide/>
+              <apply>
+                <times/>
+                <cn> 0 </cn>
+                <ci> OneNanoGram </ci>
+              </apply>
+              <ci> Masse__Molaire </ci>
+            </apply>
+            <ci> GramPerNanoGramP </ci>
+          </apply>
+        </math>
+      </initialAssignment>
+      <initialAssignment symbol="A__Venous__Blood">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <apply>
+              <divide/>
+              <ci> Dose </ci>
+              <ci> Masse__Molaire </ci>
+            </apply>
+            <ci> GramPerMilliGramP </ci>
+          </apply>
+        </math>
+      </initialAssignment>
+    </listOfInitialAssignments>
+    <listOfRules>
+      <assignmentRule variable="Adipose">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <ci> VAD </ci>
+        </math>
+      </assignmentRule>
+      <assignmentRule variable="Arterial__Blood">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <ci> VAB </ci>
+        </math>
+      </assignmentRule>
+      <assignmentRule variable="Bones">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <ci> VBO </ci>
+        </math>
+      </assignmentRule>
+      <assignmentRule variable="Brain">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <ci> VBR </ci>
+        </math>
+      </assignmentRule>
+      <assignmentRule variable="C15">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <apply>
+              <divide/>
+              <ci> A__Venous__Blood </ci>
+              <ci> S15 </ci>
+            </apply>
+            <cn> 313.397 </cn>
+            <cn> 1000000 </cn>
+            <ci> OneNanoGramLiterPerMilliLiterPerMole </ci>
+          </apply>
+        </math>
+      </assignmentRule>
+      <assignmentRule variable="CO">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <apply>
+              <divide/>
+              <apply>
+                <times/>
+                <cn> 187 </cn>
+                <apply>
+                  <power/>
+                  <apply>
+                    <times/>
+                    <ci> WT </ci>
+                    <ci> OnePerKiloGram </ci>
+                  </apply>
+                  <cn> 0.81 </cn>
+                </apply>
+                <cn> 60 </cn>
+              </apply>
+              <cn> 1000 </cn>
+            </apply>
+            <ci> OneLiterPerHour </ci>
+          </apply>
+        </math>
+      </assignmentRule>
+      <assignmentRule variable="Gut">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <ci> VGU </ci>
+        </math>
+      </assignmentRule>
+      <assignmentRule variable="Heart">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <ci> VHT </ci>
+        </math>
+      </assignmentRule>
+      <assignmentRule variable="Kidneys">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <ci> VKI </ci>
+        </math>
+      </assignmentRule>
+      <assignmentRule variable="Liver">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <ci> VLI </ci>
+        </math>
+      </assignmentRule>
+      <assignmentRule variable="Lungs">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <ci> VLU </ci>
+        </math>
+      </assignmentRule>
+      <assignmentRule variable="Muscles">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <ci> VMU </ci>
+        </math>
+      </assignmentRule>
+      <assignmentRule variable="Pancreas">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <ci> VPA </ci>
+        </math>
+      </assignmentRule>
+      <assignmentRule variable="QAD">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <apply>
+              <divide/>
+              <cn> 5 </cn>
+              <cn> 100 </cn>
+            </apply>
+            <ci> CO </ci>
+          </apply>
+        </math>
+      </assignmentRule>
+      <assignmentRule variable="QBO">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <apply>
+              <divide/>
+              <cn> 5 </cn>
+              <cn> 100 </cn>
+            </apply>
+            <ci> CO </ci>
+          </apply>
+        </math>
+      </assignmentRule>
+      <assignmentRule variable="QBR">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <apply>
+              <divide/>
+              <cn> 12 </cn>
+              <cn> 100 </cn>
+            </apply>
+            <ci> CO </ci>
+          </apply>
+        </math>
+      </assignmentRule>
+      <assignmentRule variable="QGU">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <apply>
+              <divide/>
+              <cn> 14 </cn>
+              <cn> 100 </cn>
+            </apply>
+            <ci> CO </ci>
+          </apply>
+        </math>
+      </assignmentRule>
+      <assignmentRule variable="QHA">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <minus/>
+            <ci> QLI </ci>
+            <apply>
+              <plus/>
+              <ci> QSP </ci>
+              <ci> QPA </ci>
+              <ci> QST </ci>
+              <ci> QGU </ci>
+            </apply>
+          </apply>
+        </math>
+      </assignmentRule>
+      <assignmentRule variable="QHT">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <apply>
+              <divide/>
+              <cn> 4 </cn>
+              <cn> 100 </cn>
+            </apply>
+            <ci> CO </ci>
+          </apply>
+        </math>
+      </assignmentRule>
+      <assignmentRule variable="QKI">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <apply>
+              <divide/>
+              <cn> 19 </cn>
+              <cn> 100 </cn>
+            </apply>
+            <ci> CO </ci>
+          </apply>
+        </math>
+      </assignmentRule>
+      <assignmentRule variable="QLI">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <apply>
+              <divide/>
+              <cn> 25.5 </cn>
+              <cn> 100 </cn>
+            </apply>
+            <ci> CO </ci>
+          </apply>
+        </math>
+      </assignmentRule>
+      <assignmentRule variable="QLU">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <plus/>
+            <ci> QHT </ci>
+            <ci> QBR </ci>
+            <ci> QMU </ci>
+            <ci> QAD </ci>
+            <ci> QSK </ci>
+            <ci> QLI </ci>
+            <ci> QBO </ci>
+            <ci> QKI </ci>
+            <ci> QRB </ci>
+          </apply>
+        </math>
+      </assignmentRule>
+      <assignmentRule variable="QMU">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <apply>
+              <divide/>
+              <cn> 17 </cn>
+              <cn> 100 </cn>
+            </apply>
+            <ci> CO </ci>
+          </apply>
+        </math>
+      </assignmentRule>
+      <assignmentRule variable="QPA">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <apply>
+              <divide/>
+              <cn> 1 </cn>
+              <cn> 100 </cn>
+            </apply>
+            <ci> CO </ci>
+          </apply>
+        </math>
+      </assignmentRule>
+      <assignmentRule variable="QRB">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <minus/>
+            <ci> CO </ci>
+            <apply>
+              <plus/>
+              <ci> QHT </ci>
+              <ci> QBR </ci>
+              <ci> QMU </ci>
+              <ci> QAD </ci>
+              <ci> QSK </ci>
+              <ci> QLI </ci>
+              <ci> QBO </ci>
+              <ci> QKI </ci>
+            </apply>
+          </apply>
+        </math>
+      </assignmentRule>
+      <assignmentRule variable="QSK">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <apply>
+              <divide/>
+              <cn> 5 </cn>
+              <cn> 100 </cn>
+            </apply>
+            <ci> CO </ci>
+          </apply>
+        </math>
+      </assignmentRule>
+      <assignmentRule variable="QSP">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <apply>
+              <divide/>
+              <cn> 3 </cn>
+              <cn> 100 </cn>
+            </apply>
+            <ci> CO </ci>
+          </apply>
+        </math>
+      </assignmentRule>
+      <assignmentRule variable="QST">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <apply>
+              <divide/>
+              <cn> 1 </cn>
+              <cn> 100 </cn>
+            </apply>
+            <ci> CO </ci>
+          </apply>
+        </math>
+      </assignmentRule>
+      <assignmentRule variable="Rest__of__Body">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <ci> VRB </ci>
+        </math>
+      </assignmentRule>
+      <assignmentRule variable="S15">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <ci> VVB </ci>
+            <ci> BP </ci>
+          </apply>
+        </math>
+      </assignmentRule>
+      <assignmentRule variable="Skin">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <ci> VSK </ci>
+        </math>
+      </assignmentRule>
+      <assignmentRule variable="Spleen">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <ci> VSP </ci>
+        </math>
+      </assignmentRule>
+      <assignmentRule variable="Stomach">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <ci> VST </ci>
+        </math>
+      </assignmentRule>
+      <assignmentRule variable="VAB">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <apply>
+              <divide/>
+              <apply>
+                <times/>
+                <apply>
+                  <divide/>
+                  <cn> 2.81 </cn>
+                  <cn> 100 </cn>
+                </apply>
+                <ci> WT </ci>
+              </apply>
+              <cn> 1.04 </cn>
+            </apply>
+            <ci> OneLiterPerKiloGram </ci>
+          </apply>
+        </math>
+      </assignmentRule>
+      <assignmentRule variable="VAD">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <apply>
+              <divide/>
+              <apply>
+                <times/>
+                <apply>
+                  <divide/>
+                  <cn> 21.42 </cn>
+                  <cn> 100 </cn>
+                </apply>
+                <ci> WT </ci>
+              </apply>
+              <cn> 0.916 </cn>
+            </apply>
+            <ci> OneLiterPerKiloGram </ci>
+          </apply>
+        </math>
+      </assignmentRule>
+      <assignmentRule variable="VBO">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <apply>
+              <divide/>
+              <apply>
+                <times/>
+                <apply>
+                  <divide/>
+                  <cn> 14.29 </cn>
+                  <cn> 100 </cn>
+                </apply>
+                <ci> WT </ci>
+              </apply>
+              <cn> 1.99 </cn>
+            </apply>
+            <ci> OneLiterPerKiloGram </ci>
+          </apply>
+        </math>
+      </assignmentRule>
+      <assignmentRule variable="VBR">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <apply>
+              <divide/>
+              <apply>
+                <times/>
+                <apply>
+                  <divide/>
+                  <cn> 2 </cn>
+                  <cn> 100 </cn>
+                </apply>
+                <ci> WT </ci>
+              </apply>
+              <cn> 1.036 </cn>
+            </apply>
+            <ci> OneLiterPerKiloGram </ci>
+          </apply>
+        </math>
+      </assignmentRule>
+      <assignmentRule variable="VGU">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <apply>
+              <divide/>
+              <apply>
+                <times/>
+                <apply>
+                  <divide/>
+                  <cn> 1.44 </cn>
+                  <cn> 100 </cn>
+                </apply>
+                <ci> WT </ci>
+              </apply>
+              <cn> 1.043 </cn>
+            </apply>
+            <ci> OneLiterPerKiloGram </ci>
+          </apply>
+        </math>
+      </assignmentRule>
+      <assignmentRule variable="VHT">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <apply>
+              <divide/>
+              <apply>
+                <times/>
+                <apply>
+                  <divide/>
+                  <cn> 0.47 </cn>
+                  <cn> 100 </cn>
+                </apply>
+                <ci> WT </ci>
+              </apply>
+              <cn> 1.03 </cn>
+            </apply>
+            <ci> OneLiterPerKiloGram </ci>
+          </apply>
+        </math>
+      </assignmentRule>
+      <assignmentRule variable="VKI">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <apply>
+              <divide/>
+              <apply>
+                <times/>
+                <apply>
+                  <divide/>
+                  <cn> 0.44 </cn>
+                  <cn> 100 </cn>
+                </apply>
+                <ci> WT </ci>
+              </apply>
+              <cn> 1.05 </cn>
+            </apply>
+            <ci> OneLiterPerKiloGram </ci>
+          </apply>
+        </math>
+      </assignmentRule>
+      <assignmentRule variable="VLI">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <apply>
+              <divide/>
+              <apply>
+                <times/>
+                <apply>
+                  <divide/>
+                  <cn> 2.57 </cn>
+                  <cn> 100 </cn>
+                </apply>
+                <ci> WT </ci>
+              </apply>
+              <cn> 1.04 </cn>
+            </apply>
+            <ci> OneLiterPerKiloGram </ci>
+          </apply>
+        </math>
+      </assignmentRule>
+      <assignmentRule variable="VLU">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <apply>
+              <divide/>
+              <apply>
+                <times/>
+                <apply>
+                  <divide/>
+                  <cn> 0.76 </cn>
+                  <cn> 100 </cn>
+                </apply>
+                <ci> WT </ci>
+              </apply>
+              <cn> 1.051 </cn>
+            </apply>
+            <ci> OneLiterPerKiloGram </ci>
+          </apply>
+        </math>
+      </assignmentRule>
+      <assignmentRule variable="VMU">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <apply>
+              <divide/>
+              <apply>
+                <times/>
+                <apply>
+                  <divide/>
+                  <cn> 40 </cn>
+                  <cn> 100 </cn>
+                </apply>
+                <ci> WT </ci>
+              </apply>
+              <cn> 1.041 </cn>
+            </apply>
+            <ci> OneLiterPerKiloGram </ci>
+          </apply>
+        </math>
+      </assignmentRule>
+      <assignmentRule variable="VPA">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <apply>
+              <divide/>
+              <apply>
+                <times/>
+                <apply>
+                  <divide/>
+                  <cn> 0.14 </cn>
+                  <cn> 100 </cn>
+                </apply>
+                <ci> WT </ci>
+              </apply>
+              <cn> 1.045 </cn>
+            </apply>
+            <ci> OneLiterPerKiloGram </ci>
+          </apply>
+        </math>
+      </assignmentRule>
+      <assignmentRule variable="VRB">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <apply>
+              <divide/>
+              <apply>
+                <times/>
+                <apply>
+                  <divide/>
+                  <cn> 3.86 </cn>
+                  <cn> 100 </cn>
+                </apply>
+                <ci> WT </ci>
+              </apply>
+              <cn> 1.04 </cn>
+            </apply>
+            <ci> OneLiterPerKiloGram </ci>
+          </apply>
+        </math>
+      </assignmentRule>
+      <assignmentRule variable="VSK">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <apply>
+              <divide/>
+              <apply>
+                <times/>
+                <apply>
+                  <divide/>
+                  <cn> 3.71 </cn>
+                  <cn> 100 </cn>
+                </apply>
+                <ci> WT </ci>
+              </apply>
+              <cn> 1.116 </cn>
+            </apply>
+            <ci> OneLiterPerKiloGram </ci>
+          </apply>
+        </math>
+      </assignmentRule>
+      <assignmentRule variable="VSP">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <apply>
+              <divide/>
+              <apply>
+                <times/>
+                <apply>
+                  <divide/>
+                  <cn> 0.26 </cn>
+                  <cn> 100 </cn>
+                </apply>
+                <ci> WT </ci>
+              </apply>
+              <cn> 1.054 </cn>
+            </apply>
+            <ci> OneLiterPerKiloGram </ci>
+          </apply>
+        </math>
+      </assignmentRule>
+      <assignmentRule variable="VST">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <apply>
+              <divide/>
+              <apply>
+                <times/>
+                <apply>
+                  <divide/>
+                  <cn> 0.21 </cn>
+                  <cn> 100 </cn>
+                </apply>
+                <ci> WT </ci>
+              </apply>
+              <cn> 1.05 </cn>
+            </apply>
+            <ci> OneLiterPerKiloGram </ci>
+          </apply>
+        </math>
+      </assignmentRule>
+      <assignmentRule variable="VVB">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <apply>
+              <divide/>
+              <apply>
+                <times/>
+                <apply>
+                  <divide/>
+                  <cn> 5.62 </cn>
+                  <cn> 100 </cn>
+                </apply>
+                <ci> WT </ci>
+              </apply>
+              <cn> 1.04 </cn>
+            </apply>
+            <ci> OneLiterPerKiloGram </ci>
+          </apply>
+        </math>
+      </assignmentRule>
+      <assignmentRule variable="Venous__Blood">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <ci> VVB </ci>
+        </math>
+      </assignmentRule>
+      <assignmentRule variable="fub">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <divide/>
+            <ci> fup </ci>
+            <ci> BP </ci>
+          </apply>
+        </math>
+      </assignmentRule>
+      <assignmentRule variable="logC15">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <ln/>
+            <apply>
+              <times/>
+              <ci> C15 </ci>
+              <ci> OneMilliLiterPerNanoGram </ci>
+            </apply>
+          </apply>
+        </math>
+      </assignmentRule>
+      <rateRule variable="A__Adipose">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <ci> QAD </ci>
+            <apply>
+              <minus/>
+              <apply>
+                <divide/>
+                <ci> A__Arterial__Blood </ci>
+                <ci> VAB </ci>
+              </apply>
+              <apply>
+                <divide/>
+                <ci> A__Adipose </ci>
+                <apply>
+                  <times/>
+                  <ci> KbAD </ci>
+                  <ci> VAD </ci>
+                </apply>
+              </apply>
+            </apply>
+            <ci> HourPerSecondP </ci>
+          </apply>
+        </math>
+      </rateRule>
+      <rateRule variable="A__Arterial__Blood">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <ci> QLU </ci>
+            <apply>
+              <minus/>
+              <apply>
+                <divide/>
+                <ci> A__Lungs </ci>
+                <apply>
+                  <times/>
+                  <ci> KbLU </ci>
+                  <ci> VLU </ci>
+                </apply>
+              </apply>
+              <apply>
+                <divide/>
+                <ci> A__Arterial__Blood </ci>
+                <ci> VAB </ci>
+              </apply>
+            </apply>
+            <ci> HourPerSecondP </ci>
+          </apply>
+        </math>
+      </rateRule>
+      <rateRule variable="A__Bones">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <ci> QBO </ci>
+            <apply>
+              <minus/>
+              <apply>
+                <divide/>
+                <ci> A__Arterial__Blood </ci>
+                <ci> VAB </ci>
+              </apply>
+              <apply>
+                <divide/>
+                <ci> A__Bones </ci>
+                <apply>
+                  <times/>
+                  <ci> KbBO </ci>
+                  <ci> VBO </ci>
+                </apply>
+              </apply>
+            </apply>
+            <ci> HourPerSecondP </ci>
+          </apply>
+        </math>
+      </rateRule>
+      <rateRule variable="A__Brain">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <ci> QBR </ci>
+            <apply>
+              <minus/>
+              <apply>
+                <divide/>
+                <ci> A__Arterial__Blood </ci>
+                <ci> VAB </ci>
+              </apply>
+              <apply>
+                <divide/>
+                <ci> A__Brain </ci>
+                <apply>
+                  <times/>
+                  <ci> KbBR </ci>
+                  <ci> VBR </ci>
+                </apply>
+              </apply>
+            </apply>
+            <ci> HourPerSecondP </ci>
+          </apply>
+        </math>
+      </rateRule>
+      <rateRule variable="A__Gut">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <ci> QGU </ci>
+            <apply>
+              <minus/>
+              <apply>
+                <divide/>
+                <ci> A__Arterial__Blood </ci>
+                <ci> VAB </ci>
+              </apply>
+              <apply>
+                <divide/>
+                <ci> A__Gut </ci>
+                <apply>
+                  <times/>
+                  <ci> KbGU </ci>
+                  <ci> VGU </ci>
+                </apply>
+              </apply>
+            </apply>
+            <ci> HourPerSecondP </ci>
+          </apply>
+        </math>
+      </rateRule>
+      <rateRule variable="A__Heart">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <ci> QHT </ci>
+            <apply>
+              <minus/>
+              <apply>
+                <divide/>
+                <ci> A__Arterial__Blood </ci>
+                <ci> VAB </ci>
+              </apply>
+              <apply>
+                <divide/>
+                <ci> A__Heart </ci>
+                <apply>
+                  <times/>
+                  <ci> KbHT </ci>
+                  <ci> VHT </ci>
+                </apply>
+              </apply>
+            </apply>
+            <ci> HourPerSecondP </ci>
+          </apply>
+        </math>
+      </rateRule>
+      <rateRule variable="A__Kidneys">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <ci> QKI </ci>
+            <apply>
+              <minus/>
+              <apply>
+                <divide/>
+                <ci> A__Arterial__Blood </ci>
+                <ci> VAB </ci>
+              </apply>
+              <apply>
+                <divide/>
+                <ci> A__Kidneys </ci>
+                <apply>
+                  <times/>
+                  <ci> KbKI </ci>
+                  <ci> VKI </ci>
+                </apply>
+              </apply>
+            </apply>
+            <ci> HourPerSecondP </ci>
+          </apply>
+        </math>
+      </rateRule>
+      <rateRule variable="A__Liver">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <apply>
+              <minus/>
+              <apply>
+                <minus/>
+                <apply>
+                  <plus/>
+                  <apply>
+                    <divide/>
+                    <apply>
+                      <times/>
+                      <ci> QHA </ci>
+                      <ci> A__Arterial__Blood </ci>
+                    </apply>
+                    <ci> VAB </ci>
+                  </apply>
+                  <apply>
+                    <divide/>
+                    <apply>
+                      <times/>
+                      <ci> QSP </ci>
+                      <ci> A__Spleen </ci>
+                    </apply>
+                    <apply>
+                      <times/>
+                      <ci> KbSP </ci>
+                      <ci> VSP </ci>
+                    </apply>
+                  </apply>
+                  <apply>
+                    <divide/>
+                    <apply>
+                      <times/>
+                      <ci> QPA </ci>
+                      <ci> A__Pancreas </ci>
+                    </apply>
+                    <apply>
+                      <times/>
+                      <ci> KbPA </ci>
+                      <ci> VPA </ci>
+                    </apply>
+                  </apply>
+                  <apply>
+                    <divide/>
+                    <apply>
+                      <times/>
+                      <ci> QST </ci>
+                      <ci> A__Stomach </ci>
+                    </apply>
+                    <apply>
+                      <times/>
+                      <ci> KbST </ci>
+                      <ci> VST </ci>
+                    </apply>
+                  </apply>
+                  <apply>
+                    <divide/>
+                    <apply>
+                      <times/>
+                      <ci> QGU </ci>
+                      <ci> A__Gut </ci>
+                    </apply>
+                    <apply>
+                      <times/>
+                      <ci> KbGU </ci>
+                      <ci> VGU </ci>
+                    </apply>
+                  </apply>
+                </apply>
+                <apply>
+                  <divide/>
+                  <apply>
+                    <times/>
+                    <ci> CLint </ci>
+                    <ci> fub </ci>
+                    <ci> A__Liver </ci>
+                  </apply>
+                  <apply>
+                    <times/>
+                    <ci> KbLI </ci>
+                    <ci> VLI </ci>
+                  </apply>
+                </apply>
+              </apply>
+              <apply>
+                <divide/>
+                <apply>
+                  <times/>
+                  <ci> QLI </ci>
+                  <ci> A__Liver </ci>
+                </apply>
+                <apply>
+                  <times/>
+                  <ci> KbLI </ci>
+                  <ci> VLI </ci>
+                </apply>
+              </apply>
+            </apply>
+            <ci> HourPerSecondP </ci>
+          </apply>
+        </math>
+      </rateRule>
+      <rateRule variable="A__Lungs">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <ci> QLU </ci>
+            <apply>
+              <minus/>
+              <apply>
+                <divide/>
+                <ci> A__Venous__Blood </ci>
+                <ci> VVB </ci>
+              </apply>
+              <apply>
+                <divide/>
+                <ci> A__Lungs </ci>
+                <apply>
+                  <times/>
+                  <ci> KbLU </ci>
+                  <ci> VLU </ci>
+                </apply>
+              </apply>
+            </apply>
+            <ci> HourPerSecondP </ci>
+          </apply>
+        </math>
+      </rateRule>
+      <rateRule variable="A__Muscles">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <ci> QMU </ci>
+            <apply>
+              <minus/>
+              <apply>
+                <divide/>
+                <ci> A__Arterial__Blood </ci>
+                <ci> VAB </ci>
+              </apply>
+              <apply>
+                <divide/>
+                <ci> A__Muscles </ci>
+                <apply>
+                  <times/>
+                  <ci> KbMU </ci>
+                  <ci> VMU </ci>
+                </apply>
+              </apply>
+            </apply>
+            <ci> HourPerSecondP </ci>
+          </apply>
+        </math>
+      </rateRule>
+      <rateRule variable="A__Pancreas">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <ci> QPA </ci>
+            <apply>
+              <minus/>
+              <apply>
+                <divide/>
+                <ci> A__Arterial__Blood </ci>
+                <ci> VAB </ci>
+              </apply>
+              <apply>
+                <divide/>
+                <ci> A__Pancreas </ci>
+                <apply>
+                  <times/>
+                  <ci> KbPA </ci>
+                  <ci> VPA </ci>
+                </apply>
+              </apply>
+            </apply>
+            <ci> HourPerSecondP </ci>
+          </apply>
+        </math>
+      </rateRule>
+      <rateRule variable="A__Rest__of__Body">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <ci> QRB </ci>
+            <apply>
+              <minus/>
+              <apply>
+                <divide/>
+                <ci> A__Arterial__Blood </ci>
+                <ci> VAB </ci>
+              </apply>
+              <apply>
+                <divide/>
+                <ci> A__Rest__of__Body </ci>
+                <apply>
+                  <times/>
+                  <ci> KbRB </ci>
+                  <ci> VRB </ci>
+                </apply>
+              </apply>
+            </apply>
+            <ci> HourPerSecondP </ci>
+          </apply>
+        </math>
+      </rateRule>
+      <rateRule variable="A__Skin">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <ci> QSK </ci>
+            <apply>
+              <minus/>
+              <apply>
+                <divide/>
+                <ci> A__Arterial__Blood </ci>
+                <ci> VAB </ci>
+              </apply>
+              <apply>
+                <divide/>
+                <ci> A__Skin </ci>
+                <apply>
+                  <times/>
+                  <ci> KbSK </ci>
+                  <ci> VSK </ci>
+                </apply>
+              </apply>
+            </apply>
+            <ci> HourPerSecondP </ci>
+          </apply>
+        </math>
+      </rateRule>
+      <rateRule variable="A__Spleen">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <ci> QSP </ci>
+            <apply>
+              <minus/>
+              <apply>
+                <divide/>
+                <ci> A__Arterial__Blood </ci>
+                <ci> VAB </ci>
+              </apply>
+              <apply>
+                <divide/>
+                <ci> A__Spleen </ci>
+                <apply>
+                  <times/>
+                  <ci> KbSP </ci>
+                  <ci> VSP </ci>
+                </apply>
+              </apply>
+            </apply>
+            <ci> HourPerSecondP </ci>
+          </apply>
+        </math>
+      </rateRule>
+      <rateRule variable="A__Stomach">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <ci> QST </ci>
+            <apply>
+              <minus/>
+              <apply>
+                <divide/>
+                <ci> A__Arterial__Blood </ci>
+                <ci> VAB </ci>
+              </apply>
+              <apply>
+                <divide/>
+                <ci> A__Stomach </ci>
+                <apply>
+                  <times/>
+                  <ci> KbST </ci>
+                  <ci> VST </ci>
+                </apply>
+              </apply>
+            </apply>
+            <ci> HourPerSecondP </ci>
+          </apply>
+        </math>
+      </rateRule>
+      <rateRule variable="A__Venous__Blood">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <apply>
+              <minus/>
+              <apply>
+                <plus/>
+                <apply>
+                  <divide/>
+                  <apply>
+                    <times/>
+                    <ci> QHT </ci>
+                    <ci> A__Heart </ci>
+                  </apply>
+                  <apply>
+                    <times/>
+                    <ci> KbHT </ci>
+                    <ci> VHT </ci>
+                  </apply>
+                </apply>
+                <apply>
+                  <divide/>
+                  <apply>
+                    <times/>
+                    <ci> QBR </ci>
+                    <ci> A__Brain </ci>
+                  </apply>
+                  <apply>
+                    <times/>
+                    <ci> KbBR </ci>
+                    <ci> VBR </ci>
+                  </apply>
+                </apply>
+                <apply>
+                  <divide/>
+                  <apply>
+                    <times/>
+                    <ci> QMU </ci>
+                    <ci> A__Muscles </ci>
+                  </apply>
+                  <apply>
+                    <times/>
+                    <ci> KbMU </ci>
+                    <ci> VMU </ci>
+                  </apply>
+                </apply>
+                <apply>
+                  <divide/>
+                  <apply>
+                    <times/>
+                    <ci> QAD </ci>
+                    <ci> A__Adipose </ci>
+                  </apply>
+                  <apply>
+                    <times/>
+                    <ci> KbAD </ci>
+                    <ci> VAD </ci>
+                  </apply>
+                </apply>
+                <apply>
+                  <divide/>
+                  <apply>
+                    <times/>
+                    <ci> QSK </ci>
+                    <ci> A__Skin </ci>
+                  </apply>
+                  <apply>
+                    <times/>
+                    <ci> KbSK </ci>
+                    <ci> VSK </ci>
+                  </apply>
+                </apply>
+                <apply>
+                  <divide/>
+                  <apply>
+                    <times/>
+                    <ci> QLI </ci>
+                    <ci> A__Liver </ci>
+                  </apply>
+                  <apply>
+                    <times/>
+                    <ci> KbLI </ci>
+                    <ci> VLI </ci>
+                  </apply>
+                </apply>
+                <apply>
+                  <divide/>
+                  <apply>
+                    <times/>
+                    <ci> QBO </ci>
+                    <ci> A__Bones </ci>
+                  </apply>
+                  <apply>
+                    <times/>
+                    <ci> KbBO </ci>
+                    <ci> VBO </ci>
+                  </apply>
+                </apply>
+                <apply>
+                  <divide/>
+                  <apply>
+                    <times/>
+                    <ci> QKI </ci>
+                    <ci> A__Kidneys </ci>
+                  </apply>
+                  <apply>
+                    <times/>
+                    <ci> KbKI </ci>
+                    <ci> VKI </ci>
+                  </apply>
+                </apply>
+                <apply>
+                  <divide/>
+                  <apply>
+                    <times/>
+                    <ci> QRB </ci>
+                    <ci> A__Rest__of__Body </ci>
+                  </apply>
+                  <apply>
+                    <times/>
+                    <ci> KbRB </ci>
+                    <ci> VRB </ci>
+                  </apply>
+                </apply>
+              </apply>
+              <apply>
+                <divide/>
+                <apply>
+                  <times/>
+                  <ci> QLU </ci>
+                  <ci> A__Venous__Blood </ci>
+                </apply>
+                <ci> VVB </ci>
+              </apply>
+            </apply>
+            <ci> HourPerSecondP </ci>
+          </apply>
+        </math>
+      </rateRule>
+    </listOfRules>
+  </model>
+</sbml>
