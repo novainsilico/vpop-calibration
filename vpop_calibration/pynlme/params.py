@@ -45,6 +45,9 @@ def transform_param(x: float, const: Constraint) -> float:
 
 class PopulationParameter(BaseModel):
     model_config = ConfigDict(extra="forbid")
+    # a priori value for the parameter in the physical scale (i.e. untransformed)
+    # its log (or logit if transformed) is used as the starting mean of the underlying
+    # random effects distribution
     prior: float = Field(ge=0)
     constraint: Constraint = Constraint()
 
@@ -72,9 +75,11 @@ class Covariate(BaseModel):
     prior: float
 
 
+# A PatientDescriptorUnknown (PDU) is a PopulationParameter with an omega prior and some covariates
 class PatientDescriptorUnknown(PopulationParameter):
-    # A PDU is a PopulationParameter with an omega prior and some covariates
+    # a priori VARIANCE of the log (or logit if constraints) of the parameter
     prior_omega: float = Field(ge=0)
+    # optional covariate coefficients, see docs/nlme_model.md
     covariates: Optional[dict[str, Covariate]] = None
 
     @property
@@ -260,13 +265,13 @@ class MixedEffectParameters(BaseModel):
         This effectively checks that the supplied columns contain the necessary covariates, and the output names are consistent.
         """
         descriptors_known_params = set(self.pdk + self.covariate_names)
-        assert set(data.descriptors_known) == set(descriptors_known_params), (
-            f"Discrepancy between descriptor set and data set columns. The data set informs \n{data.descriptors_known}\n The input parameters inform\n{descriptors_known_params}"
-        )
+        assert set(data.descriptors_known) == set(
+            descriptors_known_params
+        ), f"Discrepancy between descriptor set and data set columns. The data set informs \n{data.descriptors_known}\n The input parameters inform\n{descriptors_known_params}"
 
-        assert set(self.all_output_names) == set(data.all_output_names), (
-            f"Discrepancy in output names. The data set contains \n{data.all_output_names}\n The input parameters contain \n{self.all_output_names}"
-        )
+        assert set(self.all_output_names) == set(
+            data.all_output_names
+        ), f"Discrepancy in output names. The data set contains \n{data.all_output_names}\n The input parameters contain \n{self.all_output_names}"
 
         assert (self.time_to_event is not None) == (
             "event_time" in data.patients_df.columns
