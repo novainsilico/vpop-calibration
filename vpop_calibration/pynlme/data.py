@@ -21,7 +21,6 @@ class ObsData:
         """
         # Initial validation
         self.input_df = ObsDataSchema.validate(data)
-        self.patients: list[str] = self.input_df.id.drop_duplicates().to_list()
 
         # Create the patient data frame (id, protocol_arm and descriptors)
         patients_df_raw = self.input_df.drop(
@@ -42,9 +41,9 @@ class ObsData:
         if "event_time" in self.patients_df.columns:
             # Process survival data
             self.hazard_name = self.patients_df["hazard_name"].drop_duplicates()
-            assert self.hazard_name.shape[0] == 1, (
-                f"More than one hazard name provided: {self.hazard_name}"
-            )
+            assert (
+                self.hazard_name.shape[0] == 1
+            ), f"More than one hazard name provided: {self.hazard_name}"
             self.hazard_name = self.hazard_name.item()
 
             # The convention is that the model outputs for survival should be
@@ -99,6 +98,9 @@ class ObsData:
             ),
             survival_outputs=self.survival_outputs,
         )
+        # patient IDs have already undergone drop_duplicates().sort_values().tolist()
+        # so they are ORDERED starting from here
+        self.patients = self.full_obs.obs_index.id.ref_values
         self.global_timesteps = torch.tensor(
             self.full_obs.obs_index.time.ref_values, device=device
         )
@@ -138,9 +140,9 @@ class ObsData:
         Args:
             pdk_names (list[str]): The name of the known parameters which are to be assembled as pdk. Must appear in the data set columns.
         """
-        assert set(pdk_names) <= set(self.descriptors_known), (
-            f"Unknown PDK: {set(pdk_names) - set(self.descriptors_known)}"
-        )
+        assert set(pdk_names) <= set(
+            self.descriptors_known
+        ), f"Unknown PDK: {set(pdk_names) - set(self.descriptors_known)}"
         self.pdk_names = pdk_names
         self.nb_pdk = len(pdk_names)
         self.patients_pdk = {}

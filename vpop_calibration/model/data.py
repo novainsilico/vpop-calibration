@@ -80,9 +80,10 @@ class TrainingDataSet:
             ["id"] + self.parameter_names + ["output_name", "protocol_arm", "value"]
         ]
 
-        # Gather the list of patients in the training data
-        self.patients = self.full_df_raw["id"].unique()
-        self.nb_patients = self.patients.shape[0]
+        # There are potentially multiple observations per patient so the patient ID column has duplicates.
+        # The resulting list of patient IDs must be ORDERED and contain UNIQUE values
+        self.patients = self.full_df_raw["id"].drop_duplicates().sort_values().tolist()
+        self.nb_patients = len(self.patients)
 
         print(
             f"Successfully loaded a training data set with {self.nb_patients} patients. The following outputs are available:\n{self.output_names}\n and the following protocol arms:\n{self.protocol_arms}"

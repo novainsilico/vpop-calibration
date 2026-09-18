@@ -1,5 +1,5 @@
 import torch
-from typing import NamedTuple, Callable, Any
+from typing import NamedTuple, Any
 import pandas as pd
 
 from vpop_calibration.structural_model.base import StructuralModel
@@ -112,9 +112,9 @@ class StatisticalModel:
         # Validate observed data against the user-specified parameters
         self.input_params.validate_data(self.data)
         # Validate the structural model against user-specified parameters
-        assert set(self.descriptors) == set(self.structural_model.parameter_names), (
-            f"Inconsistent parameter set between patient data and structural model:\nIn the data: {set(self.descriptors)}\nIn the structural model: {set(self.structural_model.parameter_names)}"
-        )
+        assert set(self.descriptors) == set(
+            self.structural_model.parameter_names
+        ), f"Inconsistent parameter set between patient data and structural model:\nIn the data: {set(self.descriptors)}\nIn the structural model: {set(self.structural_model.parameter_names)}"
 
         # -- Mapping
         # Map structural model inputs with NLME parameters
@@ -253,9 +253,9 @@ class StatisticalModel:
         self.design_matrices = {}
         if self.nb_covariates == 0:
             # No covariates: all design matrices are the identity matrix
-            assert self.nb_betas == self.nb_pdu, (
-                "No covariates are identified, yet the number of PDUs and the number of betas differ."
-            )
+            assert (
+                self.nb_betas == self.nb_pdu
+            ), "No covariates are identified, yet the number of PDUs and the number of betas differ."
             ind_design_matrix = torch.diag(torch.ones((self.nb_pdu), device=device))
             for ind_id in self.patients:
                 self.design_matrices[ind_id] = ind_design_matrix
@@ -283,9 +283,9 @@ class StatisticalModel:
             expected_shape = self.omega_pop.shape
         else:
             expected_shape = (self.nb_pdu, self.nb_pdu)
-        assert omega.shape == expected_shape, (
-            f"Wrong shape in omega update: {omega.shape}, expected: {expected_shape}"
-        )
+        assert (
+            omega.shape == expected_shape
+        ), f"Wrong shape in omega update: {omega.shape}, expected: {expected_shape}"
 
         self.omega_pop = omega
         self.omega_pop_lower_chol = torch.linalg.cholesky(self.omega_pop).to(device)
@@ -311,9 +311,9 @@ class StatisticalModel:
             expected_shape = self.population_betas.shape
         else:
             expected_shape = (self.nb_betas,)
-        assert betas.shape == expected_shape, (
-            f"Wrong shape in Betas update: {betas.shape}, expected: {expected_shape}"
-        )
+        assert (
+            betas.shape == expected_shape
+        ), f"Wrong shape in Betas update: {betas.shape}, expected: {expected_shape}"
 
         self.population_betas = betas
 
@@ -324,9 +324,9 @@ class StatisticalModel:
             expected_shape = self.log_mi.shape
         else:
             expected_shape = (self.nb_mi,)
-        assert log_mi.shape == expected_shape, (
-            f"Wrong shape in model intrinsic parameters update: {log_mi.shape}, expected: {expected_shape}"
-        )
+        assert (
+            log_mi.shape == expected_shape
+        ), f"Wrong shape in model intrinsic parameters update: {log_mi.shape}, expected: {expected_shape}"
 
         self.log_mi = log_mi
 
@@ -409,9 +409,9 @@ class StatisticalModel:
             torch.Tensor: The individual parameters in gaussian (unconstrained) space. Size: (nb_chains, nb_patients, nb_pdu)
         """
         nb_samples = etas.shape[0]
-        assert etas.shape == torch.Size([nb_samples, self.nb_patients, self.nb_pdu]), (
-            f"Wrong shape of etas passed to `transform_etas_to_gaussian`: {etas.shape}"
-        )
+        assert etas.shape == torch.Size(
+            [nb_samples, self.nb_patients, self.nb_pdu]
+        ), f"Wrong shape of etas passed to `transform_etas_to_gaussian`: {etas.shape}"
 
         gaussian_params = self._etas_to_gaussian(
             etas=etas, design_matrix=self.full_design_matrix
@@ -435,9 +435,9 @@ class StatisticalModel:
         """
         nb_patients_local = psi.shape[1]
         assert psi.shape[2] == self.nb_pdu
-        assert log_mi.dim() == surv_coeffs.dim(), (
-            "Incompatible model intrinsics and survival coefficients"
-        )
+        assert (
+            log_mi.dim() == surv_coeffs.dim()
+        ), "Incompatible model intrinsics and survival coefficients"
 
         if log_mi.dim() == 1:
             # Regular case: fixed effects are fixed
@@ -449,9 +449,9 @@ class StatisticalModel:
             )
         elif log_mi.dim() == 2:
             # Fixed effects optimization: when computing the gradient, we compute batched of fixed effect values, but the gaussian parameters have to be fixed
-            assert psi.shape[0] == 1, (
-                "Unexpected gaussian parameter shape in multiple fixed effects evaluation"
-            )
+            assert (
+                psi.shape[0] == 1
+            ), "Unexpected gaussian parameter shape in multiple fixed effects evaluation"
             nb_samples_mi = log_mi.shape[0]
             assert surv_coeffs.shape[0] == nb_samples_mi
             psi_expanded = psi.expand(nb_samples_mi, -1, -1)
@@ -484,9 +484,7 @@ class StatisticalModel:
         assert pdk.shape == (
             nb_patients_local,
             self.nb_pdk,
-        ), (
-            f"Inconsistent shapes provided in _combine_physical_pdk:\n{physical_params.shape=}\n{pdk.shape=}"
-        )
+        ), f"Inconsistent shapes provided in _combine_physical_pdk:\n{physical_params.shape=}\n{pdk.shape=}"
 
         pdk_expanded = pdk.expand(nb_samples, -1, -1)
         theta = torch.cat((pdk_expanded, physical_params), dim=-1)
@@ -601,9 +599,7 @@ class StatisticalModel:
         assert pred_mean.shape == (
             nb_samples,
             self.data.nb_total_observations,
-        ), (
-            f"Expected ({nb_samples}, {self.data.nb_total_observations}), \nActual: {pred_mean.shape}"
-        )
+        ), f"Expected ({nb_samples}, {self.data.nb_total_observations}), \nActual: {pred_mean.shape}"
 
         return pred_mean, pred_var
 
@@ -639,56 +635,6 @@ class StatisticalModel:
             gaussian_params=gaussian_params,
             predictions=pred,
         )
-
-    def single_patient_likelihood_factory(
-        self, id: str
-    ) -> Callable[[torch.Tensor], LogPosteriorPrediction]:
-        observations = self.data.individual_observations[id]
-        time_steps = torch.as_tensor(
-            observations.obs_index.time.ref_values, device=device, dtype=default_dtype
-        )
-        design_matrix = self.design_matrices[id].unsqueeze(0)
-        pdk = self.data.patients_pdk[id]
-
-        def log_posterior_etas_single_patient(
-            etas: torch.Tensor,
-        ) -> LogPosteriorPrediction:
-            nb_samples = etas.shape[0]
-            assert etas.shape[1] == 1
-            assert etas.shape[2] == self.nb_pdu
-
-            gaussian_params = self._etas_to_gaussian(
-                etas=etas, design_matrix=design_matrix
-            )
-            physical_params = self.convert_gaussian_to_physical(
-                psi=gaussian_params, log_mi=self.log_mi, surv_coeffs=self.surv_coeffs
-            )
-            thetas = self._combine_physical_pdk(
-                physical_params=physical_params, pdk=pdk
-            )
-            inputs = self._combine_thetas_and_time(theta=thetas, time=time_steps)
-            pred, _ = self._predict(inputs=inputs, pred_index=observations.obs_index)
-
-            log_prior = self.log_prior_etas(etas)
-            assert log_prior.shape == (nb_samples, 1)
-
-            log_likelihood_obs = log_likelihood_observation(
-                observations=observations,
-                predictions=pred,
-                residual_error=self.residual_var,
-                min_variance=self.config.residual_min_variance,
-            )
-            assert log_likelihood_obs.shape == (nb_samples, 1)
-
-            log_posterior = log_likelihood_obs + log_prior
-
-            return LogPosteriorPrediction(
-                log_posterior=log_posterior,
-                gaussian_params=gaussian_params,
-                predictions=pred,
-            )
-
-        return log_posterior_etas_single_patient
 
     def convert_theta_to_dataframe(self, theta: torch.Tensor) -> pd.DataFrame:
         assert theta.shape[0] == 1, "Cannot convert batched parameters to dataframe."
