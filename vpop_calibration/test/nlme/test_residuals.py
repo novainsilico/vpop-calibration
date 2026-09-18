@@ -92,8 +92,8 @@ def test_residuals():
     torch.testing.assert_close(res, expected_res)
 
     residual_error = ResidualErrorEstimates(
-        sigma_add=torch.tensor([1.0, 0.0], dtype=default_dtype),
-        sigma_prop=torch.tensor([0.0, 1.0], dtype=default_dtype),
+        additive_variance=torch.tensor([1.0, 0.0], dtype=default_dtype),
+        proportional_variance=torch.tensor([0.0, 1.0], dtype=default_dtype),
         additive_output=torch.tensor([True, False]),
         proportional_output=torch.tensor([False, True]),
     )
@@ -115,8 +115,8 @@ def test_residuals():
     )
 
     expected_error_params = residual_error._replace(
-        sigma_add=torch.tensor([1.0, 0.0], dtype=default_dtype),
-        sigma_prop=torch.tensor([0.0, 1 / 4], dtype=default_dtype),
+        additive_variance=torch.tensor([1.0, 0.0], dtype=default_dtype),
+        proportional_variance=torch.tensor([0.0, 1 / 4], dtype=default_dtype),
     )
     torch.testing.assert_close(error_params, expected_error_params)
 
@@ -219,8 +219,8 @@ def test_residuals_with_inf():
     torch.testing.assert_close(res, expected_res)
 
     residual_error = ResidualErrorEstimates(
-        sigma_add=torch.tensor([1.0, 0.0], dtype=default_dtype),
-        sigma_prop=torch.tensor([0.0, 1.0], dtype=default_dtype),
+        additive_variance=torch.tensor([1.0, 0.0], dtype=default_dtype),
+        proportional_variance=torch.tensor([0.0, 1.0], dtype=default_dtype),
         additive_output=torch.tensor([True, False]),
         proportional_output=torch.tensor([False, True]),
     )
@@ -234,8 +234,8 @@ def test_residuals_with_inf():
     torch.testing.assert_close(out_variance, expected_variance)
 
     expected_error_params = residual_error._replace(
-        sigma_add=torch.tensor([1.0, 0.0], dtype=default_dtype),
-        sigma_prop=torch.tensor([0.0, 1 / 4], dtype=default_dtype),
+        additive_variance=torch.tensor([1.0, 0.0], dtype=default_dtype),
+        proportional_variance=torch.tensor([0.0, 1 / 4], dtype=default_dtype),
     )
     error_params = estimate_error_params(
         observations=obs,
@@ -466,8 +466,8 @@ def test_joint_likelihood():
 
     sigma_val = 2.0
     residual_error = ResidualErrorEstimates(
-        sigma_add=torch.tensor([0.0, 0.0, sigma_val], dtype=default_dtype),
-        sigma_prop=torch.tensor([0.0, 0.0, 0.0], dtype=default_dtype),
+        additive_variance=torch.tensor([0.0, 0.0, sigma_val], dtype=default_dtype),
+        proportional_variance=torch.tensor([0.0, 0.0, 0.0], dtype=default_dtype),
         additive_output=torch.tensor([False, False, True]),
         proportional_output=torch.tensor([False, False, False]),
     )

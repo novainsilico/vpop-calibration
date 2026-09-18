@@ -30,10 +30,10 @@ output:
       error_model:
         out_1:
           error_type: additive
-          sigma: 0.1
+          initial_variance: 0.1
         out_2:
           error_type: proportional
-          sigma: 0.5
+          initial_variance: 0.5
       beta_init:
       - 2.302585092994046
       - 0.5
@@ -77,10 +77,10 @@ output:
       - 2.2668416013294843
       surv_coeffs: []
       res_var:
-        sigma_add:
+        additive_variance:
         - 5737.760322526124
         - 0.0
-        sigma_prop:
+        proportional_variance:
         - 0.0
         - 3.6299560659061934
         additive_output:
@@ -172,13 +172,13 @@ output:
         2: 0.5408601876701662
         3: 0.5050656615988439
         4: 0.5050126720152591
-      sigma_out_1:
+      variance_out_1:
         0: 0.1
         1: 7452.36737367771
         2: 7079.749004993824
         3: 5737.838401885993
         4: 5737.760322526124
-      sigma_out_2:
+      variance_out_2:
         0: 0.5
         1: 3.505217367275447
         2: 3.552582868079925
@@ -248,11 +248,11 @@ output:
       complete_likelihood: 71.14930283693437
       fixed_effects_loss:
       - 59.41080519089622
-      sigma:
-        sigma_add:
+      residual_variance:
+        additive_variance:
         - 5737.760322526124
         - 0.0
-        sigma_prop:
+        proportional_variance:
         - 0.0
         - 3.6299560659061934
         additive_output:

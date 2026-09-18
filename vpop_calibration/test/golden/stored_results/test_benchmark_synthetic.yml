@@ -20,19 +20,19 @@ output:
       error_model:
         y_1:
           error_type: additive
-          sigma: 4.0
+          initial_variance: 4.0
         y_2:
           error_type: additive
-          sigma: 4.0
+          initial_variance: 4.0
         y_3:
           error_type: additive
-          sigma: 4.0
+          initial_variance: 4.0
         y_4:
           error_type: additive
-          sigma: 4.0
+          initial_variance: 4.0
         y_5:
           error_type: additive
-          sigma: 4.0
+          initial_variance: 4.0
       beta_init:
       - 2.302585092994046
       - 2.302585092994046
@@ -95,13 +95,13 @@ output:
       log_mi: []
       surv_coeffs: []
       res_var:
-        sigma_add:
+        additive_variance:
         - 0.02023850339381201
         - 0.01823263601891792
         - 0.037435688570810845
         - 0.0842746710683802
         - 0.039083911873976834
-        sigma_prop:
+        proportional_variance:
         - 0.0
         - 0.0
         - 0.0
@@ -5665,7 +5665,7 @@ output:
         497: 1.1022258293130673
         498: 1.1018778795125221
         499: 1.1032753804038953
-      sigma_y_1:
+      variance_y_1:
         0: 4.0
         1: 4.0
         2: 4.0
@@ -6166,7 +6166,7 @@ output:
         497: 0.02024106220207023
         498: 0.02028041494254369
         499: 0.02023850339381201
-      sigma_y_2:
+      variance_y_2:
         0: 4.0
         1: 4.0
         2: 4.0
@@ -6667,7 +6667,7 @@ output:
         497: 0.0182097278771843
         498: 0.018227758067272892
         499: 0.01823263601891792
-      sigma_y_3:
+      variance_y_3:
         0: 4.0
         1: 4.0
         2: 4.0
@@ -7168,7 +7168,7 @@ output:
         497: 0.0376746642283158
         498: 0.03750047121705407
         499: 0.037435688570810845
-      sigma_y_4:
+      variance_y_4:
         0: 4.0
         1: 4.0
         2: 4.0
@@ -7669,7 +7669,7 @@ output:
         497: 0.08462421618076009
         498: 0.08444868520707229
         499: 0.0842746710683802
-      sigma_y_5:
+      variance_y_5:
         0: 4.0
         1: 4.0
         2: 4.0
@@ -11319,14 +11319,14 @@ output:
       complete_likelihood: 865.1616376316288
       fixed_effects_loss:
       - .nan
-      sigma:
-        sigma_add:
+      residual_variance:
+        additive_variance:
         - 0.02023850339381201
         - 0.01823263601891792
         - 0.037435688570810845
         - 0.0842746710683802
         - 0.039083911873976834
-        sigma_prop:
+        proportional_variance:
         - 0.0
         - 0.0
         - 0.0

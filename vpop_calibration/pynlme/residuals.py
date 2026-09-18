@@ -8,8 +8,8 @@ from vpop_calibration.config import device, default_dtype
 
 
 class ResidualErrorEstimates(NamedTuple):
-    sigma_add: torch.Tensor
-    sigma_prop: torch.Tensor
+    additive_variance: torch.Tensor
+    proportional_variance: torch.Tensor
     additive_output: torch.Tensor  # bool, size (nb_outputs,)
     proportional_output: torch.Tensor  # bool, size (nb_outputs,)
 
@@ -21,7 +21,10 @@ class ResidualErrorEstimates(NamedTuple):
     ) -> "ResidualErrorEstimates":
         """Build the initial estimates from the user-specified priors."""
         empty_error_model = ErrorModel(
-            error_type="survival", sigma=None, sigma_add=None, sigma_prop=None
+            error_type="survival",
+            initial_variance=None,
+            initial_variance_add=None,
+            initial_variance_prop=None,
         )
         priors = [
             error_model_priors.get(name, empty_error_model) for name in output_names
@@ -29,8 +32,12 @@ class ResidualErrorEstimates(NamedTuple):
         variances = [prior.variance_components for prior in priors]
         active = [prior.active_components for prior in priors]
         return cls(
-            sigma_add=torch.as_tensor([var[0] for var in variances], device=device),
-            sigma_prop=torch.as_tensor([var[1] for var in variances], device=device),
+            additive_variance=torch.as_tensor(
+                [var[0] for var in variances], device=device
+            ),
+            proportional_variance=torch.as_tensor(
+                [var[1] for var in variances], device=device
+            ),
             additive_output=torch.as_tensor([act[0] for act in active], device=device),
             proportional_output=torch.as_tensor(
                 [act[1] for act in active], device=device
@@ -38,14 +45,16 @@ class ResidualErrorEstimates(NamedTuple):
         )
 
     def assert_initialized(self) -> None:
-        if bool(((self.sigma_add < 0.0) | (self.sigma_prop < 0.0)).any()):
+        if bool(
+            ((self.additive_variance < 0.0) | (self.proportional_variance < 0.0)).any()
+        ):
             raise RuntimeError(
                 "The residual error model still holds its uninitialized value. `update_res_var` was never called"
             )
 
     @property
     def nb_outputs(self) -> int:
-        return self.sigma_add.shape[0]
+        return self.additive_variance.shape[0]
 
     @property
     def error_types(self) -> list[ErrorType]:
@@ -64,15 +73,15 @@ class ResidualErrorEstimates(NamedTuple):
     def sanitized(self) -> "ResidualErrorEstimates":
         """Force inactive components to zero and active ones to stay non-negative."""
         return self._replace(
-            sigma_add=torch.where(
+            additive_variance=torch.where(
                 self.additive_output,
-                self.sigma_add.clamp_min(0.0),
-                torch.zeros_like(self.sigma_add),
+                self.additive_variance.clamp_min(0.0),
+                torch.zeros_like(self.additive_variance),
             ),
-            sigma_prop=torch.where(
+            proportional_variance=torch.where(
                 self.proportional_output,
-                self.sigma_prop.clamp_min(0.0),
-                torch.zeros_like(self.sigma_prop),
+                self.proportional_variance.clamp_min(0.0),
+                torch.zeros_like(self.proportional_variance),
             ),
         )
 
@@ -84,14 +93,18 @@ class ResidualErrorEstimates(NamedTuple):
     ) -> torch.Tensor:
         """Residual variance of each prediction."""
         nb_samples = predictions.shape[0]
-        sigma_add = self.sigma_add.index_select(0, output_index).expand(nb_samples, -1)
-        sigma_prop = self.sigma_prop.index_select(0, output_index).expand(
-            nb_samples, -1
-        )
+        additive_variance = self.additive_variance.index_select(
+            0, output_index
+        ).expand(nb_samples, -1)
+        proportional_variance = self.proportional_variance.index_select(
+            0, output_index
+        ).expand(nb_samples, -1)
         sq_predictions = torch.where(
             torch.isfinite(predictions), predictions**2, torch.ones_like(predictions)
         )
-        return (sigma_add + sigma_prop * sq_predictions).clamp_min(min_variance)
+        return (additive_variance + proportional_variance * sq_predictions).clamp_min(
+            min_variance
+        )
 
     def get_state_dict(self) -> dict[str, Any]:
         return {key: val.detach().cpu().tolist() for key, val in self._asdict().items()}
@@ -222,7 +235,7 @@ def compute_normal_likelihood(
     nb_patients = len(observations.obs_index.id.ref_values)
 
     continuous_outputs_indicator = torch.logical_or(
-        residual_error.sigma_add, residual_error.sigma_prop
+        residual_error.additive_variance, residual_error.proportional_variance
     )
     obs_output_indices = observations.obs_index.output_name.index_values
     continuous_outputs_mask = torch.index_select(

@@ -45,8 +45,8 @@ def estimate_error_params(
     finite = torch.isfinite(predictions)
 
     # Outputs without usable observations simply keep their current estimate.
-    new_sigma_add = residual_error.sigma_add.clone()
-    new_sigma_prop = residual_error.sigma_prop.clone()
+    new_additive_variance = residual_error.additive_variance.clone()
+    new_proportional_variance = residual_error.proportional_variance.clone()
 
     for output, error_type in enumerate(residual_error.error_types):
         keep = (output_index == output).unsqueeze(0) & finite
@@ -58,23 +58,31 @@ def estimate_error_params(
             continue
 
         if error_type == "additive":
-            new_sigma_add[output] = sq_residuals.mean()
+            new_additive_variance[output] = sq_residuals.mean()
         elif error_type == "proportional":
-            new_sigma_prop[output] = (sq_residuals / sq_predictions).mean()
+            new_proportional_variance[output] = (sq_residuals / sq_predictions).mean()
         elif error_type == "combined":
             warm_start = torch.stack(
-                (residual_error.sigma_add[output], residual_error.sigma_prop[output])
+                (
+                    residual_error.additive_variance[output],
+                    residual_error.proportional_variance[output],
+                )
             )
-            new_sigma_add[output], new_sigma_prop[output] = _solve_combined_output(
-                sq_residuals=sq_residuals,
-                sq_predictions=sq_predictions,
-                max_iter=max_iter,
-                warm_start=warm_start,
-                min_variance=min_variance,
+            new_additive_variance[output], new_proportional_variance[output] = (
+                _solve_combined_output(
+                    sq_residuals=sq_residuals,
+                    sq_predictions=sq_predictions,
+                    max_iter=max_iter,
+                    warm_start=warm_start,
+                    min_variance=min_variance,
+                )
             )
         else:
             raise NotImplementedError(
                 f"No variance estimator implemented for error_type={error_type!r}"
             )
 
-    return residual_error._replace(sigma_add=new_sigma_add, sigma_prop=new_sigma_prop)
+    return residual_error._replace(
+        additive_variance=new_additive_variance,
+        proportional_variance=new_proportional_variance,
+    )

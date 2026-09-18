@@ -101,9 +101,9 @@ error_components: dict[ErrorType, tuple[bool, bool]] = {
 class ErrorModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
     error_type: ErrorType
-    sigma: float | None = Field(default=None, ge=0)
-    sigma_add: float | None = Field(default=None, ge=0)
-    sigma_prop: float | None = Field(default=None, ge=0)
+    initial_variance: float | None = Field(default=None, ge=0)
+    initial_variance_add: float | None = Field(default=None, ge=0)
+    initial_variance_prop: float | None = Field(default=None, ge=0)
 
     @property
     def active_components(self) -> tuple[bool, bool]:
@@ -112,33 +112,43 @@ class ErrorModel(BaseModel):
     @model_validator(mode="after")
     def check_error_components(self) -> Self:
         if self.error_type == "combined":
-            if self.sigma is not None:
+            if self.initial_variance is not None:
                 raise ValueError(
-                    "error_type='combined' uses sigma_add and sigma_prop, not sigma"
+                    "error_type='combined' uses initial_variance_add and initial_variance_prop, not initial_variance"
                 )
-            if self.sigma_add is None or self.sigma_prop is None:
+            if self.initial_variance_add is None or self.initial_variance_prop is None:
                 raise ValueError(
-                    "error_type='combined' requires both sigma_add and sigma_prop"
+                    "error_type='combined' requires both initial_variance_add and initial_variance_prop"
                 )
         elif self.error_type == "additive" or self.error_type == "proportional":
-            if self.sigma_add is not None or self.sigma_prop is not None:
+            if self.initial_variance_add is not None or self.initial_variance_prop is not None:
                 raise ValueError(
-                    f"error_type='{self.error_type}' uses sigma, "
-                    "not sigma_add/sigma_prop"
+                    f"error_type='{self.error_type}' uses initial_variance, "
+                    "not initial_variance_add/initial_variance_prop"
                 )
-            if self.sigma is None:
-                raise ValueError(f"error_type='{self.error_type}' requires sigma")
+            if self.initial_variance is None:
+                raise ValueError(
+                    f"error_type='{self.error_type}' requires initial_variance"
+                )
         elif self.error_type == "survival":
-            if any([self.sigma, self.sigma_add, self.sigma_prop]):
-                raise ValueError("Survival error type requires no sigma to be defined")
+            if any(
+                [
+                    self.initial_variance,
+                    self.initial_variance_add,
+                    self.initial_variance_prop,
+                ]
+            ):
+                raise ValueError(
+                    "Survival error type requires no initial_variance to be defined"
+                )
         return self
 
     @property
     def variance_components(self) -> tuple[float, float]:
         return {
-            "additive": (self.sigma, 0.0),
-            "proportional": (0.0, self.sigma),
-            "combined": (self.sigma_add, self.sigma_prop),
+            "additive": (self.initial_variance, 0.0),
+            "proportional": (0.0, self.initial_variance),
+            "combined": (self.initial_variance_add, self.initial_variance_prop),
             "survival": (0.0, 0.0),
         }[self.error_type]
 

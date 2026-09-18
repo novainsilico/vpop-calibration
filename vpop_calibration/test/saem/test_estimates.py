@@ -7,9 +7,9 @@ import torch
 def test_check_convergence():
     tensor_1 = torch.tensor([0, 0])
     tensor_2 = torch.tensor([0, 0.2])
-    sigma = ResidualErrorEstimates(
-        sigma_add=torch.tensor([1.0, 0.0]),
-        sigma_prop=torch.tensor([0.0, 1.0]),
+    residual_variance = ResidualErrorEstimates(
+        additive_variance=torch.tensor([1.0, 0.0]),
+        proportional_variance=torch.tensor([0.0, 1.0]),
         additive_output=torch.tensor([True, False]),
         proportional_output=torch.tensor([False, True]),
     )
@@ -18,7 +18,7 @@ def test_check_convergence():
         beta=tensor_1,
         omega=tensor_1,
         ebe=tensor_1,
-        sigma=sigma,
+        residual_variance=residual_variance,
         complete_likelihood=tensor_1,
         model_intrinsic=tensor_1,
         fixed_effects_loss=tensor_1,
@@ -28,7 +28,7 @@ def test_check_convergence():
         beta=tensor_1,
         omega=tensor_1,
         ebe=tensor_2,
-        sigma=sigma,
+        residual_variance=residual_variance,
         complete_likelihood=tensor_1,
         model_intrinsic=tensor_2,
         fixed_effects_loss=tensor_1,
@@ -54,9 +54,9 @@ def test_iter_summary():
     mi = torch.tensor([0.0])
     mi_names = ["mi_1"]
     cov_coeff_names = ["cov_1"]
-    sigma = ResidualErrorEstimates(
-        sigma_add=torch.tensor([1.0, 0.0]),
-        sigma_prop=torch.tensor([0.0, 1.0]),
+    residual_variance = ResidualErrorEstimates(
+        additive_variance=torch.tensor([1.0, 0.0]),
+        proportional_variance=torch.tensor([0.0, 1.0]),
         additive_output=torch.tensor([True, False]),
         proportional_output=torch.tensor([False, True]),
     )
@@ -66,7 +66,7 @@ def test_iter_summary():
         beta=beta,
         omega=omega,
         model_intrinsic=mi,
-        sigma=sigma,
+        residual_variance=residual_variance,
         ebe=torch.tensor([0.0]),
         complete_likelihood=torch.tensor([0.0]),
         fixed_effects_loss=torch.tensor([0.0]),
@@ -89,9 +89,9 @@ def test_state_dict():
     beta = torch.tensor([0.0, 0.0, 0.0])
     omega = torch.tensor([[0.0, 0.0], [0.0, 0.0]])
     mi = torch.tensor([0.0])
-    sigma = ResidualErrorEstimates(
-        sigma_add=torch.tensor([1.0, 0.0]),
-        sigma_prop=torch.tensor([0.0, 1.0]),
+    residual_variance = ResidualErrorEstimates(
+        additive_variance=torch.tensor([1.0, 0.0]),
+        proportional_variance=torch.tensor([0.0, 1.0]),
         additive_output=torch.tensor([True, False]),
         proportional_output=torch.tensor([False, True]),
     )
@@ -100,7 +100,7 @@ def test_state_dict():
         beta=beta,
         omega=omega,
         model_intrinsic=mi,
-        sigma=sigma,
+        residual_variance=residual_variance,
         ebe=torch.tensor([0.0]),
         complete_likelihood=torch.tensor([0.0]),
         fixed_effects_loss=torch.tensor([0.0]),
