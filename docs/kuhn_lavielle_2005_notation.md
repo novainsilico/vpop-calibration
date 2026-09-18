@@ -11,7 +11,7 @@ article, so some mappings cover several code variables.
 | $x_{ij}$ | Known observation condition, such as time | `model.data.full_obs.obs_index.time` (with protocol information in the other `DataIndex` fields) |
 | $g(\phi_i, \beta, x_{ij})$ | Structural-model prediction | `model.predict_all_patients(...)` / the configured `StructuralModel` |
 | $h(\phi_i, \beta, x_{ij})$ | Observation-error scale | `model.residual_var.variance(...)` |
-| $\sigma^2$ | Within-individual residual variance | `model.residual_var` (`sigma_add` and `sigma_prop` store variance components) |
+| $\sigma^2$ | Within-individual residual variance | `model.residual_var` (`additive_variance` and `proportional_variance` store variance components) |
 | $\phi_i$ | Individual parameter vector, with $\phi_i=A_i\mu+\eta_i$ | `mh_state.gaussian_params` |
 | $A_i$ | Known individual design matrix | `model.design_matrices[id]`; stacked as `model.full_design_matrix` |
 | $\mu$ | Population means and covariate coefficients | `model.population_betas` |

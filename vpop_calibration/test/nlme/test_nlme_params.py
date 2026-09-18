@@ -26,8 +26,8 @@ def sample_nlme_params() -> dict:
             },
         },
         "error_model": {
-            "out_1": {"error_type": "additive", "sigma": 0.1},
-            "out_2": {"error_type": "proportional", "sigma": 0.5},
+            "out_1": {"error_type": "additive", "initial_variance": 0.1},
+            "out_2": {"error_type": "proportional", "initial_variance": 0.5},
         },
         "pdk": ["pdk_1"],
     }
@@ -88,7 +88,7 @@ def test_duplicate_names():
             },
         },
         "error_model": {
-            "out_1": {"error_type": "additive", "sigma": 0.1},
+            "out_1": {"error_type": "additive", "initial_variance": 0.1},
         },
     }
 
@@ -100,7 +100,7 @@ def test_duplicate_names():
             },
         },
         "error_model": {
-            "out_1": {"error_type": "additive", "sigma": 0.1},
+            "out_1": {"error_type": "additive", "initial_variance": 0.1},
         },
         "pdk": ["foo"],
     }
@@ -114,7 +114,7 @@ def test_duplicate_names():
             },
         },
         "error_model": {
-            "out_1": {"error_type": "additive", "sigma": 0.1},
+            "out_1": {"error_type": "additive", "initial_variance": 0.1},
         },
         "pdk": ["foo"],
     }
@@ -132,30 +132,30 @@ def test_state_dict(sample_nlme_params):
 
 
 VALID_ERROR_MODELS = [
-    {"error_type": "additive", "sigma": 0.1},
-    {"error_type": "proportional", "sigma": 0.5},
-    {"error_type": "combined", "sigma_add": 0.1, "sigma_prop": 0.5},
+    {"error_type": "additive", "initial_variance": 0.1},
+    {"error_type": "proportional", "initial_variance": 0.5},
+    {"error_type": "combined", "initial_variance_add": 0.1, "initial_variance_prop": 0.5},
 ]
 
 INVALID_ERROR_MODELS = [
-    # An additive or proportional error model is parametrized by `sigma` alone
+    # An additive or proportional error model is parametrized by `initial_variance` alone
     {"error_type": "additive"},
-    {"error_type": "additive", "sigma_add": 0.1},
-    {"error_type": "additive", "sigma": 0.1, "sigma_add": 0.1},
+    {"error_type": "additive", "initial_variance_add": 0.1},
+    {"error_type": "additive", "initial_variance": 0.1, "initial_variance_add": 0.1},
     {"error_type": "proportional"},
-    {"error_type": "proportional", "sigma_prop": 0.5},
-    {"error_type": "proportional", "sigma": 0.5, "sigma_prop": 0.5},
-    # A combined error model needs both components, and no `sigma`
+    {"error_type": "proportional", "initial_variance_prop": 0.5},
+    {"error_type": "proportional", "initial_variance": 0.5, "initial_variance_prop": 0.5},
+    # A combined error model needs both components, and no `initial_variance`
     {"error_type": "combined"},
-    {"error_type": "combined", "sigma_add": 0.1},
-    {"error_type": "combined", "sigma_prop": 0.5},
-    {"error_type": "combined", "sigma": 0.1, "sigma_add": 0.1, "sigma_prop": 0.5},
+    {"error_type": "combined", "initial_variance_add": 0.1},
+    {"error_type": "combined", "initial_variance_prop": 0.5},
+    {"error_type": "combined", "initial_variance": 0.1, "initial_variance_add": 0.1, "initial_variance_prop": 0.5},
     # Variances are non-negative
-    {"error_type": "additive", "sigma": -0.1},
-    {"error_type": "combined", "sigma_add": -0.1, "sigma_prop": 0.5},
+    {"error_type": "additive", "initial_variance": -0.1},
+    {"error_type": "combined", "initial_variance_add": -0.1, "initial_variance_prop": 0.5},
     # Unknown error type, and unexpected field
-    {"error_type": "exponential", "sigma": 0.1},
-    {"error_type": "additive", "sigma": 0.1, "sigmaa": 0.1},
+    {"error_type": "exponential", "initial_variance": 0.1},
+    {"error_type": "additive", "initial_variance": 0.1, "sigmaa": 0.1},
 ]
 
 

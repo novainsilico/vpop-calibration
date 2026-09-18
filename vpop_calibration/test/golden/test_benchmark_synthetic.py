@@ -95,7 +95,7 @@ def model_params() -> dict:
             f"x_{j + 1}": {"prior": 10, "prior_omega": 3} for j in range(DIMENSION)
         },
         "error_model": {
-            f"y_{j + 1}": {"error_type": "additive", "sigma": 4.0}
+            f"y_{j + 1}": {"error_type": "additive", "initial_variance": 4.0}
             for j in range(DIMENSION)
         },
     }
@@ -134,7 +134,9 @@ def test_benchmark_synthetic(
     )
     recovered_omega = nlme_model.statistical_model.omega_pop.detach().cpu().numpy()
     recovered_noise_variance = (
-        nlme_model.statistical_model.residual_var.sigma_add.detach().cpu().numpy()
+        nlme_model.statistical_model.residual_var.additive_variance.detach()
+        .cpu()
+        .numpy()
     )
     log_lik = nlme_model.diagnostics.importance_sampler.log_lik
 

@@ -92,7 +92,7 @@ class PySaem:
             beta=self.model.population_betas,
             omega=self.model.omega_pop,
             ebe=output.gaussian_params.mean(dim=0),
-            sigma=self.model.residual_var,
+            residual_variance=self.model.residual_var,
             complete_likelihood=init_likelihood,
             model_intrinsic=self.model.log_mi,
             fixed_effects_loss=fixed_effects_loss,
@@ -240,26 +240,26 @@ class PySaem:
             if self.scheduler.phase == "learning":
                 # Simulated annealing is only considered in learning phase
                 target_res_var = target_res_var._replace(
-                    sigma_add=simulated_annealing(
-                        current=current_res_var.sigma_add,
-                        target=target_res_var.sigma_add,
+                    additive_variance=simulated_annealing(
+                        current=current_res_var.additive_variance,
+                        target=target_res_var.additive_variance,
                         factor=self.config.annealing_factor,
                     ),
-                    sigma_prop=simulated_annealing(
-                        current=current_res_var.sigma_prop,
-                        target=target_res_var.sigma_prop,
+                    proportional_variance=simulated_annealing(
+                        current=current_res_var.proportional_variance,
+                        target=target_res_var.proportional_variance,
                         factor=self.config.annealing_factor,
                     ),
                 )
             new_res_error_var = current_res_var._replace(
-                sigma_add=stochastic_approximation(
-                    previous=current_res_var.sigma_add,
-                    new=target_res_var.sigma_add,
+                additive_variance=stochastic_approximation(
+                    previous=current_res_var.additive_variance,
+                    new=target_res_var.additive_variance,
                     learning_rate=self.scheduler.stochastic_approximation_rate,
                 ),
-                sigma_prop=stochastic_approximation(
-                    previous=current_res_var.sigma_prop,
-                    new=target_res_var.sigma_prop,
+                proportional_variance=stochastic_approximation(
+                    previous=current_res_var.proportional_variance,
+                    new=target_res_var.proportional_variance,
                     learning_rate=self.scheduler.stochastic_approximation_rate,
                 ),
             )
@@ -333,7 +333,7 @@ class PySaem:
             beta=self.model.population_betas,
             omega=self.model.omega_pop,
             ebe=new_ebe,
-            sigma=self.model.residual_var,
+            residual_variance=self.model.residual_var,
             model_intrinsic=self.model.log_mi,
             surv_coeffs=self.model.surv_coeffs,
             complete_likelihood=self.mh_state.complete_likelihood,

@@ -10,7 +10,7 @@ class PopEstimates(NamedTuple):
     beta: torch.Tensor
     omega: torch.Tensor
     ebe: torch.Tensor
-    sigma: ResidualErrorEstimates
+    residual_variance: ResidualErrorEstimates
     model_intrinsic: torch.Tensor
     surv_coeffs: torch.Tensor
     complete_likelihood: torch.Tensor
@@ -20,19 +20,21 @@ class PopEstimates(NamedTuple):
         state_dict = {
             k: v.detach().cpu().numpy().tolist()
             for k, v in self._asdict().items()
-            if k != "sigma"
+            if k != "residual_variance"
         }
-        state_dict["sigma"] = self.sigma.get_state_dict()
+        state_dict["residual_variance"] = self.residual_variance.get_state_dict()
         return state_dict
 
     @classmethod
     def from_state_dict(cls, state_dict: dict[str, Any]) -> "PopEstimates":
         return cls(
-            sigma=ResidualErrorEstimates.from_state_dict(state_dict["sigma"]),
+            residual_variance=ResidualErrorEstimates.from_state_dict(
+                state_dict["residual_variance"]
+            ),
             **{
                 k: torch.as_tensor(v, device=device, dtype=default_dtype)
                 for k, v in state_dict.items()
-                if k != "sigma"
+                if k != "residual_variance"
             },
         )
 
@@ -41,7 +43,7 @@ class PopEstimates(NamedTuple):
             "beta",
             "omega",
             "ebe",
-            "sigma",
+            "residual_variance",
             "model_intrinsic",
             "surv_coeffs",
             "complete_likelihood",
@@ -66,8 +68,14 @@ def check_convergence(
     ]
     # The residual error model keeps its two variances in separate tensors
     compared_pairs += [
-        (current_est.sigma.sigma_add, prev_est.sigma.sigma_add),
-        (current_est.sigma.sigma_prop, prev_est.sigma.sigma_prop),
+        (
+            current_est.residual_variance.additive_variance,
+            prev_est.residual_variance.additive_variance,
+        ),
+        (
+            current_est.residual_variance.proportional_variance,
+            prev_est.residual_variance.proportional_variance,
+        ),
     ]
     for current_val, prev_val in compared_pairs:
         abs_diff = torch.abs(current_val - prev_val)
@@ -85,7 +93,7 @@ class IterSummary(NamedTuple):
     model_intrinsic: dict[str, float]
     surv_coeffs: dict[str, float]
     cov: dict[str, float]
-    sigma: dict[str, float]
+    residual_variance: dict[str, float]
     convergence_indicator: float
     fixed_effects_loss: float
 
@@ -97,7 +105,7 @@ class IterSummary(NamedTuple):
             (self.model_intrinsic, ""),
             (self.surv_coeffs, ""),
             (self.cov, ""),
-            (self.sigma, "sigma_"),
+            (self.residual_variance, "variance_"),
         ]
         return header_tuples
 
@@ -130,17 +138,25 @@ class IterSummary(NamedTuple):
             coef: estimates.surv_coeffs[surv_coeffs_names.index(coef)].item()
             for coef in surv_coeffs_names
         }
-        sigma_dict: dict[str, float] = {}
+        residual_variance_dict: dict[str, float] = {}
         for i, (output, error_type) in enumerate(
-            zip(output_names, estimates.sigma.error_types)
+            zip(output_names, estimates.residual_variance.error_types)
         ):
             if error_type == "combined":
-                sigma_dict[f"{output}_add"] = estimates.sigma.sigma_add[i].item()
-                sigma_dict[f"{output}_prop"] = estimates.sigma.sigma_prop[i].item()
+                residual_variance_dict[f"{output}_add"] = (
+                    estimates.residual_variance.additive_variance[i].item()
+                )
+                residual_variance_dict[f"{output}_prop"] = (
+                    estimates.residual_variance.proportional_variance[i].item()
+                )
             elif error_type == "additive":
-                sigma_dict[output] = estimates.sigma.sigma_add[i].item()
+                residual_variance_dict[output] = (
+                    estimates.residual_variance.additive_variance[i].item()
+                )
             else:
-                sigma_dict[output] = estimates.sigma.sigma_prop[i].item()
+                residual_variance_dict[output] = (
+                    estimates.residual_variance.proportional_variance[i].item()
+                )
 
         return IterSummary(
             iteration=iteration,
@@ -148,7 +164,7 @@ class IterSummary(NamedTuple):
             omega=omega_dict,
             model_intrinsic=mi_dict,
             cov=cov_dict,
-            sigma=sigma_dict,
+            residual_variance=residual_variance_dict,
             convergence_indicator=estimates.complete_likelihood.item(),
             fixed_effects_loss=estimates.fixed_effects_loss.item(),
             surv_coeffs=surv_coeffs_dict,
@@ -160,7 +176,13 @@ class IterSummary(NamedTuple):
         else:
             header = ""
         out_str_list = [f"{self.iteration:<{width}}"]
-        for d in [self.mu, self.omega, self.model_intrinsic, self.cov, self.sigma]:
+        for d in [
+            self.mu,
+            self.omega,
+            self.model_intrinsic,
+            self.cov,
+            self.residual_variance,
+        ]:
             if d:
                 out_str_list.append(dict_values_to_str(d, width))
         out_str = header + ", ".join(out_str_list)

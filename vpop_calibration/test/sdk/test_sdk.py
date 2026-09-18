@@ -47,9 +47,9 @@ def sample_nlme_params() -> dict:
             },
         },
         "error_model": {
-            "A0": {"error_type": "additive", "sigma": 0.1},
-            "A1": {"error_type": "additive", "sigma": 0.5},
-            "A2": {"error_type": "additive", "sigma": 0.5},
+            "A0": {"error_type": "additive", "initial_variance": 0.1},
+            "A1": {"error_type": "additive", "initial_variance": 0.5},
+            "A2": {"error_type": "additive", "initial_variance": 0.5},
         },
         "pdk": ["k_el"],
     }
