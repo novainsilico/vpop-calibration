@@ -243,3 +243,79 @@ def test_state_dict(sample_nlme_params, obs_data, struct_model):
     )
 
     assert nlme_model.current_params == new_nlme_model.current_params
+
+
+def structural_model(offset, gain, t):
+    return offset + gain + 0 * t
+
+
+def test_patient_ids_ordered():
+    obs = ObsData(
+        pd.DataFrame(
+            {
+                "id": ["a", "b"],
+                "output_name": ["y", "y"],
+                "time": [0.0, 0.0],
+                "value": [21.0, 11.0],
+                "offset": [20.0, 10.0],
+            }
+        )
+    )
+    params = MixedEffectParameters(
+        pdu={"gain": {"prior": 1.0, "prior_omega": 0.1}},
+        pdk=["offset"],
+        error_model={"y": {"error_type": "additive", "initial_variance": 1.0}},
+    )
+    model = StatisticalModel(
+        StructuralAnalytical(equations=structural_model, variable_names=["y"]),
+        obs,
+        params,
+    )
+    batched = model.log_posterior_etas_all_patients(torch.zeros(1, 2, 1))
+    singles = [
+        model.single_patient_likelihood_factory(p)(torch.zeros(1, 1, 1))
+        for p in model.patients
+    ]
+    expected_predictions = [[s.predictions.item() for s in singles]]
+
+    assert batched.predictions.tolist() == expected_predictions, (
+        "Batched predict_all_patients() must return each patient's own "
+        "prediction in the same row order as the observations, matching the "
+        "id-keyed single_patient_likelihood_factory ground truth."
+    )
+
+
+def test_patient_ids_unordered():
+    obs = ObsData(
+        pd.DataFrame(
+            {
+                "id": ["b", "a"],
+                "output_name": ["y", "y"],
+                "time": [0.0, 0.0],
+                "value": [21.0, 11.0],
+                "offset": [20.0, 10.0],
+            }
+        )
+    )
+    params = MixedEffectParameters(
+        pdu={"gain": {"prior": 1.0, "prior_omega": 0.1}},
+        pdk=["offset"],
+        error_model={"y": {"error_type": "additive", "initial_variance": 1.0}},
+    )
+    model = StatisticalModel(
+        StructuralAnalytical(equations=structural_model, variable_names=["y"]),
+        obs,
+        params,
+    )
+    batched = model.log_posterior_etas_all_patients(torch.zeros(1, 2, 1))
+    singles = [
+        model.single_patient_likelihood_factory(p)(torch.zeros(1, 1, 1))
+        for p in model.patients
+    ]
+    expected_predictions = [[s.predictions.item() for s in singles]]
+
+    assert batched.predictions.tolist() == expected_predictions, (
+        "Batched predict_all_patients() must return each patient's own "
+        "prediction in the same row order as the observations, matching the "
+        "id-keyed single_patient_likelihood_factory ground truth."
+    )
