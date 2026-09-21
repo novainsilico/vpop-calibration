@@ -358,7 +358,7 @@ class ModelDiagnostics:
             q_obs.index.names = ["bin", "quantile"]
 
             pred_q_batch = df_output.groupby(["bin", "batch_id"])[
-                "predicted_value"
+                "simulated_value_with_noise"
             ].quantile(quantiles_arr)
             pred_q_batch.index.names = ["bin", "batch_id", "quantile"]
             pred_median = (
