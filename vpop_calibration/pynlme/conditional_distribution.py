@@ -15,6 +15,7 @@ except ImportError:
 
 
 from vpop_calibration.pynlme.model import StatisticalModel
+from vpop_calibration.pynlme.residuals import add_predictive_error
 from vpop_calibration.config import smoke_test, device, default_dtype
 from vpop_calibration.metropolis_hastings import MetropolisHastingsState, mh_step
 from vpop_calibration.utils import reproducible_uuid4
@@ -310,10 +311,20 @@ class ConditionalDistributionSampler:
             this_sample_df = self.add_unique_id(
                 self.model.data.full_obs.to_pandas(prediction=sample.predictions)
             )
+            # Add the calibrated residual/observation noise to the simulated outputs
+            simulated_value_with_noise = add_predictive_error(
+                observations=self.model.data.full_obs,
+                predictions=sample.predictions,
+                residual_error=self.model.residual_var,
+                min_variance=self.model.config.residual_min_variance,
+            )
+
+            this_sample_df["simulated_value_with_noise"] = (
+                simulated_value_with_noise.squeeze(0).detach().cpu().numpy()
+            )
             this_sample_df["batch_id"] = i
             all_df.append(this_sample_df)
-        total_df = pd.concat(all_df)
-        return total_df
+        return pd.concat(all_df, ignore_index=True)
 
     def add_unique_id(self, df: pd.DataFrame) -> pd.DataFrame:
         """Create  a new `id` column with unique values, store the patient id in `id_ref`.
