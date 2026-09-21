@@ -243,3 +243,77 @@ def test_state_dict(sample_nlme_params, obs_data, struct_model):
     )
 
     assert nlme_model.current_params == new_nlme_model.current_params
+
+
+def structural_model(offset, gain, t):
+    return offset + gain + 0 * t
+
+
+def test_patient_ids_ordered():
+    obs = ObsData(
+        pd.DataFrame(
+            {
+                "id": ["a", "b"],
+                "output_name": ["y", "y"],
+                "time": [0.0, 0.0],
+                "value": [21.0, 11.0],
+                "offset": [10.0, 20.0],
+            }
+        )
+    )
+    params = MixedEffectParameters(
+        pdu={"gain": {"prior": 1.0, "prior_omega": 0.1}},
+        pdk=["offset"],
+        error_model={"y": {"error_type": "additive", "initial_variance": 1.0}},
+    )
+    model = StatisticalModel(
+        StructuralAnalytical(equations=structural_model, variable_names=["y"]),
+        obs,
+        params,
+    )
+    # model patients are sorted by lexicographic order
+    assert model.patients == ["a", "b"]
+
+    # batched predictions use the observation-row order
+    batched = model.log_posterior_etas_all_patients(torch.zeros(1, 2, 1))
+    assert batched.predictions.tolist() == [
+        [
+            structural_model(offset=10, gain=1, t=0),  # patient "a"
+            structural_model(offset=20, gain=1, t=0),  # patient "b"
+        ]
+    ], "batched predictions must be ordered by observation row"
+
+
+def test_patient_ids_unordered():
+    obs = ObsData(
+        pd.DataFrame(
+            {
+                "id": ["b", "a"],
+                "output_name": ["y", "y"],
+                "time": [0.0, 0.0],
+                "value": [21.0, 11.0],
+                "offset": [20.0, 10.0],
+            }
+        )
+    )
+    params = MixedEffectParameters(
+        pdu={"gain": {"prior": 1.0, "prior_omega": 0.1}},
+        pdk=["offset"],
+        error_model={"y": {"error_type": "additive", "initial_variance": 1.0}},
+    )
+    model = StatisticalModel(
+        StructuralAnalytical(equations=structural_model, variable_names=["y"]),
+        obs,
+        params,
+    )
+    # model patients are sorted by lexicographic order
+    assert model.patients == ["a", "b"]
+
+    # batched predictions use the observation-row order
+    batched = model.log_posterior_etas_all_patients(torch.zeros(1, 2, 1))
+    assert batched.predictions.tolist() == [
+        [
+            structural_model(offset=20, gain=1, t=0),  # patient "b"
+            structural_model(offset=10, gain=1, t=0),  # patient "a"
+        ]
+    ], "batched predictions must be ordered by observation row"
