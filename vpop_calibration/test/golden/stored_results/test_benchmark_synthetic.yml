@@ -129,7 +129,7 @@ output:
       init_step_adaptation: 0.5
       learning_rate_power: 0.7
       annealing_factor: 0.95
-      fixed_effects_nb_iter: 5
+      fixed_effects_nb_iter: 1
       fixed_effects_grad_scale: 0.001
       fixed_effects_lr: 0.01
       convergence_threshold: 0.0001
@@ -145,6 +145,7 @@ output:
       logging_frequency: 10
       column_width: 12
       progress_bars: false
+      fixed_effects_patient_batch_size:
     scheduler:
       nb_iter_burnin: 30
       nb_iter_learning: 270

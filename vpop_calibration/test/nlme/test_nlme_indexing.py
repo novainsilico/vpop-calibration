@@ -1,10 +1,13 @@
 import torch
 import pandas as pd
+import pytest
 
 from vpop_calibration.pynlme.indexing import (
     TensorIndexing,
     DataIndex,
     ObservationsDataSet,
+    SurvivalOutputs,
+    remap_single_index,
 )
 from vpop_calibration.pynlme.schemas import ObsDataSchema
 
@@ -284,4 +287,123 @@ def test_from_pandas():
 
     pd.testing.assert_frame_equal(
         df_in_val.drop(columns=["task"]), df_out, check_dtype=False
+    )
+
+
+@pytest.fixture
+def sparse_observations():
+    df = pd.DataFrame(
+        {
+            "id": ["p2", "p0", "p3", "p2", "p1", "p0"],
+            "output_name": ["a", "c", "c", "b", "a", "c"],
+            "protocol_arm": ["arm-0", "arm-2", "arm-2", "arm-1", "arm-0", "arm-2"],
+            "task": ["a_arm-0", "c_arm-2", "c_arm-2", "b_arm-1", "a_arm-0", "c_arm-2"],
+            "time": [0, 2, 2, 1, 0, 3],
+        },
+        index=[20, 30, 40, 50, 60, 70],
+    )
+    return ObservationsDataSet(
+        obs_index=DataIndex.from_dataframe(df),
+        obs_values=torch.tensor([20.0, 30.0, 40.0, 50.0, 60.0, 70.0]),
+        survival_outputs=SurvivalOutputs("log_hazard", "cumulative_hazard"),
+    )
+
+
+def test_select_patients_preserves_sparse_rows_and_model_indices(sparse_observations):
+    selected = sparse_observations.select_patients(torch.tensor([3, 0]))
+    expected_positions = [1, 2, 5]
+
+    assert selected.obs_index.id.ref_values == ["p3", "p0"]
+    torch.testing.assert_close(
+        selected.obs_index.id.index_values,
+        torch.tensor(
+            [1, 0, 1], device=sparse_observations.obs_index.id.index_values.device
+        ),
+    )
+    torch.testing.assert_close(selected.obs_values, torch.tensor([30.0, 40.0, 70.0]))
+    for field in DataIndex._fields:
+        original_index = getattr(sparse_observations.obs_index, field)
+        selected_index = getattr(selected.obs_index, field)
+        pd.testing.assert_series_equal(
+            selected_index.raw_values,
+            original_index.raw_values.iloc[expected_positions],
+        )
+        if field != "id":
+            assert selected_index.ref_values == original_index.ref_values
+            torch.testing.assert_close(
+                selected_index.index_values,
+                original_index.index_values[expected_positions],
+            )
+    assert selected.survival_outputs == sparse_observations.survival_outputs
+
+
+def test_select_patients_does_not_mutate_source(sparse_observations):
+    original = sparse_observations.model_copy(deep=True)
+    selected = sparse_observations.select_patients(torch.tensor([3, 0]))
+    selected.obs_values.fill_(-1)
+    for index in selected.obs_index:
+        index.index_values.fill_(0)
+        index.ref_values.clear()
+        index.raw_values.iloc[:] = index.raw_values.iloc[0]
+
+    torch.testing.assert_close(sparse_observations.obs_values, original.obs_values)
+    for original_index, actual_index in zip(
+        original.obs_index, sparse_observations.obs_index
+    ):
+        torch.testing.assert_close(
+            actual_index.index_values, original_index.index_values
+        )
+        assert actual_index.ref_values == original_index.ref_values
+        pd.testing.assert_series_equal(
+            actual_index.raw_values, original_index.raw_values
+        )
+
+
+@pytest.mark.parametrize(
+    "patient_indices, message",
+    [
+        (torch.tensor([], dtype=torch.long), "nonempty one-dimensional"),
+        (torch.tensor(0), "nonempty one-dimensional"),
+        (torch.tensor([[0, 1]]), "nonempty one-dimensional"),
+        (torch.tensor([0.0, 1.0]), "integer"),
+        (torch.tensor([True, False]), "integer"),
+        (torch.tensor([1, 1]), "unique"),
+        (torch.tensor([-1, 0]), "out-of-range"),
+        (torch.tensor([0, 4]), "out-of-range"),
+    ],
+)
+def test_select_patients_rejects_invalid_indices(
+    sparse_observations, patient_indices, message
+):
+    with pytest.raises(ValueError, match=message):
+        sparse_observations.select_patients(patient_indices)
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is unavailable")
+@pytest.mark.parametrize(
+    "observation_device, selection_device", [("cuda", "cpu"), ("cpu", "cuda")]
+)
+def test_select_patients_handles_selection_on_another_device(
+    sparse_observations, observation_device, selection_device
+):
+    sparse_observations.obs_index = DataIndex(
+        *[
+            index._replace(index_values=index.index_values.to(observation_device))
+            for index in sparse_observations.obs_index
+        ]
+    )
+    sparse_observations.obs_values = sparse_observations.obs_values.to(
+        observation_device
+    )
+    selected = sparse_observations.select_patients(
+        torch.tensor([3, 0], device=selection_device)
+    )
+    for index in selected.obs_index:
+        assert index.index_values.device.type == observation_device
+    torch.testing.assert_close(
+        selected.obs_values, torch.tensor([30.0, 40.0, 70.0], device=observation_device)
+    )
+    torch.testing.assert_close(
+        selected.obs_index.id.index_values,
+        torch.tensor([1, 0, 1], device=observation_device),
     )

@@ -20,7 +20,11 @@ def remap_single_index(
     assert input_index.dim() == 1, (
         f"Unexpected indexing tensor dimension {input_index.dim()}"
     )
-    new_index = torch.as_tensor([mapping[int(i.item())] for i in input_index])
+    new_index = torch.as_tensor(
+        [mapping[int(i.item())] for i in input_index],
+        device=input_index.device,
+        dtype=input_index.dtype,
+    )
     return new_index
 
 
@@ -110,6 +114,68 @@ class ObservationsDataSet(BaseModel):
     survival_outputs: SurvivalOutputs | None = None
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    def select_patients(self, patient_indices: torch.Tensor) -> "ObservationsDataSet":
+        """Select patient positions, retaining complete observation records.
+
+        Patient references follow the requested order and their indices become
+        local to the selection. Observation rows retain their original order;
+        all other reference lists retain their model-wide indexing.
+        """
+        if patient_indices.dim() != 1 or patient_indices.numel() == 0:
+            raise ValueError(
+                "patient_indices must be a nonempty one-dimensional tensor"
+            )
+        if patient_indices.dtype not in (
+            torch.uint8,
+            torch.int8,
+            torch.int16,
+            torch.int32,
+            torch.int64,
+        ):
+            raise ValueError("patient_indices must contain integer indices")
+
+        patient_index = self.obs_index.id
+        nb_patients = len(patient_index.ref_values)
+        selected = patient_indices.to(
+            device=patient_index.index_values.device, dtype=torch.long
+        )
+        if ((selected < 0) | (selected >= nb_patients)).any():
+            raise ValueError("patient_indices contains an out-of-range patient index")
+        if selected.unique().numel() != selected.numel():
+            raise ValueError("patient_indices must contain unique indices")
+
+        mapping = torch.full(
+            (nb_patients,), -1, dtype=torch.long, device=selected.device
+        )
+        mapping[selected] = torch.arange(selected.numel(), device=selected.device)
+        local_patient_indices = mapping[patient_index.index_values]
+        row_mask = local_patient_indices >= 0
+        row_positions = row_mask.nonzero(as_tuple=True)[0].cpu().numpy()
+        selected_refs = [patient_index.ref_values[i] for i in selected.cpu().tolist()]
+
+        indexes = []
+        for field, index in zip(DataIndex._fields, self.obs_index):
+            index_values = (
+                local_patient_indices[row_mask]
+                if field == "id"
+                else index.index_values[row_mask.to(index.index_values.device)]
+            )
+            indexes.append(
+                TensorIndexing(
+                    index_values=index_values,
+                    ref_values=selected_refs
+                    if field == "id"
+                    else list(index.ref_values),
+                    raw_values=index.raw_values.iloc[row_positions].copy(),
+                )
+            )
+
+        return ObservationsDataSet(
+            obs_index=DataIndex(*indexes),
+            obs_values=self.obs_values[row_mask.to(self.obs_values.device)],
+            survival_outputs=self.survival_outputs,
+        )
 
     def to_pandas(
         self,

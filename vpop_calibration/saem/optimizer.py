@@ -5,6 +5,7 @@ from typing import Callable, Any
 import pandas as pd
 
 from collections import defaultdict
+from numbers import Integral
 from vpop_calibration.pynlme.model import StatisticalModel
 from vpop_calibration.saem.scheduler import SaemScheduler
 from vpop_calibration.saem.estimates import PopEstimates, IterSummary, check_convergence
@@ -27,7 +28,7 @@ from vpop_calibration.pynlme.residuals import (
 from vpop_calibration.pynlme.error_estimation import estimate_error_params
 from vpop_calibration.saem.plot import OptimizerPlot
 from vpop_calibration.config import smoke_test, default_dtype, device
-from vpop_calibration.saem.fixed_effects import optimize_fixed_effects
+from vpop_calibration.saem.fixed_effects import take_fixed_effects_step
 
 
 class PySaem:
@@ -38,6 +39,15 @@ class PySaem:
     ):
         self.model: StatisticalModel = model
         self.config = config
+        batch_size = self.config.fixed_effects_patient_batch_size
+        if batch_size is not None and (
+            isinstance(batch_size, bool)
+            or not isinstance(batch_size, Integral)
+            or batch_size <= 0
+        ):
+            raise ValueError(
+                "fixed_effects_patient_batch_size must be a positive integer or None"
+            )
         if self.config.nb_iter_smoothing is None:
             self.config = self.config._replace(
                 nb_iter_smoothing=self.config.nb_iter_learning
@@ -50,7 +60,6 @@ class PySaem:
                 nb_iter_burnin=1,
                 nb_iter_learning=2,
                 nb_iter_smoothing=2,
-                fixed_effects_nb_iter=1,
                 progress_bars=False,
                 live_plot=False,
                 logging=False,
@@ -228,6 +237,38 @@ class PySaem:
         if self.scheduler.phase != "burnin":
             new_params = self.model.current_params
 
+            # Evaluate at the population state targeted by the MCMC samples,
+            # before changing residual variances or other population parameters.
+            if self.model.nb_mi + self.model.nb_surv_coeffs > 0:
+                # Keep the same branch and patients for baseline and perturbations.
+                gaussian_params = self.mh_state.gaussian_params
+                branch_index = torch.randint(
+                    gaussian_params.shape[0], (1,), device=gaussian_params.device
+                )
+                batch_size = self.config.fixed_effects_patient_batch_size
+                patient_indices = None
+                if batch_size is not None and batch_size < self.model.nb_patients:
+                    patient_indices = torch.randperm(
+                        self.model.nb_patients, device=gaussian_params.device
+                    )[:batch_size]
+                objective_fun = self.build_fixed_effects_objective_function(
+                    gaussian_params.index_select(0, branch_index),
+                    patient_indices=patient_indices,
+                )
+                psi0 = torch.cat([self.model.log_mi, self.model.surv_coeffs], dim=-1)
+                new_fixed_effects, fixed_effects_loss = take_fixed_effects_step(
+                    loss_fn=objective_fun,
+                    psi0=psi0,
+                    lr=(
+                        self.config.fixed_effects_lr
+                        * self.scheduler.stochastic_approximation_rate
+                    ),
+                    eps_grad=self.config.fixed_effects_grad_scale,
+                    step_scale=self.model.fixed_effects_step_scale,
+                )
+                # Report the summed negative log-likelihood, not the per-patient mean.
+                fixed_effects_loss = fixed_effects_loss * self.model.nb_patients
+
             # M-step:
             # maximum-likelihood target for the residual error variance
             current_res_var: ResidualErrorEstimates = self.model.residual_var
@@ -288,34 +329,12 @@ class PySaem:
 
             # 3. Update fixed effects MIs
             if self.model.nb_mi + self.model.nb_surv_coeffs > 0:
-                objective_fun = self.build_fixed_effects_objective_function(
-                    self.mh_state.gaussian_params.mean(dim=0, keepdim=True)
-                )
-                psi0 = torch.cat([self.model.log_mi, self.model.surv_coeffs], dim=-1)
-                target_fixed_effects, fixed_effects_loss = optimize_fixed_effects(
-                    loss_fn=objective_fun,
-                    psi0=psi0,
-                    lr=self.config.fixed_effects_lr,
-                    nb_iter=self.config.fixed_effects_nb_iter,
-                    eps_grad=self.config.fixed_effects_grad_scale,
-                )
-                target_log_mi = target_fixed_effects[: self.model.nb_mi]
-                new_log_mi = stochastic_approximation(
-                    previous=self.model.log_mi,
-                    new=target_log_mi,
-                    learning_rate=self.scheduler.stochastic_approximation_rate,
-                )
-
+                # The proposal already includes the stochastic-approximation rate.
+                new_log_mi = new_fixed_effects[: self.model.nb_mi]
                 self.model.update_log_mi(new_log_mi)
                 new_params = new_params._replace(log_mi=new_log_mi)
 
-                target_surv_coeffs = target_fixed_effects[self.model.nb_mi :]
-                new_surv_coeffs = stochastic_approximation(
-                    previous=self.model.surv_coeffs,
-                    new=target_surv_coeffs,
-                    learning_rate=self.scheduler.stochastic_approximation_rate,
-                )
-
+                new_surv_coeffs = new_fixed_effects[self.model.nb_mi :]
                 self.model.update_surv_coeffs(new_surv_coeffs)
                 new_params = new_params._replace(surv_coeffs=new_surv_coeffs)
             self.model.current_params = new_params
@@ -354,13 +373,30 @@ class PySaem:
         return summary
 
     def build_fixed_effects_objective_function(
-        self, gaussian_params: torch.Tensor
+        self,
+        gaussian_params: torch.Tensor,
+        patient_indices: torch.Tensor | None = None,
     ) -> Callable:
-        """Build the objective function to be optimized for model intrinsic parameters estimation."""
+        """Build an objective with a fixed branch and optional patient subset.
 
-        assert (
-            gaussian_params.shape[0] == 1
-        ), "Ensure to average the gaussian parameters before building the fixed effects objective function"
+        ``gaussian_params`` contains the whole branch. ``patient_indices`` selects
+        patients once; the loss is averaged over the selected patients.
+        """
+
+        assert gaussian_params.shape[0] == 1, (
+            "Select one MCMC branch before building the fixed effects objective function"
+        )
+        assert gaussian_params.shape[1] == self.model.nb_patients
+
+        observations = self.model.data.full_obs
+        nb_patients = self.model.nb_patients
+        if patient_indices is not None:
+            observations = observations.select_patients(patient_indices)
+            patient_indices = patient_indices.to(
+                device=gaussian_params.device, dtype=torch.long
+            ).clone()
+            gaussian_params = gaussian_params.index_select(1, patient_indices)
+            nb_patients = patient_indices.numel()
 
         def fixed_effects_objective_function(fixed_effects: torch.Tensor):
             # Assemble the patient parameters
@@ -369,26 +405,34 @@ class PySaem:
             new_physical_params = self.model.convert_gaussian_to_physical(
                 psi=gaussian_params, log_mi=log_mi, surv_coeffs=surv_coeffs
             )
-            new_thetas = self.model.convert_physical_to_thetas_all_patients(
-                new_physical_params
-            )
-            model_input = self.model.convert_thetas_to_model_parameters_all_patients(
-                new_thetas
-            )
-            predictions, _ = self.model.predict_all_patients(model_input)
+            if patient_indices is None:
+                new_thetas = self.model.convert_physical_to_thetas_all_patients(
+                    new_physical_params
+                )
+                model_input = (
+                    self.model.convert_thetas_to_model_parameters_all_patients(
+                        new_thetas
+                    )
+                )
+                predictions, _ = self.model.predict_all_patients(model_input)
+            else:
+                predictions, _ = self.model.predict_patient_subset(
+                    physical_params=new_physical_params,
+                    patient_indices=patient_indices,
+                    prediction_index=observations.obs_index,
+                )
             total_log_lik = (
                 log_likelihood_observation(
                     predictions=predictions,
-                    observations=self.model.data.full_obs,
+                    observations=observations,
                     residual_error=self.model.residual_var,
                     min_variance=self.model.config.residual_min_variance,
                 )
                 .detach()
-                .cpu()
                 .sum(dim=1)
             )
 
-            return -total_log_lik
+            return -total_log_lik / nb_patients
 
         return fixed_effects_objective_function
 

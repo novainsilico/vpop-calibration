@@ -147,6 +147,13 @@ class StatisticalModel:
             new_protocol_arms=self.protocol_arms,
             new_tasks=self.task_names,
         )
+        # Full patient tensors follow input order, which need not be alphabetical.
+        # Individual observation datasets retain their own local patient indices.
+        self.data.full_obs.obs_index = (
+            self.data.full_obs.obs_index.remap_observation_index(
+                new_patient_ids=self.patients
+            )
+        )
 
         # -- NLME state initialization
         # Initiate the nlme model parameters in torch tensors
@@ -172,6 +179,18 @@ class StatisticalModel:
 
         init_surv_coeffs = torch.as_tensor(
             self.input_params.surv_coeff_init, device=device, dtype=default_dtype
+        )
+        # Gradient step multipliers, in the same [log_mi, surv_coeffs] order
+        surv_coeffs_params = (
+            self.input_params.time_to_event.coefficients
+            if self.input_params.time_to_event is not None
+            else {}
+        )
+        self.fixed_effects_step_scale = torch.as_tensor(
+            [self.input_params.model_intrinsic[name].step_scale for name in self.mi_names]
+            + [surv_coeffs_params[name].step_scale for name in self.surv_coeff_names],
+            device=device,
+            dtype=default_dtype,
         )
 
         init_params = NlmeModelState(
@@ -602,6 +621,38 @@ class StatisticalModel:
         ), f"Expected ({nb_samples}, {self.data.nb_total_observations}), \nActual: {pred_mean.shape}"
 
         return pred_mean, pred_var
+
+    def predict_patient_subset(
+        self,
+        physical_params: torch.Tensor,
+        patient_indices: torch.Tensor,
+        prediction_index: DataIndex,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Simulate only selected patients, retaining the full observation time grid.
+
+        Physical parameters and the locally remapped patient IDs in
+        ``prediction_index`` must follow ``patient_indices`` order. Other index
+        reference values (outputs, protocols, tasks, times) remain global.
+        """
+        nb_samples = physical_params.shape[0]
+        nb_patients = patient_indices.numel()
+        assert physical_params.shape == (
+            nb_samples,
+            nb_patients,
+            self.nb_pdu + self.nb_mi + self.nb_surv_coeffs,
+        )
+        assert len(prediction_index.id.ref_values) == nb_patients
+        pdk = self.data.patients_pdk_full.index_select(
+            0, patient_indices.to(self.data.patients_pdk_full.device)
+        )
+        thetas = self._combine_physical_pdk(physical_params, pdk)
+        inputs = self._combine_thetas_and_time(thetas, self.data.global_timesteps)
+        predictions, variance = self._predict(inputs, prediction_index)
+        assert predictions.shape == (
+            nb_samples,
+            prediction_index.id.index_values.numel(),
+        )
+        return predictions, variance
 
     def log_posterior_etas_all_patients(
         self, etas: torch.Tensor

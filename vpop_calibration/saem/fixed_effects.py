@@ -1,8 +1,5 @@
 import torch
 from typing import Callable
-import numpy as np
-
-from vpop_calibration.config import device, default_dtype
 
 
 def compute_fixed_effects_gradient(
@@ -21,24 +18,26 @@ def compute_fixed_effects_gradient(
     return grad, loss
 
 
-def optimize_fixed_effects(
+def take_fixed_effects_step(
     loss_fn: Callable,
     psi0: torch.Tensor,
     lr: float,
-    nb_iter: int,
     eps_grad: float,
+    step_scale: torch.Tensor | None = None,
 ) -> tuple[torch.Tensor, torch.Tensor]:
-    assert psi0.dim() == 1
-    fixed_effects = psi0.detach().clone().requires_grad_(True)
-    optimizer = torch.optim.Adam([fixed_effects], lr=lr)
+    """Take one scaled finite-difference gradient step and return its baseline loss.
 
-    loss_output = torch.tensor([np.nan], device=device, dtype=default_dtype)
-    for _ in range(nb_iter):
-        optimizer.zero_grad()
+    ``lr`` includes the outer stochastic-approximation rate. ``step_scale``
+    is a fixed positive diagonal preconditioner in the coordinates of ``psi0``.
+    """
+    assert psi0.dim() == 1
+    if step_scale is None:
+        step_scale = torch.ones_like(psi0)
+    assert step_scale.shape == psi0.shape
+
+    with torch.no_grad():
         grad, loss = compute_fixed_effects_gradient(
-            loss_fn=loss_fn, psi=fixed_effects.detach(), eps_base=eps_grad
+            loss_fn=loss_fn, psi=psi0.detach(), eps_base=eps_grad
         )
-        fixed_effects.grad = grad
-        optimizer.step()
-        loss_output = loss
-    return fixed_effects.detach(), loss_output.detach()
+        fixed_effects = psi0 - lr * step_scale * grad
+    return fixed_effects.detach(), loss.detach()

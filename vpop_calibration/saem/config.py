@@ -20,8 +20,12 @@ class SaemConfigDict(NamedTuple):
     annealing_factor: float = 0.95
 
     # Fixed effects optimization parameters
-    fixed_effects_nb_iter: int = 5
+    # Deprecated: retained for old configurations; always take one gradient step.
+    fixed_effects_nb_iter: int = 1
+    # Relative forward finite-difference step.
     fixed_effects_grad_scale: float = 1e-3
+    # Base gradient learning rate on the per-patient mean loss, multiplied by the SA
+    # schedule each iteration.
     fixed_effects_lr: float = 1e-2
 
     # Convergence parameters
@@ -42,6 +46,9 @@ class SaemConfigDict(NamedTuple):
     column_width: int = 12
 
     progress_bars: bool = mode == "notebook"
+
+    # Patients per fixed-effect gradient; None or a size >= N uses all patients.
+    fixed_effects_patient_batch_size: int | None = None
 
     def get_state_dict(self) -> dict[str, Any]:
         return self._asdict()

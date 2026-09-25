@@ -66,7 +66,8 @@ class PopulationParameter(BaseModel):
 
 class ModelIntrinsicParam(PopulationParameter):
     # Model intrinsic parameters are just simple population parameters
-    pass
+    # Multiplier of the SAEM gradient step, applied in the transformed (log/logit) space
+    step_scale: float = Field(default=1.0, gt=0, allow_inf_nan=False)
 
 
 class Covariate(BaseModel):
@@ -156,6 +157,8 @@ class ErrorModel(BaseModel):
 class GaussianParameter(BaseModel):
     model_config = ConfigDict(extra="forbid")
     prior: float
+    # Multiplier of the SAEM gradient step
+    step_scale: float = Field(default=1.0, gt=0, allow_inf_nan=False)
 
 
 class TimeToEvent(BaseModel):

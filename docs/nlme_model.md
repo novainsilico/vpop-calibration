@@ -37,6 +37,8 @@ The patient descriptors $\theta_i$ are divided in 4 groups:
 - Covariates: similarly to PDK, these are informed by the data. However, they are not used by the structural model, instead their effect is incorporated inside the statistical model.
 - MI: Model intrinsic, denoted as $\psi_i$. These are parameters which are assumed to be constant in the population, but their value is unknown (to be calibrated).
 
+MIs and survival coefficients accept an optional positive `step_scale` (default 1), which multiplies their SAEM gradient step in the transformed (log/logit) space, e.g. `"model_intrinsic": {"k_a": {"prior": 0.5, "step_scale": 0.1}}`. See [saem_implementation.md](saem_implementation.md).
+
 #### PDUs
 
 The PDUs are assumed to follow a multivariate log-normal distribution
