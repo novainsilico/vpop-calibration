@@ -25,13 +25,13 @@ pbpk <- function(){
     lCLint = 7.6
     lKbBO = 0.03
     lKbRB = 0.3
-    eta.LClint ~ 1
+    eta.LClint ~ 4
     eta.LKbBR ~ 0.5
     eta.LKbMU ~ 0.5
     eta.LKbAD ~ 0.5
     eta.LKbBO ~ 0.5
     eta.LKbRB ~ 0.5
-    add.err <- 0.5
+    add.err <- 1
   })
   model({
     KbBR = exp(lKbBR + eta.LKbBR)
@@ -124,11 +124,11 @@ fit <- nlmixr2(
   dat,
   est = "saem",
   control = saemControl(
-    print  = 100,
-    nBurn  = 100,
-    nEm    = 100,
-    nmc    = 1,
-    nu     = c(1, 1, 1),
+    print  = 10,
+    nBurn  = 200,
+    nEm    = 300,
+    nmc    = 3,
+    nu = c(2, 2, 2),
     logLik = FALSE,
     rxControl = rxControl(
       method = "liblsoda",
@@ -146,4 +146,128 @@ ebe <- fit %>%
   distinct()
 ebe
 
-write.csv(ebe,file="nlmixr2_map.csv",row.names = F,quote = F)
+write.csv(ebe,file="nlmixr2_map_20260923_1349.csv",row.names = F,quote = F)
+
+xpdb <- xpose_data_nlmixr(fit)
+
+print(dv_vs_pred(xpdb) +
+        ylab("Observed Mavoglurant Concentrations (ng/mL)") +
+        xlab("Population Predicted Mavoglurant Concentrations (ng/mL)"));
+
+print(dv_vs_ipred(xpdb) +
+        ylab("Observed Mavoglurant Concentrations (ng/mL)") +
+        xlab("Individual Predicted Mavoglurant Concentrations (ng/mL)"));
+
+print(res_vs_pred(xpdb) +
+        ylab("Conditional Weighted Residuals") +
+        xlab("Population Predicted Mavoglurant Concentrations (ng/mL)"));
+
+print(res_vs_idv(xpdb) +
+        ylab("Conditional Weighted Residuals") +
+        xlab("Time (h)"));
+
+if (!is.null(fit$saem)){
+  print(prm_vs_iteration(xpdb));
+}
+
+print(absval_res_vs_idv(xpdb, res = 'IWRES') +
+        ylab("Individual Weighted Residuals") +
+        xlab("Time (h)"))
+
+print(absval_res_vs_pred(xpdb, res = 'IWRES') +
+        ylab("Individual Weighted Residuals") +
+        xlab("Population Predicted Mavoglurant Concentrations (ng/mL)"))
+
+print(ind_plots(xpdb, nrow=3, ncol=4) +
+        ylab("Predicted and Observed Mavoglurant Concentrations (ng/mL)") +
+        xlab("Time (h)"))
+
+print(res_distrib(xpdb) +
+        ylab("Density") +
+        xlab("Conditional Weighted Residuals"));
+# Visual Predictive Checks
+f1 <- vpcPlot(fit,n=500,stratify="DOSE", show=list(obs_dv=T), log_y=TRUE,
+              bins = c(0, 2, 4, 6, 8, 10, 20, 30, 40, 50),
+              ylab = "Mavoglurant Concentrations (ng/mL)",
+              xlab = "Time (hours)")
+f2 <- vpcPlot(fit,n=500, show=list(obs_dv=T), bins = c(0, 2, 4, 6, 8, 10, 20, 30, 40, 50), log_y=TRUE,
+              ylab = "Mavoglurant Concentrations (ng/mL)", xlab = "Time (hours)")
+plot(f1)
+plot(f2)
+
+
+quantiles  <- c(0.05, 0.50, 0.95)
+precision  <- 0.90
+n_sim      <- 500
+output_lab <- "C15"
+set.seed(1234)
+
+## Bins taken from Simwork,
+
+bin_breaks <- c(-Inf,
+                4.996700, 9.793400, 14.590100, 19.386800, 24.183500,
+                28.980200, 33.776900, 38.573600, 43.370300,
+                Inf)
+
+bin_fun <- function(t) cut(t, breaks = bin_breaks,
+                           include.lowest = TRUE, right = TRUE, labels = FALSE)
+
+
+## VPC Simulations
+
+sim <- vpcSim(fit, n = n_sim)
+
+rep_col  <- "sim.id"
+time_col <- "time"
+val_col  <- "sim"
+stopifnot(!is.na(rep_col), !is.na(time_col), !is.na(val_col))
+
+
+sim$bin <- bin_fun(sim[[time_col]])
+sim <- sim[!is.na(sim$bin), ]
+
+
+## Observations
+
+fitdf <- as.data.frame(fit)
+obs <- data.frame(time = fitdf$TIME, value = fitdf$DV)
+obs <- subset(obs, is.finite(value))
+obs$bin <- bin_fun(obs$time)
+obs <- obs[!is.na(obs$bin), ]
+
+bin_centers <- obs %>% group_by(bin) %>%
+  summarise(bin_center = median(time), .groups = "drop")
+
+
+## Simulated and observed Quantiles
+
+q_obs <- obs %>%
+  group_by(bin) %>%
+  reframe(quantile = quantiles,
+          q_obs = as.numeric(quantile(value, quantiles, na.rm = TRUE)))
+
+pred_rep <- sim %>%
+  group_by(bin, .data[[rep_col]]) %>%
+  reframe(quantile = quantiles,
+          qval = as.numeric(quantile(.data[[val_col]], quantiles, na.rm = TRUE)))
+
+
+pred <- pred_rep %>%
+  group_by(bin, quantile) %>%
+  summarise(pred_median = median(qval),
+            pred_lower  = as.numeric(quantile(qval, 1 - precision)),
+            pred_upper  = as.numeric(quantile(qval, precision)),
+            .groups = "drop")
+pred_rep %>% filter(bin == 1) %>% arrange(quantile) %>% group_by(quantile) %>% slice(1)
+
+## Export CSV
+
+vpc_R <- q_obs %>%
+  left_join(pred,        by = c("bin", "quantile")) %>%
+  left_join(bin_centers, by = "bin") %>%
+  mutate(output_name = output_lab,
+         model = "R (nlmixr2 SAEM)") %>%
+  arrange(quantile, bin_center)
+
+write.csv(vpc_R, "nlmixr2_vpc_20260923_1349.csv", row.names = FALSE)
+print(head(vpc_R, 12))
