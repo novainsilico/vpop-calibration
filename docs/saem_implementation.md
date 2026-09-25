@@ -189,16 +189,23 @@ Only the observation term of the complete-data log-likelihood depends on $\psi$ 
 h(\psi) = -\frac{1}{N}\sum_i \log p(y_i \mid \phi_{J_k,i}^{(k+1)}, \psi; \sigma_k^2)
 ```
 
-Because maximizing the above is computationally intensive, the implementation combines partial maximization and stochastic approximation. 
+Because minimizing the above is computationally intensive, the implementation combines two approximations:
 
-A single step is taken along a forward finite-difference estimate $\widehat g_k$ of $\nabla h(\psi_k)$, evaluated before the other M-step updates, i.e. at the parameters targeted by the MCMC samples:
+  1. A single step is taken along a forward finite-difference estimate $\widehat g_k$ of $\nabla h(\psi_k)$, evaluated before the other M-step updates, i.e. at the parameters targeted by the MCMC samples:
 ```math
 \psi^{k+1} = \psi_k - a\gamma_k D\widehat g_k
 ```
 
 where $a$ is `fixed_effects_lr`, $\gamma_k$ is the stochastic-approximation rate and $D$ is the diagonal matrix of the parameters' `step_scale` (1 by default). `fixed_effects_nb_iter` has no effect. The reported fixed-effects loss is $N\,h(\psi_k)$, the summed negative log-likelihood before the update.
 
-If `fixed_effects_patient_batch_size=n` is set with $n<N$, the mean is taken over a uniform sample $S_k$ of $n$ patients drawn without replacement, held fixed for all finite-difference evaluations of the iteration.
+  2. If `fixed_effects_patient_batch_size=n` is set with $n<N$, the mean is taken over a uniform sample $S_k$ of $n$ patients drawn without replacement, held fixed for all finite-difference evaluations of the iteration.
+
+With `fixed_effects_preconditioner="fisher"`, the gradient is additionally preconditioned by a stochastic approximation $F_k$ of the Fisher information matrix of $h$, so that the step is close to a Newton step and becomes insensitive to the scale of each parameter, the residual variance and the number of observations:
+```math
+\psi^{k+1} = \psi_k - a\gamma_k D\left(F_k + \lambda\,\mathrm{diag}(F_k)\right)^{-1}\widehat g_k, \qquad F_k = F_{k-1} + \gamma_k(\widehat F_k - F_{k-1})
+```
+
+where $\lambda$ is `fixed_effects_fisher_damping`. $\widehat F_k$ is computed from the same finite-difference simulations: normally distributed observations contribute the Gauss-Newton term $\frac1N\sum_{i,j} \nabla f_{ij} \nabla f_{ij}^\top / v_{ij}$ (residual variances $v_{ij}$ held at $\psi_k$), and survival data the empirical Fisher $\frac1N\sum_i \nabla \ell^{s}_i \nabla {\ell^{s}_i}^\top$ of the per-patient survival negative log-likelihoods. In this mode $a$ is dimensionless; values between 0.1 and 0.5 are recommended, larger values can overshoot in the transformed (log/logit) space during the learning phase.
 
 ### References
 

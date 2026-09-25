@@ -50,6 +50,12 @@ class SaemConfigDict(NamedTuple):
     # Patients per fixed-effect gradient; None or a size >= N uses all patients.
     fixed_effects_patient_batch_size: int | None = None
 
+    # "fisher" preconditions the fixed-effect gradient by a Fisher matrix estimate,
+    # making the step close to a Newton step (then use fixed_effects_lr in 0.1 - 0.5).
+    fixed_effects_preconditioner: Literal["identity", "fisher"] = "identity"
+    # Marquardt damping of the Fisher matrix, relative to its diagonal.
+    fixed_effects_fisher_damping: float = 1e-3
+
     def get_state_dict(self) -> dict[str, Any]:
         return self._asdict()
 

@@ -22,13 +22,18 @@ from vpop_calibration.saem.utils import (
     covariance_matrix_simulated_annealing,
 )
 from vpop_calibration.pynlme.residuals import (
-    log_likelihood_observation,
+    compute_error_variance,
+    compute_normal_likelihood,
+    compute_survival_likelihood,
     ResidualErrorEstimates,
 )
 from vpop_calibration.pynlme.error_estimation import estimate_error_params
 from vpop_calibration.saem.plot import OptimizerPlot
 from vpop_calibration.config import smoke_test, default_dtype, device
-from vpop_calibration.saem.fixed_effects import take_fixed_effects_step
+from vpop_calibration.saem.fixed_effects import (
+    FixedEffectsEvaluation,
+    take_fixed_effects_step,
+)
 
 
 class PySaem:
@@ -48,6 +53,12 @@ class PySaem:
             raise ValueError(
                 "fixed_effects_patient_batch_size must be a positive integer or None"
             )
+        if self.config.fixed_effects_preconditioner not in ("identity", "fisher"):
+            raise ValueError(
+                "fixed_effects_preconditioner must be 'identity' or 'fisher'"
+            )
+        # Stochastic-approximation estimate of the fixed-effects Fisher matrix
+        self.fixed_effects_fisher: torch.Tensor | None = None
         if self.config.nb_iter_smoothing is None:
             self.config = self.config._replace(
                 nb_iter_smoothing=self.config.nb_iter_learning
@@ -88,6 +99,7 @@ class PySaem:
             self.model.nb_pdu
         )
         fixed_effects_loss = torch.tensor([np.nan], device=device, dtype=default_dtype)
+        self.fixed_effects_fisher = None
         # Initialize the Metropolis Hastings state variables
         self.mh_state = MetropolisHastingsState(
             etas=init_samples,
@@ -128,6 +140,11 @@ class PySaem:
                     "mh_state": self.mh_state.get_state_dict(),
                     "pop_estimates": self.pop_estimates.get_state_dict(),
                     "sufficient_statistics": self.sufficient_statistics.get_state_dict(),
+                    "fixed_effects_fisher": (
+                        None
+                        if self.fixed_effects_fisher is None
+                        else self.fixed_effects_fisher.detach().cpu().numpy().tolist()
+                    ),
                     "has_run": True,
                 }
             )
@@ -159,6 +176,11 @@ class PySaem:
             instance.sufficient_statistics = MStepState.from_state_dict(
                 state_dict=state_dict["sufficient_statistics"]
             )
+            fisher = state_dict.get("fixed_effects_fisher")
+            if fisher is not None:
+                instance.fixed_effects_fisher = torch.as_tensor(
+                    fisher, device=device, dtype=default_dtype
+                )
         return instance
 
     def run(self):
@@ -256,15 +278,25 @@ class PySaem:
                     patient_indices=patient_indices,
                 )
                 psi0 = torch.cat([self.model.log_mi, self.model.surv_coeffs], dim=-1)
-                new_fixed_effects, fixed_effects_loss = take_fixed_effects_step(
-                    loss_fn=objective_fun,
-                    psi0=psi0,
-                    lr=(
-                        self.config.fixed_effects_lr
-                        * self.scheduler.stochastic_approximation_rate
-                    ),
-                    eps_grad=self.config.fixed_effects_grad_scale,
-                    step_scale=self.model.fixed_effects_step_scale,
+                use_fisher = self.config.fixed_effects_preconditioner == "fisher"
+                new_fixed_effects, fixed_effects_loss, self.fixed_effects_fisher = (
+                    take_fixed_effects_step(
+                        loss_fn=objective_fun,
+                        psi0=psi0,
+                        lr=(
+                            self.config.fixed_effects_lr
+                            * self.scheduler.stochastic_approximation_rate
+                        ),
+                        eps_grad=self.config.fixed_effects_grad_scale,
+                        step_scale=self.model.fixed_effects_step_scale,
+                        fisher=self.fixed_effects_fisher,
+                        fisher_rate=(
+                            self.scheduler.stochastic_approximation_rate
+                            if use_fisher
+                            else None
+                        ),
+                        fisher_damping=self.config.fixed_effects_fisher_damping,
+                    )
                 )
                 # Report the summed negative log-likelihood, not the per-patient mean.
                 fixed_effects_loss = fixed_effects_loss * self.model.nb_patients
@@ -380,7 +412,8 @@ class PySaem:
         """Build an objective with a fixed branch and optional patient subset.
 
         ``gaussian_params`` contains the whole branch. ``patient_indices`` selects
-        patients once; the loss is averaged over the selected patients.
+        patients once. The objective returns a ``FixedEffectsEvaluation``, with one
+        negative log-likelihood per selected patient.
         """
 
         assert gaussian_params.shape[0] == 1, (
@@ -389,14 +422,12 @@ class PySaem:
         assert gaussian_params.shape[1] == self.model.nb_patients
 
         observations = self.model.data.full_obs
-        nb_patients = self.model.nb_patients
         if patient_indices is not None:
             observations = observations.select_patients(patient_indices)
             patient_indices = patient_indices.to(
                 device=gaussian_params.device, dtype=torch.long
             ).clone()
             gaussian_params = gaussian_params.index_select(1, patient_indices)
-            nb_patients = patient_indices.numel()
 
         def fixed_effects_objective_function(fixed_effects: torch.Tensor):
             # Assemble the patient parameters
@@ -421,18 +452,41 @@ class PySaem:
                     patient_indices=patient_indices,
                     prediction_index=observations.obs_index,
                 )
-            total_log_lik = (
-                log_likelihood_observation(
-                    predictions=predictions,
-                    observations=observations,
-                    residual_error=self.model.residual_var,
-                    min_variance=self.model.config.residual_min_variance,
-                )
-                .detach()
-                .sum(dim=1)
+            residual_error = self.model.residual_var
+            min_variance = self.model.config.residual_min_variance
+            normal_log_lik = compute_normal_likelihood(
+                observations=observations,
+                predictions=predictions,
+                residual_error=residual_error,
+                min_variance=min_variance,
             )
-
-            return -total_log_lik / nb_patients
+            survival_log_lik = compute_survival_likelihood(
+                observations=observations, predictions=predictions
+            )
+            variance = compute_error_variance(
+                observations=observations,
+                predictions=predictions,
+                residual_error=residual_error,
+                min_variance=min_variance,
+            )
+            # Only normally distributed rows contribute to the Gauss-Newton term
+            continuous_rows = torch.index_select(
+                torch.logical_or(
+                    residual_error.additive_variance,
+                    residual_error.proportional_variance,
+                ),
+                0,
+                observations.obs_index.output_name.index_values,
+            )
+            precision = torch.where(
+                continuous_rows, 1.0 / variance, torch.zeros_like(variance)
+            )
+            return FixedEffectsEvaluation(
+                patient_loss=-(normal_log_lik + survival_log_lik).detach(),
+                survival_loss=-survival_log_lik.detach(),
+                predictions=predictions.detach(),
+                precision=precision.detach(),
+            )
 
         return fixed_effects_objective_function
 

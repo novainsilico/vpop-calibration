@@ -26,11 +26,11 @@
 | vpop\_calibration/pynlme/schemas.py                   |       25 |        0 |        2 |        0 |    100% |           |
 | vpop\_calibration/pynlme/utils.py                     |       26 |        4 |        2 |        0 |     79% |     82-85 |
 | vpop\_calibration/saem/\_\_init\_\_.py                |        0 |        0 |        0 |        0 |    100% |           |
-| vpop\_calibration/saem/config.py                      |       30 |        0 |        0 |        0 |    100% |           |
+| vpop\_calibration/saem/config.py                      |       32 |        0 |        0 |        0 |    100% |           |
 | vpop\_calibration/saem/estimates.py                   |       97 |       17 |       26 |        0 |     78% |174-189, 192-199, 219, 223 |
-| vpop\_calibration/saem/fixed\_effects.py              |       21 |        1 |        2 |        1 |     91% |        35 |
+| vpop\_calibration/saem/fixed\_effects.py              |       56 |       21 |       10 |        3 |     58% |46, 58-65, 77-83, 109, 121-126 |
 | vpop\_calibration/saem/m\_step.py                     |       53 |        0 |        2 |        0 |    100% |           |
-| vpop\_calibration/saem/optimizer.py                   |      176 |       26 |       58 |       11 |     81% |48, 52, 169, 180-183, 186-189, 192-199, 201-\>exit, 251, 394-399, 419, 446-447, 463-472 |
+| vpop\_calibration/saem/optimizer.py                   |      188 |       27 |       62 |       16 |     80% |53, 57, 63, 68-\>79, 181, 191, 202-205, 208-211, 214-221, 223-\>exit, 264-\>306, 273, 363-\>372, 426-430, 450, 500-501, 517-526 |
 | vpop\_calibration/saem/plot.py                        |       50 |       39 |       20 |        0 |     16% |3-4, 7-8, 24-59, 62-70, 73-74 |
 | vpop\_calibration/saem/scheduler.py                   |       48 |        0 |       14 |        0 |    100% |           |
 | vpop\_calibration/saem/utils.py                       |       27 |        0 |        0 |        0 |    100% |           |
@@ -46,4 +46,4 @@
 | vpop\_calibration/structural\_model/sbml.py           |       90 |        8 |       12 |        2 |     88% |29-30, 61-66, 69 |
 | vpop\_calibration/structural\_model/simwork.py        |      128 |        7 |       22 |        2 |     91% |72-89, 121 |
 | vpop\_calibration/utils.py                            |       24 |        3 |        6 |        2 |     83% | 29-30, 35 |
-| **TOTAL**                                             | **3401** |  **357** |  **700** |  **130** | **86%** |           |
+| **TOTAL**                                             | **3450** |  **378** |  **712** |  **137** | **85%** |           |
