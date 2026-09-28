@@ -62,17 +62,26 @@ def run_diagnostics(
     if config.iwres:
         model.diagnostics.compute_iwres()
 
-    if config.pwres:
-        model.diagnostics.compute_pwres()
-
-    if config.npde:
-        model.diagnostics.compute_npde()
+    pwres = None
+    npde = None
+    if config.pwres or config.npde:
+        population_residuals = model.diagnostics.compute_population_residuals(
+            nb_samples=config.nb_samples
+        )
+        if config.pwres:
+            pwres = population_residuals.loc[
+                population_residuals["residual_type"] == "pwres"
+            ]
+        if config.npde:
+            npde = population_residuals.loc[
+                population_residuals["residual_type"] == "npde"
+            ]
 
     # Format the output
     out = DiagnosticsOutput(
         iwres=model.diagnostics.iwres,
-        pwres=model.diagnostics.pwres,
-        npde=model.diagnostics.npde,
+        pwres=pwres,
+        npde=npde,
         conditional_samples=full_samples,
         map_samples=map_samples,
         log_likelihood=ll,

@@ -6,6 +6,7 @@ import pandera.pandas as pa
 
 from vpop_calibration.pynlme.model import StatisticalModel
 from vpop_calibration.pynlme.residuals import (
+    add_predictive_error,
     calculate_residuals,
     compute_error_variance,
 )
@@ -33,9 +34,10 @@ class ModelDiagnostics:
     ):
         self.model = nlme_model
         self.population_parameters_predictions_df: pd.DataFrame | None = None
-        self.pwres: pa.typing.DataFrame[WeightedResidualsSchema] | None = None
+        self.population_residuals: (
+            pa.typing.DataFrame[WeightedResidualsSchema] | None
+        ) = None
         self.iwres: pa.typing.DataFrame[WeightedResidualsSchema] | None = None
-        self.npde: pa.typing.DataFrame[WeightedResidualsSchema] | None = None
         self.sampler = ConditionalDistributionSampler(nlme_model=self.model)
         self.importance_sampler = ImportanceSampler(
             model=self.model,
@@ -145,18 +147,42 @@ class ModelDiagnostics:
             iwres_list.append(this_patient_residuals)
         self.iwres = WeightedResidualsSchema.validate(pd.concat(iwres_list))
 
-    def compute_pwres(self, nb_samples: int = 100) -> None:
-        """Compute Population Weighted Residuals (PWRES), following the formula :
+    def compute_population_residuals(
+        self, nb_samples: int = 100
+    ) -> pa.typing.DataFrame[WeightedResidualsSchema]:
+        """Compute PWRES and NPDE from the same simulated population.
 
-        PWRES_i = V_i^(-1/2) (y_i - E(f(t_ij, psi_i))
+        PWRES_i = L_i^(-1) (y_i - E(f_i)), where L_i L_i^T = V_i
+        and V_i is the covariance matrix of the model-predicted observations
+        (predictive covariance).
+
+        The covariance of observations is decomposed into two contributions: the
+        variation between individual profiles and the residual-error contribution
+        (which is diagonal because of the independent noise assumption):
+
+        V_i = Cov(f_i) + diag(E(g_i^2))
+
+        where f_i are the model predictions for patient i: f(t_ij, theta_i)
+        and g_i^2 are the residual-error variances.
+
+        Why go through all this trouble? To remove the within-patient correlation between measurements.
+
+        NPDE ranks observed PWRES against noisy simulations transformed with the
+        same mean E(f_i) and Cholesky factor L_i, then applies the normal inverse CDF.
 
         Returns:
-            dict: PWRES with patientId as key, with PWRES and timesteps for each patient
+            A dataframe with one row per observation and diagnostic, identified
+            by residual_type ("pwres" or "npde"). Also stored in population_residuals.
         """
-
+        if nb_samples < 2:
+            raise ValueError("Population diagnostics require at least two simulations.")
+        if self.model.data.full_obs.survival_outputs is not None:
+            raise ValueError(
+                "Population diagnostics currently support continuous observations only."
+            )
         if smoke_test:
             nb_samples = 3
-        # Sample new etas, in order to approximate mean E(y_i) and variance V_i
+        # Sample etas in order to approximate mean E(y_i) and variance V_i
         mc_etas = self.model.sample_etas(nb_samples)
         mc_gaussian = self.model.convert_etas_to_gaussian_all_patients(mc_etas)
         mc_physical = self.model.convert_gaussian_to_physical(
@@ -172,117 +198,88 @@ class ModelDiagnostics:
         )
         # Simulate model
         simulated_tensor, _ = self.model.predict_all_patients(inputs=inputs)
+        # Compute the error variance given the prescribed error model
+        variance = compute_error_variance(
+            observations=self.model.data.full_obs,
+            predictions=simulated_tensor,
+            residual_error=self.model.residual_var,
+            min_variance=self.model.config.residual_min_variance,
+        )
+        # Add noise to the predictions for NPDE
+        noisy_predictions = add_predictive_error(
+            observations=self.model.data.full_obs,
+            predictions=simulated_tensor,
+            residual_error=self.model.residual_var,
+            min_variance=self.model.config.residual_min_variance,
+        )
+        # Keep the ICDF finite for NPDE, including when there are only two draws.
+        eps = 0.5 / simulated_tensor.shape[0]
+        normal_dist = torch.distributions.Normal(
+            simulated_tensor.new_tensor(0.0), simulated_tensor.new_tensor(1.0)
+        )
 
-        # Compute PWRES per patient
-        pwres_list = []
+        residuals_list = []
 
         for i, patient_id in enumerate(
             self.model.data.full_obs.obs_index.id.ref_values
         ):
             this_patient_rows = self.model.data.full_obs.obs_index.id.index_values == i
             this_patient_data = simulated_tensor[:, this_patient_rows]
-
-            # mean_patient shape: nb_samples * n_obs_patient -> n_obs_patient
+            observations = self.model.data.individual_observations[patient_id]
             mean_patient = this_patient_data.mean(dim=0)
+            centered = this_patient_data - mean_patient
+            variance_patient = centered.T @ centered / (simulated_tensor.shape[0] - 1)
+            variance_patient += torch.diag(variance[:, this_patient_rows].mean(dim=0))
+            if not torch.isfinite(variance_patient).all():
+                raise ValueError(f"Non-finite predictive covariance for {patient_id}.")
 
-            # obs_patient shape: n_obs_patient
-            obs_patient = self.model.data.individual_observations[patient_id].obs_values
-            time_steps_patient = self.model.data.individual_observations[
-                patient_id
-            ].obs_index.time.raw_values
-            output_names_patient = self.model.data.individual_observations[
-                patient_id
-            ].obs_index.output_name.raw_values
+            # Scale jitter to each measurement's predictive variance for stability.
+            jitter = torch.diag(variance_patient.diagonal() * 1e-6)
+            L = torch.linalg.cholesky(variance_patient + jitter)
 
-            # variance_patient shape: n_obs_patient * n_obs_patient
-            variance_patient = torch.cov(obs_patient.T)
-
-            # Transform residual into a column
-            residual = (obs_patient - mean_patient).unsqueeze(-1)
-
-            # Compute V^-1/2 with Cholesky factorization, adding a jitter for stability purposes
-            if variance_patient.dim() > 1:
-                jitter = torch.eye(variance_patient.size(0)) * 1e-6
-                L = torch.linalg.cholesky(variance_patient + jitter)
-                pwres_patient = torch.linalg.solve_triangular(L, residual, upper=False)
-            else:
-                jitter = 1e-6
-                pwres_patient = variance_patient ** (-1 / 2) * residual
-
-            # Compute patient PWRES and add them to dictionnary
-            patient_pwres = pd.DataFrame(
-                {
-                    "id": patient_id,
-                    "time": time_steps_patient,
-                    "residual_value": pwres_patient.squeeze(-1).detach().cpu().numpy(),
-                    "residual_type": "pwres",
-                    "output_name": output_names_patient,
-                }
-            )
-            pwres_list.append(patient_pwres)
-        self.pwres = WeightedResidualsSchema.validate(pd.concat(pwres_list))
-
-    def compute_npde(self, nb_samples: int = 100) -> None:
-        if smoke_test:
-            nb_samples = 3
-
-        # Sample new etas
-        mc_etas = self.model.sample_etas(nb_samples)
-        mc_gaussian = self.model.convert_etas_to_gaussian_all_patients(mc_etas)
-        mc_physical = self.model.convert_gaussian_to_physical(
-            psi=mc_gaussian,
-            log_mi=self.model.log_mi,
-            surv_coeffs=self.model.surv_coeffs,
+            # Center and decorrelate the observations
+            pwres_patient = torch.linalg.solve_triangular(
+                L,
+                (observations.obs_values.unsqueeze(0) - mean_patient).T,
+                upper=False,
+            ).T
+            # Center and decorrelate the simulated noisy predictions
+            simulated_pwres = torch.linalg.solve_triangular(
+                L,
+                (noisy_predictions[:, this_patient_rows] - mean_patient).T,
+                upper=False,
+            ).T
+            # The indicator function of whether each decorrelated simulated value is
+            # at or below the decorrelated observation
+            is_below_obs = (simulated_pwres <= pwres_patient).to(simulated_tensor.dtype)
+            # By averaging over all replicates, we get the empirical CDF of the simulated values evaluated at the
+            # observed values.
+            # These should be uniform on [0, 1] across observations if each observation is a realization of
+            # the simulated distribution, i.e. if the model is correct (that's the probability integral transform)
+            empirical_cdf = is_below_obs.mean(dim=0)
+            # Map the CDF values to the N(0, 1) space using the standard normal ICDF
+            # Why clamp? Because if an observation is either below or above all simulations, it will produce an
+            # infinite ICDF value
+            npde_patient = normal_dist.icdf(empirical_cdf.clamp(min=eps, max=1.0 - eps))
+            for residual_type, values in (
+                ("pwres", pwres_patient.squeeze(0)),
+                ("npde", npde_patient),
+            ):
+                residuals_list.append(
+                    pd.DataFrame(
+                        {
+                            "id": patient_id,
+                            "time": observations.obs_index.time.raw_values,
+                            "output_name": observations.obs_index.output_name.raw_values,
+                            "residual_value": values.detach().cpu().numpy(),
+                            "residual_type": residual_type,
+                        }
+                    )
+                )
+        self.population_residuals = WeightedResidualsSchema.validate(
+            pd.concat(residuals_list, ignore_index=True)
         )
-        mc_thetas = self.model.convert_physical_to_thetas_all_patients(mc_physical)
-        inputs = self.model.convert_thetas_to_model_parameters_all_patients(mc_thetas)
-
-        # Simulate outputs
-        simulated_tensor, _ = self.model.predict_all_patients(inputs)
-
-        # Expand observation tensor to match simulated tensor
-        observed_tensor = self.model.data.full_obs.obs_values.expand(nb_samples, -1)
-
-        # Compute indicator function in NPDE formula
-        mc_F = simulated_tensor <= observed_tensor
-        mc_F = mc_F.to(torch.float)
-
-        # Average on MC samples, avoiding 0 and 1 values
-        mean_F = mc_F.mean(dim=0)
-        eps = 1.0 / simulated_tensor.shape[0]
-        mean_F_clamped = torch.clamp(mean_F, min=eps, max=1.0 - eps)
-
-        # Apply normal inverse CDF to compare NPDE with N(0,1)
-        normal_dist = torch.distributions.Normal(0, 1)
-        npde = normal_dist.icdf(mean_F_clamped)
-
-        npde_list = []
-
-        for i, patient_id in enumerate(
-            self.model.data.full_obs.obs_index.id.ref_values
-        ):
-            this_patient_rows = self.model.data.full_obs.obs_index.id.index_values == i
-            this_patient_data = npde[this_patient_rows]
-            this_patient_time = self.model.data.individual_observations[
-                patient_id
-            ].obs_index.time.raw_values
-            this_patient_output_names = self.model.data.individual_observations[
-                patient_id
-            ].obs_index.output_name.raw_values
-            this_patient_npde = pd.DataFrame(
-                {
-                    "id": patient_id,
-                    "residual_value": this_patient_data.squeeze(-1)
-                    .detach()
-                    .cpu()
-                    .numpy(),
-                    "residual_type": "npde",
-                    "time": this_patient_time,
-                    "output_name": this_patient_output_names,
-                }
-            )
-            npde_list.append(this_patient_npde)
-        self.npde = WeightedResidualsSchema.validate(pd.concat(npde_list))
+        return self.population_residuals
 
     def zero_random_effect_predictions(self) -> None:
         eta = torch.zeros((1, self.model.nb_patients, self.model.nb_pdu))
@@ -315,15 +312,44 @@ class ModelDiagnostics:
 
     def compute_vpc(
         self,
+        nb_samples: int = 500,
         nb_bins: int = 10,
-        quantiles: list[float] = [0.1, 0.5, 0.9],
-        precision: float = 0.9,
+        quantiles: list[float] = [0.05, 0.5, 0.95],
+        precision: float = 0.95,
     ) -> None:
-
-        if not hasattr(self.sampler, "samples"):
-            self.sampler.run_sampler()
-
-        df = self.sampler.total_samples_predictions_df
+        """Population VPC: random effects are drawn from N(0, Omega) for each patient."""
+        if smoke_test:
+            nb_samples = 3
+        mc_etas = self.model.sample_etas(nb_samples)
+        mc_gaussian = self.model.convert_etas_to_gaussian_all_patients(mc_etas)
+        mc_physical = self.model.convert_gaussian_to_physical(
+            psi=mc_gaussian,
+            log_mi=self.model.log_mi,
+            surv_coeffs=self.model.surv_coeffs,
+        )
+        mc_thetas = self.model.convert_physical_to_thetas_all_patients(
+            physical_params=mc_physical
+        )
+        inputs = self.model.convert_thetas_to_model_parameters_all_patients(
+            theta=mc_thetas
+        )
+        # Simulate model
+        simulated_tensor, _ = self.model.predict_all_patients(inputs=inputs)
+        # Add residual noise to the predictions
+        noisy_predictions = add_predictive_error(
+            observations=self.model.data.full_obs,
+            predictions=simulated_tensor,
+            residual_error=self.model.residual_var,
+            min_variance=self.model.config.residual_min_variance,
+        )
+        # One copy of the observed data per simulated replicate
+        obs_df = self.model.data.full_obs.to_pandas()
+        nb_replicates = noisy_predictions.shape[0]
+        df = pd.concat([obs_df] * nb_replicates, ignore_index=True)
+        df["batch_id"] = np.repeat(np.arange(nb_replicates), len(obs_df))
+        df["simulated_value_with_noise"] = (
+            noisy_predictions.detach().cpu().numpy().reshape(-1)
+        )
         all_vpc_records = []
         quantiles_arr = np.asarray(quantiles)
 
