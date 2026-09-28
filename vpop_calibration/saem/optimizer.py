@@ -21,13 +21,17 @@ from vpop_calibration.saem.utils import (
     covariance_matrix_simulated_annealing,
 )
 from vpop_calibration.pynlme.residuals import (
-    log_likelihood_observation,
+    compute_normal_likelihood,
+    compute_survival_likelihood,
     ResidualErrorEstimates,
 )
 from vpop_calibration.pynlme.error_estimation import estimate_error_params
 from vpop_calibration.saem.plot import OptimizerPlot
 from vpop_calibration.config import smoke_test, default_dtype, device
-from vpop_calibration.saem.fixed_effects import optimize_fixed_effects
+from vpop_calibration.saem.fixed_effects import (
+    FixedEffectsEvaluation,
+    minimize_fixed_effects_loss,
+)
 
 
 class PySaem:
@@ -38,11 +42,6 @@ class PySaem:
     ):
         self.model: StatisticalModel = model
         self.config = config
-        if self.config.nb_iter_smoothing is None:
-            self.config = self.config._replace(
-                nb_iter_smoothing=self.config.nb_iter_learning
-            )
-        assert self.config.nb_iter_smoothing is not None
 
         if smoke_test:
             # Override with test config
@@ -50,7 +49,6 @@ class PySaem:
                 nb_iter_burnin=1,
                 nb_iter_learning=2,
                 nb_iter_smoothing=2,
-                fixed_effects_nb_iter=1,
                 progress_bars=False,
                 live_plot=False,
                 logging=False,
@@ -228,6 +226,47 @@ class PySaem:
         if self.scheduler.phase != "burnin":
             new_params = self.model.current_params
 
+            # Optimize the fixed effects at the population state targeted by the MCMC samples,
+            # before changing residual variances or other population parameters.
+            if self.model.nb_mi + self.model.nb_surv_coeffs > 0:
+                gaussian_params = self.mh_state.gaussian_params
+                # pick a MCMC branch at random
+                branch_index = torch.randint(
+                    gaussian_params.shape[0], (1,), device=gaussian_params.device
+                )
+                # Define the fixed-effects loss function using that single branch
+                loss_fn = self.build_fixed_effects_loss_function(
+                    gaussian_params.index_select(0, branch_index),
+                )
+                # initial guess for the minimization of the loss function
+                psi0 = torch.cat([self.model.log_mi, self.model.surv_coeffs], dim=-1)
+                # Minimize the fixed effects loss function wrt psi. In practice, few iterations are needed because
+                # this is repeated over each SAEM iteration
+                (
+                    target_fixed_effects,
+                    mean_fixed_effects_loss,
+                ) = minimize_fixed_effects_loss(
+                    loss_fn=loss_fn,
+                    psi0=psi0,
+                    lr=self.config.fixed_effects_lr,
+                    nb_iter=self.config.fixed_effects_nb_iter,
+                    eps_grad=self.config.fixed_effects_grad_scale,
+                )
+                # Multiply back by the number of patients to report the summed negative log-likelihood, not the per-patient mean.
+                fixed_effects_loss = mean_fixed_effects_loss * self.model.nb_patients
+                target_log_mi = target_fixed_effects[: self.model.nb_mi]
+                new_log_mi = stochastic_approximation(
+                    previous=self.model.log_mi,
+                    new=target_log_mi,
+                    learning_rate=self.scheduler.stochastic_approximation_rate,
+                )
+                target_surv_coeffs = target_fixed_effects[self.model.nb_mi :]
+                new_surv_coeffs = stochastic_approximation(
+                    previous=self.model.surv_coeffs,
+                    new=target_surv_coeffs,
+                    learning_rate=self.scheduler.stochastic_approximation_rate,
+                )
+
             # M-step:
             # maximum-likelihood target for the residual error variance
             current_res_var: ResidualErrorEstimates = self.model.residual_var
@@ -286,36 +325,11 @@ class PySaem:
             self.model.update_omega(new_omega)
             new_params = new_params._replace(omega=new_omega)
 
-            # 3. Update fixed effects MIs
+            # 3. Update fixed effects (MI and survival coefficients)
             if self.model.nb_mi + self.model.nb_surv_coeffs > 0:
-                objective_fun = self.build_fixed_effects_objective_function(
-                    self.mh_state.gaussian_params.mean(dim=0, keepdim=True)
-                )
-                psi0 = torch.cat([self.model.log_mi, self.model.surv_coeffs], dim=-1)
-                target_fixed_effects, fixed_effects_loss = optimize_fixed_effects(
-                    loss_fn=objective_fun,
-                    psi0=psi0,
-                    lr=self.config.fixed_effects_lr,
-                    nb_iter=self.config.fixed_effects_nb_iter,
-                    eps_grad=self.config.fixed_effects_grad_scale,
-                )
-                target_log_mi = target_fixed_effects[: self.model.nb_mi]
-                new_log_mi = stochastic_approximation(
-                    previous=self.model.log_mi,
-                    new=target_log_mi,
-                    learning_rate=self.scheduler.stochastic_approximation_rate,
-                )
-
+                # The proposal already includes the stochastic-approximation rate.
                 self.model.update_log_mi(new_log_mi)
                 new_params = new_params._replace(log_mi=new_log_mi)
-
-                target_surv_coeffs = target_fixed_effects[self.model.nb_mi :]
-                new_surv_coeffs = stochastic_approximation(
-                    previous=self.model.surv_coeffs,
-                    new=target_surv_coeffs,
-                    learning_rate=self.scheduler.stochastic_approximation_rate,
-                )
-
                 self.model.update_surv_coeffs(new_surv_coeffs)
                 new_params = new_params._replace(surv_coeffs=new_surv_coeffs)
             self.model.current_params = new_params
@@ -353,16 +367,24 @@ class PySaem:
         )
         return summary
 
-    def build_fixed_effects_objective_function(
-        self, gaussian_params: torch.Tensor
+    def build_fixed_effects_loss_function(
+        self,
+        gaussian_params: torch.Tensor,
     ) -> Callable:
-        """Build the objective function to be optimized for model intrinsic parameters estimation."""
+        """Build a loss function with a fixed MCMC branch.
+
+        ``gaussian_params`` contains the whole branch. The objective returns a ``FixedEffectsEvaluation``, with one
+        negative log-likelihood per selected patient.
+        """
 
         assert (
             gaussian_params.shape[0] == 1
-        ), "Ensure to average the gaussian parameters before building the fixed effects objective function"
+        ), "Select one MCMC branch before building the fixed effects objective function"
+        assert gaussian_params.shape[1] == self.model.nb_patients
 
-        def fixed_effects_objective_function(fixed_effects: torch.Tensor):
+        observations = self.model.data.full_obs
+
+        def fixed_effects_loss_function(fixed_effects: torch.Tensor):
             # Assemble the patient parameters
             log_mi = fixed_effects[..., : self.model.nb_mi]
             surv_coeffs = fixed_effects[..., self.model.nb_mi :]
@@ -376,21 +398,23 @@ class PySaem:
                 new_thetas
             )
             predictions, _ = self.model.predict_all_patients(model_input)
-            total_log_lik = (
-                log_likelihood_observation(
-                    predictions=predictions,
-                    observations=self.model.data.full_obs,
-                    residual_error=self.model.residual_var,
-                    min_variance=self.model.config.residual_min_variance,
-                )
-                .detach()
-                .cpu()
-                .sum(dim=1)
+            normal_log_lik = compute_normal_likelihood(
+                observations=observations,
+                predictions=predictions,
+                residual_error=self.model.residual_var,
+                min_variance=self.model.config.residual_min_variance,
+            )
+            survival_log_lik = compute_survival_likelihood(
+                observations=observations, predictions=predictions
+            )
+            # the total log-likelihood is the sum of the fixed effects and survival coefficients log-likelihoods
+            total_log_lik = normal_log_lik + survival_log_lik
+            return FixedEffectsEvaluation(
+                patient_loss=-total_log_lik.detach(),
+                predictions=predictions.detach(),
             )
 
-            return -total_log_lik
-
-        return fixed_effects_objective_function
+        return fixed_effects_loss_function
 
     def update_pop_estimates_convergence_check(
         self, new_estimates: PopEstimates

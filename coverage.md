@@ -7,11 +7,11 @@
 | vpop\_calibration/data\_generation.py                 |       91 |        2 |       12 |        4 |     94% |59, 73, 128-\>131, 167-\>170 |
 | vpop\_calibration/metropolis\_hastings.py             |       59 |        1 |        8 |        1 |     97% |       137 |
 | vpop\_calibration/model/\_\_init\_\_.py               |        2 |        0 |        0 |        0 |    100% |           |
-| vpop\_calibration/model/data.py                       |      162 |       23 |       44 |       14 |     80% |51, 53, 55, 57, 170, 235, 283-293, 367, 374, 381, 386, 390, 394, 401-403, 452 |
+| vpop\_calibration/model/data.py                       |      162 |       23 |       44 |       14 |     80% |51, 53, 55, 57, 171, 236, 284-294, 368, 375, 382, 387, 391, 395, 402-404, 453 |
 | vpop\_calibration/model/gp.py                         |      227 |       49 |       68 |       20 |     75% |61, 66, 102, 139, 141-142, 146-149, 224-225, 232, 252, 286, 308, 310, 364, 385, 389-394, 401-409, 411-\>346, 435-437, 465, 475-484, 514-\>exit, 589-596 |
 | vpop\_calibration/model/plot.py                       |      122 |       11 |       32 |        8 |     88% |76-77, 147-148, 174-\>177, 219-\>178, 224-225, 244, 253-\>255, 256-259 |
 | vpop\_calibration/pynlme/\_\_init\_\_.py              |        0 |        0 |        0 |        0 |    100% |           |
-| vpop\_calibration/pynlme/conditional\_distribution.py |      185 |       18 |       44 |        5 |     86% |9-10, 13-14, 131, 136-\>138, 144-148, 236, 257-263, 335 |
+| vpop\_calibration/pynlme/conditional\_distribution.py |      187 |       18 |       44 |        5 |     87% |9-10, 13-14, 132, 137-\>139, 145-149, 237, 258-264, 346 |
 | vpop\_calibration/pynlme/config.py                    |       14 |        0 |        0 |        0 |    100% |           |
 | vpop\_calibration/pynlme/data.py                      |       61 |        0 |       12 |        0 |    100% |           |
 | vpop\_calibration/pynlme/diagnostics.py               |      164 |        8 |       22 |        7 |     92% |84-85, 157-\>160, 205-207, 226-\>230, 304, 324, 395 |
@@ -28,9 +28,9 @@
 | vpop\_calibration/saem/\_\_init\_\_.py                |        0 |        0 |        0 |        0 |    100% |           |
 | vpop\_calibration/saem/config.py                      |       29 |        0 |        0 |        0 |    100% |           |
 | vpop\_calibration/saem/estimates.py                   |       97 |       17 |       26 |        0 |     78% |174-189, 192-199, 219, 223 |
-| vpop\_calibration/saem/fixed\_effects.py              |       26 |        0 |        2 |        0 |    100% |           |
+| vpop\_calibration/saem/fixed\_effects.py              |       33 |        1 |        4 |        1 |     95% |        57 |
 | vpop\_calibration/saem/m\_step.py                     |       53 |        0 |        2 |        0 |    100% |           |
-| vpop\_calibration/saem/optimizer.py                   |      156 |       19 |       48 |        7 |     83% |42, 160, 171-174, 177-180, 183-190, 192-\>exit, 402-403, 419-428 |
+| vpop\_calibration/saem/optimizer.py                   |      166 |       18 |       48 |        6 |     85% |160, 171-174, 177-180, 183-190, 192-\>exit, 447-448, 464-473 |
 | vpop\_calibration/saem/plot.py                        |       50 |       39 |       20 |        0 |     16% |3-4, 7-8, 24-59, 62-70, 73-74 |
 | vpop\_calibration/saem/scheduler.py                   |       48 |        0 |       14 |        0 |    100% |           |
 | vpop\_calibration/saem/utils.py                       |       27 |        0 |        0 |        0 |    100% |           |
@@ -46,4 +46,4 @@
 | vpop\_calibration/structural\_model/sbml.py           |       90 |        8 |       12 |        2 |     88% |29-30, 61-66, 69 |
 | vpop\_calibration/structural\_model/simwork.py        |      128 |        7 |       22 |        2 |     91% |72-89, 121 |
 | vpop\_calibration/utils.py                            |       24 |        3 |        6 |        2 |     83% | 29-30, 35 |
-| **TOTAL**                                             | **3345** |  **339** |  **680** |  **125** | **86%** |           |
+| **TOTAL**                                             | **3364** |  **339** |  **682** |  **125** | **86%** |           |

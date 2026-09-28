@@ -20,8 +20,12 @@ class SaemConfigDict(NamedTuple):
     annealing_factor: float = 0.95
 
     # Fixed effects optimization parameters
-    fixed_effects_nb_iter: int = 5
+    # Number of gradient descent steps in the inner fixed effects optimization loop
+    fixed_effects_nb_iter: int = 1
+    # Relative forward finite-difference step.
     fixed_effects_grad_scale: float = 1e-3
+    # Base gradient learning rate on the per-patient mean loss, multiplied by the SA
+    # schedule each iteration.
     fixed_effects_lr: float = 1e-2
 
     # Convergence parameters

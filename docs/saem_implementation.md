@@ -184,14 +184,14 @@ The MI parameters target is computed by maximizing the complete-data log-likelih
 \hat \psi^{k+1} = \underset{\psi}{\arg \max} \,\ell_c (\Theta; \mathbf y, \eta)
 ```
 
-Only the observation term of the complete-data log-likelihood depends on $\psi$ so we can directly maximize
+Only the observation term of the complete-data log-likelihood depends on $\psi$ so we can directly minimize the mean over 
+patients of the negative observation log-likelihood, evaluated on one MCMC branch $J_k$ drawn uniformly at each SAEM iteration:
 ```math
-h(\psi) = \sum_i \sum_j \left[y_{i,j} - f(\phi_i^{(k+1)}, \psi, t_{i,j})\right]^2
+h(\psi) = -\frac{1}{N}\sum_i \log p(y_i \mid \phi_{J_k,i}^{(k+1)}, \psi; \sigma_k^2)
 ```
 
-Because maximizing the above is computationally intensive, the implementation combines partial maximization and stochastic approximation. 
-
-$\hat \psi^{k+1}$ is obtained after running only `fixed_effects_nb_iter` iterations of Adam steps using a finite-difference estimate of the gradient of $h(\psi)$.  
+Because maximizing the above is computationally intensive, the implementation combines partial minimization and stochastic approximation: 
+$\hat \psi^{k+1}$ is obtained after running only `fixed_effects_nb_iter` iterations (default number is 1) of the Adam minimizer [^Adam14] using a finite-difference estimate of the gradient of $h(\psi)$.  
 Then, we use stochastic approximation for the update:
 ```math
 \psi^{k+1} = \gamma_k\hat \psi_{k+1} +  (1-\gamma_k)\psi_{k}
@@ -208,3 +208,5 @@ Then, we use stochastic approximation for the update:
 [^Lindstrom90]: Lindstrom, M. J., & Bates, D. M. (1990). Nonlinear mixed effects models for repeated measures data. Biometrics, 673-687. https://doi.org/10.2307/2532087
 
 [^KuhnLavielle05]: E. Kuhn, M. Lavielle (2005). Maximum likelihood estimation in nonlinear mixed effects models. Computational Statistics & Data Analysis, Volume 49, Issue 4. https://doi.org/10.1016/j.csda.2004.07.002.
+
+[^Adam14]: Diederik P. Kingma, Jimmy Ba (2014). Adam: A Method for Stochastic Optimization. https://arxiv.org/abs/1412.6980
