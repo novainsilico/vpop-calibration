@@ -20,7 +20,11 @@ def remap_single_index(
     assert input_index.dim() == 1, (
         f"Unexpected indexing tensor dimension {input_index.dim()}"
     )
-    new_index = torch.as_tensor([mapping[int(i.item())] for i in input_index])
+    new_index = torch.as_tensor(
+        [mapping[int(i.item())] for i in input_index],
+        device=input_index.device,
+        dtype=input_index.dtype,
+    )
     return new_index
 
 
