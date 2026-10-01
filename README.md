@@ -45,7 +45,7 @@ Here is an overview of the proposed workflow:
 
 ## Support
 
-For any issue or comments, please reach out to <paul.lemarre@novainsilico.ai>, or feel free to open an issue in the repo directly.
+For any issue or comments, please reach out to <eliott.tixier@novainsilico.ai>, or feel free to open an issue in the repo directly.
 
 ## Authors
 
@@ -53,11 +53,14 @@ For any issue or comments, please reach out to <paul.lemarre@novainsilico.ai>, o
 - Eléonore Dravet
 - Hugo Alves
 
-## Acknowledgements
+## Active maintainers
 
-- Adeline Leclercq-Samson
 - Eliott Tixier
+- Guillaume Bouchard
 - Louis Philippe
+- Hugo Alves
+- Nicolas Ratto
+- Théo Plissonneau
 
 ## QSPC26 poster
 
