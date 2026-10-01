@@ -1840,9 +1840,13 @@
           <apply>
             <ln/>
             <apply>
-              <times/>
-              <ci> C15 </ci>
-              <ci> OneMilliLiterPerNanoGram </ci>
+              <max/>
+              <apply>
+                <times/>
+                <ci> C15 </ci>
+                <ci> OneMilliLiterPerNanoGram </ci>
+              </apply>
+              <cn type="e-notation"> 1 <sep/> -12 </cn>
             </apply>
           </apply>
         </math>
