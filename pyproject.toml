@@ -1,8 +1,20 @@
 [project]
 name = "vpop-calibration"
-version = "4.7.1"
+version = "4.7.2"
 description = ""
-authors = [{ name = "Paul Lemarre", email = "paul.lemarre@novainsilico.ai" }]
+authors = [
+  { name = "Paul Lemarre"},
+  { name = "Eléonore Dravet"},
+  { name = "Hugo Alves", email = "hugo.alves@novainsilico.ai" }
+]
+maintainers = [
+  {name = "Eliott Tixier", email = "eliott.tixier@novainsilico.ai"},
+  {name = "Guillaume Bouchard", email = "guillaume.bouchard@novainsilico.ai"},
+  {name = "Louis Philippe", email = "louis.philippe@novainsilico.ai"},
+  {name = "Hugo Alves", email = "hugo.alves@novainsilico.ai"},
+  {name = "Nicolas Ratto", email = "nicolas.ratto@novainsilico.ai"},
+  {name = "Théo Plissonneau", email = "theo.plissonneau@novainsilico.ai"}
+]
 readme = "README.md"
 requires-python = ">=3.12,<3.15"
 

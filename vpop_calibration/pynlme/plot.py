@@ -32,9 +32,9 @@ class PlottingUtility:
     ) -> tuple[dict, dict]:
         pdus = self.model_diag.model.descriptors
         gp_model_struct = self.model_diag.model.structural_model
-        assert isinstance(gp_model_struct, StructuralGp), (
-            "Posterior surrogate validity check only implemented for GP structural model."
-        )
+        assert isinstance(
+            gp_model_struct, StructuralGp
+        ), "Posterior surrogate validity check only implemented for GP structural model."
 
         if not hasattr(self.model_diag.sampler, "map"):
             self.model_diag.sample_conditional_distribution()
@@ -508,11 +508,13 @@ class PlottingUtility:
     ) -> None:
 
         match res_type:
-            case "pwres":
-                if self.model_diag.pwres is None:
-                    self.model_diag.compute_pwres()
-                assert self.model_diag.pwres is not None
-                wres_results = self.model_diag.pwres
+            case "pwres" | "npde":
+                if self.model_diag.population_residuals is None:
+                    self.model_diag.compute_population_residuals()
+                assert self.model_diag.population_residuals is not None
+                wres_results = self.model_diag.population_residuals.loc[
+                    self.model_diag.population_residuals["residual_type"] == res_type
+                ]
                 compare_to_pop_pred = True
             case "iwres":
                 if self.model_diag.iwres is None:
@@ -520,12 +522,6 @@ class PlottingUtility:
                 assert self.model_diag.iwres is not None
                 wres_results = self.model_diag.iwres
                 compare_to_pop_pred = False
-            case "npde":
-                if self.model_diag.npde is None:
-                    self.model_diag.compute_npde()
-                assert self.model_diag.npde is not None
-                wres_results = self.model_diag.npde
-                compare_to_pop_pred = True
             case _:
                 raise ValueError(f"Not implemented residual type: {res_type}")
         if compare_to_pop_pred:
@@ -614,9 +610,11 @@ class PlottingUtility:
 
         ## Plot vs. predictions
 
-        # Merge WRES with predictions, matching patientID and time
+        # Merge WRES with predictions, matching patientID, output and time
         vs_pred_plot_df = pd.merge(
-            res_df, comparison[["id", "time", "predicted_value"]], on=["id", "time"]
+            res_df,
+            comparison[["id", "output_name", "time", "predicted_value"]],
+            on=["id", "output_name", "time"],
         )
 
         wres_to_plot = vs_pred_plot_df["residual_value"]
