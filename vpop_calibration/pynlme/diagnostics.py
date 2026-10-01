@@ -212,8 +212,6 @@ class ModelDiagnostics:
             residual_error=self.model.residual_var,
             min_variance=self.model.config.residual_min_variance,
         )
-        # Keep the ICDF finite for NPDE, including when there are only two draws.
-        eps = 0.5 / simulated_tensor.shape[0]
         normal_dist = torch.distributions.Normal(
             simulated_tensor.new_tensor(0.0), simulated_tensor.new_tensor(1.0)
         )
@@ -224,12 +222,23 @@ class ModelDiagnostics:
             self.model.data.full_obs.obs_index.id.ref_values
         ):
             this_patient_rows = self.model.data.full_obs.obs_index.id.index_values == i
-            this_patient_data = simulated_tensor[:, this_patient_rows]
+            # Discard replicates with non-finite predictions for this patient (e.g. failed simulations or NaN or Inf values)
+            valid_replicates = torch.isfinite(
+                simulated_tensor[:, this_patient_rows]
+            ).all(dim=1)
+            nb_valid = int(valid_replicates.sum())
+            if nb_valid < 2:
+                raise ValueError(
+                    f"Less than two finite simulated replicates for {patient_id}."
+                )
+            this_patient_data = simulated_tensor[valid_replicates][:, this_patient_rows]
             observations = self.model.data.individual_observations[patient_id]
             mean_patient = this_patient_data.mean(dim=0)
             centered = this_patient_data - mean_patient
-            variance_patient = centered.T @ centered / (simulated_tensor.shape[0] - 1)
-            variance_patient += torch.diag(variance[:, this_patient_rows].mean(dim=0))
+            variance_patient = centered.T @ centered / (nb_valid - 1)
+            variance_patient += torch.diag(
+                variance[valid_replicates][:, this_patient_rows].mean(dim=0)
+            )
             if not torch.isfinite(variance_patient).all():
                 raise ValueError(f"Non-finite predictive covariance for {patient_id}.")
 
@@ -246,7 +255,10 @@ class ModelDiagnostics:
             # Center and decorrelate the simulated noisy predictions
             simulated_pwres = torch.linalg.solve_triangular(
                 L,
-                (noisy_predictions[:, this_patient_rows] - mean_patient).T,
+                (
+                    noisy_predictions[valid_replicates][:, this_patient_rows]
+                    - mean_patient
+                ).T,
                 upper=False,
             ).T
             # The indicator function of whether each decorrelated simulated value is
@@ -260,6 +272,8 @@ class ModelDiagnostics:
             # Map the CDF values to the N(0, 1) space using the standard normal ICDF
             # Why clamp? Because if an observation is either below or above all simulations, it will produce an
             # infinite ICDF value
+            # Keep the ICDF finite for NPDE, including when there are only two draws.
+            eps = 0.5 / nb_valid
             npde_patient = normal_dist.icdf(empirical_cdf.clamp(min=eps, max=1.0 - eps))
             for residual_type, values in (
                 ("pwres", pwres_patient.squeeze(0)),

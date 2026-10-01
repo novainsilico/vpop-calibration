@@ -24,11 +24,18 @@ def simulate_rr_single_patient(
     rr.setValues(patient_overrides)
     # Reset the floating species to their init value
     rr.reset()
+
+    prepend_zero = time_steps[0] > 0
+    # roadrunner starts the simulation at t = min(time_steps) so if it isn't t=0, 
+    # it will shift the whole results! So we prepend 0 if it is not there already.
+    simulation_times = [0.0, *time_steps] if prepend_zero else time_steps
     try:
-        out = rr.simulate(times=time_steps, selections=outputs)
+        out = rr.simulate(times=simulation_times, selections=outputs)
     except Exception:
         raise RuntimeError(f"Solving failed for {patient_overrides}")
-
+    # if we prepended zero, remove it from the output such that we match the requested time_steps
+    if prepend_zero:
+        out = out[1:]
     patient_df = pd.DataFrame(data=out, columns=outputs)
     patient_df["time"] = time_steps
     patient_df["id"] = patient_id

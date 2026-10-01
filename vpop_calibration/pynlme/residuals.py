@@ -93,9 +93,9 @@ class ResidualErrorEstimates(NamedTuple):
     ) -> torch.Tensor:
         """Residual variance of each prediction."""
         nb_samples = predictions.shape[0]
-        additive_variance = self.additive_variance.index_select(
-            0, output_index
-        ).expand(nb_samples, -1)
+        additive_variance = self.additive_variance.index_select(0, output_index).expand(
+            nb_samples, -1
+        )
         proportional_variance = self.proportional_variance.index_select(
             0, output_index
         ).expand(nb_samples, -1)
@@ -134,14 +134,14 @@ def calculate_residuals(
     Returns:
         torch.Tensor: a tensor of residual values
     """
-    assert predictions.dim() == 2, (
-        "Incorrect amount of dimensions in predictions tensor"
-    )
+    assert (
+        predictions.dim() == 2
+    ), "Incorrect amount of dimensions in predictions tensor"
     batch_size = predictions.shape[0]
     obs_vals = observed_data.obs_values.expand(batch_size, -1)
-    assert predictions.shape == obs_vals.shape, (
-        f"Non-matching shapes in `calculate_residuals`: {predictions.shape=}, {obs_vals.shape=}"
-    )
+    assert (
+        predictions.shape == obs_vals.shape
+    ), f"Non-matching shapes in `calculate_residuals`: {predictions.shape=}, {obs_vals.shape=}"
 
     residuals = obs_vals - predictions
     nan_or_inf_mask = torch.logical_not(torch.isfinite(predictions))
@@ -309,14 +309,22 @@ def add_predictive_error(
     residual_error: ResidualErrorEstimates,
     min_variance: float,
 ) -> torch.Tensor:
+    # Non-finite predictions (e.g. failed simulations or NaN or Inf values) will make 
+    # torch.distributions.Normal() raise an Exception
+    finite_mask = torch.isfinite(predictions)
+    safe_predictions = torch.where(
+        finite_mask, predictions, torch.zeros_like(predictions)
+    )
     out_variance = compute_error_variance(
         observations=observations,
-        predictions=predictions,
+        predictions=safe_predictions,
         residual_error=residual_error,
         min_variance=min_variance,
     )
     noisy_predictions = torch.distributions.Normal(
-        predictions, torch.sqrt(out_variance)
+        safe_predictions, torch.sqrt(out_variance)
     ).sample()
+    # Reintegrate the nonfinite values
+    noisy_predictions[~finite_mask] = torch.nan
 
     return noisy_predictions
