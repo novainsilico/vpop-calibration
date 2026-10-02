@@ -1,0 +1,7 @@
+#!/bin/bash
+set -e
+
+export LD_LIBRARY_PATH="${NB_PYTHON_PREFIX}/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+export PYTHONWARNINGS="ignore::FutureWarning"
+
+exec "$@"

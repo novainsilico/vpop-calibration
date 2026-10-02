@@ -59,7 +59,7 @@ The target is mean 0 and variance 1 but normality is not guaranteed for nonlinea
 
 **NPDE** builds on the already computed **PWRES** and applies further transformations to target normality of the residuals.
 
-Residual noise is added the simulations and the noisy simulationd are transformed them with the same $\mu_i$ and $L_i$:
+Residual noise is added the simulations and the noisy simulations are transformed with the same $\mu_i$ and $L_i$:
 
 ```math
 \tilde z^{(k)}_{ij} = L_i^{-1}(f_{i}^{(k)} + g_{i}^{(k)}\varepsilon_{i}^{(k)}-\mu_{i})
