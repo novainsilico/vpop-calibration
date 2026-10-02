@@ -31,7 +31,7 @@
             "parentUuid": null,
             "tMax": "PT49H",
             "tMin": "PT0S",
-            "tStep": "PT15M",
+            "tStep": "PT6M",
             "uuid": null
         }
     ],
