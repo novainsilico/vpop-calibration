@@ -3,7 +3,7 @@ from typing import Literal, Any
 import numpy as np
 import pandas as pd
 import pandera.pandas as pa
-
+from vpop_calibration.compatibility import tqdm
 from vpop_calibration.pynlme.model import StatisticalModel
 from vpop_calibration.pynlme.residuals import (
     add_predictive_error,
@@ -45,6 +45,7 @@ class ModelDiagnostics:
         )
         self.shrinkage: torch.Tensor | None = None
         self.vpc: pd.DataFrame | None = None
+        self.cached_population_predictions: torch.Tensor | None = None
 
     def get_state_dict(self) -> dict[str, Any]:
         state_dict = {
@@ -147,6 +148,69 @@ class ModelDiagnostics:
             iwres_list.append(this_patient_residuals)
         self.iwres = WeightedResidualsSchema.validate(pd.concat(iwres_list))
 
+    def simulate_population_samples(
+        self, nb_samples=100, chunk_size=20
+    ) -> torch.Tensor:
+        if smoke_test:
+            nb_samples = 3
+        # Sample etas in order to approximate mean E(y_i) and variance V_i
+        etas = self.model.sample_etas(nb_samples)
+        chunks = torch.split(etas, chunk_size, dim=0)
+        predictions = []
+        with tqdm(
+            total=nb_samples,
+            desc="Simulating population",
+            disable=not self.model.config.progress_bar,
+        ) as pbar:
+            for etas_chunk in chunks:
+                gaussian = self.model.convert_etas_to_gaussian_all_patients(etas_chunk)
+                physical = self.model.convert_gaussian_to_physical(
+                    psi=gaussian,
+                    log_mi=self.model.log_mi,
+                    surv_coeffs=self.model.surv_coeffs,
+                )
+                thetas = self.model.convert_physical_to_thetas_all_patients(
+                    physical_params=physical
+                )
+                patients_inputs = (
+                    self.model.convert_thetas_to_model_parameters_all_patients(
+                        theta=thetas
+                    )
+                )
+                # Simulate model
+                predictions_chunk, _ = self.model.predict_all_patients(
+                    inputs=patients_inputs
+                )
+                predictions.append(predictions_chunk)
+                pbar.update(etas_chunk.shape[0])
+        population_predictions = torch.cat(predictions, dim=0)
+        self.cached_population_predictions = population_predictions
+        return population_predictions
+
+    def get_population_predictions(self, nb_samples: int):
+        if (
+            self.cached_population_predictions is not None
+            and self.cached_population_predictions.shape[0] >= nb_samples
+        ):
+            return self.cached_population_predictions[:nb_samples]
+        else:
+            return self.simulate_population_samples(nb_samples)
+
+    def compute_population_diagnostics(
+        self,
+        nb_samples: int = 100,
+        vpc_nb_bins=10,
+        vpc_quantiles=[0.05, 0.5, 0.95],
+        vpc_precision=0.95,
+    ):
+        self.compute_population_residuals(nb_samples=nb_samples)
+        self.compute_vpc(
+            nb_samples=nb_samples,
+            nb_bins=vpc_nb_bins,
+            quantiles=vpc_quantiles,
+            precision=vpc_precision,
+        )
+
     def compute_population_residuals(
         self, nb_samples: int = 100
     ) -> pa.typing.DataFrame[WeightedResidualsSchema]:
@@ -180,24 +244,7 @@ class ModelDiagnostics:
             raise ValueError(
                 "Population diagnostics currently support continuous observations only."
             )
-        if smoke_test:
-            nb_samples = 3
-        # Sample etas in order to approximate mean E(y_i) and variance V_i
-        mc_etas = self.model.sample_etas(nb_samples)
-        mc_gaussian = self.model.convert_etas_to_gaussian_all_patients(mc_etas)
-        mc_physical = self.model.convert_gaussian_to_physical(
-            psi=mc_gaussian,
-            log_mi=self.model.log_mi,
-            surv_coeffs=self.model.surv_coeffs,
-        )
-        mc_thetas = self.model.convert_physical_to_thetas_all_patients(
-            physical_params=mc_physical
-        )
-        inputs = self.model.convert_thetas_to_model_parameters_all_patients(
-            theta=mc_thetas
-        )
-        # Simulate model
-        simulated_tensor, _ = self.model.predict_all_patients(inputs=inputs)
+        simulated_tensor = self.get_population_predictions(nb_samples)
         # Compute the error variance given the prescribed error model
         variance = compute_error_variance(
             observations=self.model.data.full_obs,
@@ -326,29 +373,13 @@ class ModelDiagnostics:
 
     def compute_vpc(
         self,
-        nb_samples: int = 500,
+        nb_samples: int = 100,
         nb_bins: int = 10,
         quantiles: list[float] = [0.05, 0.5, 0.95],
         precision: float = 0.95,
     ) -> None:
         """Population VPC: random effects are drawn from N(0, Omega) for each patient."""
-        if smoke_test:
-            nb_samples = 3
-        mc_etas = self.model.sample_etas(nb_samples)
-        mc_gaussian = self.model.convert_etas_to_gaussian_all_patients(mc_etas)
-        mc_physical = self.model.convert_gaussian_to_physical(
-            psi=mc_gaussian,
-            log_mi=self.model.log_mi,
-            surv_coeffs=self.model.surv_coeffs,
-        )
-        mc_thetas = self.model.convert_physical_to_thetas_all_patients(
-            physical_params=mc_physical
-        )
-        inputs = self.model.convert_thetas_to_model_parameters_all_patients(
-            theta=mc_thetas
-        )
-        # Simulate model
-        simulated_tensor, _ = self.model.predict_all_patients(inputs=inputs)
+        simulated_tensor = self.get_population_predictions(nb_samples)
         # Add residual noise to the predictions
         noisy_predictions = add_predictive_error(
             observations=self.model.data.full_obs,

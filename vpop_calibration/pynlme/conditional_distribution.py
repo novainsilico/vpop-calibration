@@ -138,7 +138,7 @@ class ConditionalDistributionSampler:
             nb_samples = 2
         try:
             for i in self.sampling_stream(nb_samples):
-                if self.live_plot:
+                if self.live_plot and i % self.plot_frequency == 0:
                     self.update_convergence_plot()
             if self.live_plot:
                 plt.close(self.fig)
