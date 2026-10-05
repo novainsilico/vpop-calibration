@@ -161,7 +161,17 @@ class PySaem:
         try:
             for progress in self.optimization_stream():
                 # Push history
-                row = progress.to_pandas().to_dict(orient="records")[0]
+                row_df = progress.to_pandas()
+                if self.model.has_fixed_effects():
+                    row_df_lean = row_df
+                else:
+                    # storing the fixed effects loss in the history when there are no
+                    # fixed effects is useless, these are just NaN, and they pollute the
+                    # history plot
+                    row_df_lean = row_df.drop(
+                        columns=["fixed_effects_loss"], errors="ignore"
+                    )
+                row = row_df_lean.to_dict(orient="records")[0]
                 for k, v in row.items():
                     history_dict[k].append(v)
                 # Logging
@@ -228,7 +238,7 @@ class PySaem:
 
             # Optimize the fixed effects at the population state targeted by the MCMC samples,
             # before changing residual variances or other population parameters.
-            if self.model.nb_mi + self.model.nb_surv_coeffs > 0:
+            if self.model.has_fixed_effects():
                 gaussian_params = self.mh_state.gaussian_params
                 # pick a MCMC branch at random
                 branch_index = torch.randint(
@@ -326,7 +336,7 @@ class PySaem:
             new_params = new_params._replace(omega=new_omega)
 
             # 3. Update fixed effects (MI and survival coefficients)
-            if self.model.nb_mi + self.model.nb_surv_coeffs > 0:
+            if self.model.has_fixed_effects():
                 # The proposal already includes the stochastic-approximation rate.
                 self.model.update_log_mi(new_log_mi)
                 new_params = new_params._replace(log_mi=new_log_mi)
