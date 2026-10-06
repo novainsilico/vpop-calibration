@@ -151,6 +151,11 @@ class ModelDiagnostics:
     def simulate_population_samples(
         self, nb_samples=100, chunk_size=20
     ) -> torch.Tensor:
+        """
+        Sample from the POPULATION distribution (NOT the conditional one), simulates the model and return
+        the predictions tensor.
+        The eta samples are split by chunks of size 'chunk_size', mostly such that we can display a progress bar
+        """
         if smoke_test:
             nb_samples = 3
         # Sample etas in order to approximate mean E(y_i) and variance V_i
@@ -188,6 +193,10 @@ class ModelDiagnostics:
         return population_predictions
 
     def get_population_predictions(self, nb_samples: int):
+        """
+        Sample from the POPULATION distribution (NOT the conditional one), simulates the model and return
+        the predictions. Reads from the cache if any
+        """
         if (
             self.cached_population_predictions is not None
             and self.cached_population_predictions.shape[0] >= nb_samples
@@ -203,6 +212,9 @@ class ModelDiagnostics:
         vpc_quantiles=[0.05, 0.5, 0.95],
         vpc_precision=0.95,
     ):
+        """
+        A convenient helper to compute all population diagnostics: PWRES, NPDE and VPC
+        """
         self.compute_population_residuals(nb_samples=nb_samples)
         self.compute_vpc(
             nb_samples=nb_samples,
