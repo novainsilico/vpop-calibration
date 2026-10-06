@@ -5,6 +5,7 @@ from typing import Any
 from vpop_calibration.pynlme.model import StatisticalModel
 from vpop_calibration.pynlme.conditional_distribution import ConditionalDistribSamples
 from vpop_calibration.config import smoke_test, device, default_dtype
+from vpop_calibration.compatibility import tqdm
 
 
 class ImportanceSampler:
@@ -81,7 +82,7 @@ class ImportanceSampler:
         samples = self.dist.rsample((nb_samples,))
         return samples
 
-    def compute_likelihood(self, nb_samples: int = 100) -> None:
+    def compute_likelihood(self, nb_samples: int = 100, chunk_size: int = 20) -> None:
 
         if smoke_test:
             nb_samples = 2
@@ -90,8 +91,18 @@ class ImportanceSampler:
 
         log_q = self._student_t_log_prob(student_samples=student_samples)
 
-        predictions = self.model.log_posterior_etas_all_patients(student_samples)
-        log_posterior = predictions.log_posterior
+        chunks = torch.split(student_samples, chunk_size, dim=0)
+        log_posterior_chunks = []
+        with tqdm(
+            total=nb_samples,
+            desc="Importance sampling",
+            disable=not self.model.config.progress_bar,
+        ) as pbar:
+            for samples_chunk in chunks:
+                predictions = self.model.log_posterior_etas_all_patients(samples_chunk)
+                log_posterior_chunks.append(predictions.log_posterior)
+                pbar.update(samples_chunk.shape[0])
+        log_posterior = torch.cat(log_posterior_chunks, dim=0)
 
         N_tensor = torch.tensor(nb_samples, device=device, dtype=default_dtype)
 

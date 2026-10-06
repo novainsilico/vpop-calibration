@@ -60,11 +60,11 @@ class ResidualErrorEstimates(NamedTuple):
     def error_types(self) -> list[ErrorType]:
         """Error type of each output, recovered from the active components."""
         return [
-            "combined"
-            if additive and proportional
-            else "additive"
-            if additive
-            else "proportional"
+            (
+                "combined"
+                if additive and proportional
+                else "additive" if additive else "proportional"
+            )
             for additive, proportional in zip(
                 self.additive_output.tolist(), self.proportional_output.tolist()
             )
@@ -309,7 +309,7 @@ def add_predictive_error(
     residual_error: ResidualErrorEstimates,
     min_variance: float,
 ) -> torch.Tensor:
-    # Non-finite predictions (e.g. failed simulations or NaN or Inf values) will make 
+    # Non-finite predictions (e.g. failed simulations or NaN or Inf values) will make
     # torch.distributions.Normal() raise an Exception
     finite_mask = torch.isfinite(predictions)
     safe_predictions = torch.where(

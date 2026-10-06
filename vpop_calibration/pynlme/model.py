@@ -478,9 +478,7 @@ class StatisticalModel:
         """Atomic method to combine physical parameters, survival model coefficients and pdks"""
         nb_samples = physical_params.shape[0]
         nb_patients_local = physical_params.shape[1]
-        assert (
-            physical_params.shape[2] == self.nb_pdu + self.nb_mi + self.nb_surv_coeffs
-        )
+        assert physical_params.shape[2] == self.nb_pdu + self.num_fixed_effects()
         assert pdk.shape == (
             nb_patients_local,
             self.nb_pdk,
@@ -509,7 +507,7 @@ class StatisticalModel:
         assert physical_params.shape == (
             nb_samples,
             self.nb_patients,
-            self.nb_pdu + self.nb_mi + self.nb_surv_coeffs,
+            self.nb_pdu + self.num_fixed_effects(),
         )
         theta = self._combine_physical_pdk(
             physical_params=physical_params, pdk=self.data.patients_pdk_full
@@ -644,3 +642,13 @@ class StatisticalModel:
         vpop["id"] = self.patients
 
         return vpop
+
+    def num_fixed_effects(self) -> int:
+        """Return the number of fixed effects: model intrinsic ("MI")
+        and survival coefficients
+        """
+        return self.nb_mi + self.nb_surv_coeffs
+
+    def has_fixed_effects(self) -> bool:
+        """Whether there are fixed effects in the statistical model"""
+        return self.num_fixed_effects() > 0
