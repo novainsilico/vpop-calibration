@@ -34,3 +34,29 @@ def reproducible_uuid4(seed=None):
     if seed is not None:
         random.seed(seed)
     return uuid.UUID(int=random.getrandbits(128), version=4)
+
+
+def from_seconds_time_scale(time_unit: str) -> float:
+    match time_unit:
+        case "second":
+            return 1
+        case "minute":
+            return 60
+        case "hour":
+            return 60 * 60
+        case "day":
+            return 60 * 60 * 24
+        case "week":
+            return 60 * 60 * 24 * 7
+        case _:
+            raise ValueError(f"Unsupported time unit: {time_unit}")
+
+
+def time_scale_and_label(time_unit: str | None) -> tuple[str, float]:
+    if time_unit is None:
+        xlabel = "Time"
+        time_scale = 1
+    else:
+        xlabel = f"Time ({time_unit})"
+        time_scale = from_seconds_time_scale(time_unit)
+    return (xlabel, time_scale)
