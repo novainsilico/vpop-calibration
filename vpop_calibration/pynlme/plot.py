@@ -18,6 +18,7 @@ from vpop_calibration.pynlme.diagnostics import (
 from vpop_calibration.model.gp import GP
 from vpop_calibration.structural_model.gp import StructuralGp
 from vpop_calibration.config import smoke_test
+from vpop_calibration.utils import time_scale_and_label
 
 
 class PlottingUtility:
@@ -129,6 +130,7 @@ class PlottingUtility:
         self,
         facet_width: float = 5.0,
         facet_height: float = 4.0,
+        time_unit: str | None = None,
     ) -> None:
         if not hasattr(self.model_diag.sampler, "map"):
             self.model_diag.sample_conditional_distribution()
@@ -142,7 +144,7 @@ class PlottingUtility:
             figsize=(facet_width * n_cols, facet_height * n_rows),
             squeeze=False,
         )
-
+        xlabel, time_scale = time_scale_and_label(time_unit)
         cmap = plt.get_cmap("Spectral")
         colors = cmap(np.linspace(0, 1, self.model_diag.model.nb_patients))
         for output_index, output_name in enumerate(
@@ -158,12 +160,12 @@ class PlottingUtility:
                 if data_loop.shape[0] == 0:
                     pass
                 ax = axes[protocol_index, output_index]
-                ax.set_xlabel("Time")
+                ax.set_xlabel(xlabel)
                 patients_protocol = data_loop["id"].drop_duplicates().to_list()
                 for patient_ind in patients_protocol:
                     patient_num = self.model_diag.model.patients.index(patient_ind)
                     patient_data = data_loop.loc[data_loop["id"] == patient_ind]
-                    time_vec = patient_data["time"].values
+                    time_vec = patient_data["time"].values / time_scale
                     sorted_indices = np.argsort(time_vec)
                     sorted_times = time_vec[sorted_indices]
                     obs_vec = patient_data["value"].values[sorted_indices]
@@ -505,6 +507,7 @@ class PlottingUtility:
         res_type: ResidualType,
         facet_width: int = 10,
         facet_height: int = 10,
+        time_unit: str | None = None,
     ) -> None:
 
         match res_type:
@@ -543,6 +546,7 @@ class PlottingUtility:
             res_type=res_type,
             facet_height=facet_height,
             facet_width=facet_width,
+            time_unit=time_unit,
         )
 
     def residual_values(
@@ -552,10 +556,11 @@ class PlottingUtility:
         res_type: str,
         facet_width: int = 10,
         facet_height: int = 10,
+        time_unit: str | None = None,
     ) -> None:
 
         fig, ax = plt.subplots(2, 2, figsize=(facet_width, facet_height))
-
+        xlabel, time_scale = time_scale_and_label(time_unit)
         ## Histogram plot
         ax[0, 0].hist(
             res_df["residual_value"],
@@ -584,7 +589,7 @@ class PlottingUtility:
         ax[0, 1].grid(True, linestyle="--", alpha=0.6, which="both")
         ax[0, 1].set_facecolor("#fdfdfd")
         ax[0, 1].scatter(
-            res_df["time"],
+            res_df["time"] / time_scale,
             res_df["residual_value"],
             alpha=0.5,
             color="#2c3e50",
@@ -601,7 +606,7 @@ class PlottingUtility:
             label=r"95% CI Limit ($\pm 1.96$)",
         )
         ax[0, 1].axhline(y=-1.96, color="#e74c3c", linestyle="--", linewidth=1.3)
-        ax[0, 1].set_xlabel("Time", fontsize=12)
+        ax[0, 1].set_xlabel(xlabel, fontsize=12)
         ax[0, 1].set_ylabel("Weighted Residual (Standard Deviations)", fontsize=12)
         ax[0, 1].set_ylim(
             -1.1 * max(abs(res_df["residual_value"])),
@@ -752,6 +757,7 @@ class PlottingUtility:
         self,
         facet_width: int = 10,
         facet_height: int = 6,
+        time_unit: str | None = None,
     ):
 
         if self.model_diag.vpc is None:
@@ -774,6 +780,8 @@ class PlottingUtility:
             1, nb_outputs, figsize=(facet_width, facet_height), squeeze=False
         )
 
+        xlabel, time_scale = time_scale_and_label(time_unit)
+
         for i, output_name in enumerate(output_names):
             ax = axes[0, i]
             df_output = vpc_df[vpc_df["output_name"] == output_name]
@@ -784,7 +792,7 @@ class PlottingUtility:
             for q, df_q in df_output.groupby("quantile"):
                 df_q = df_q.sort_values("bin_center")
 
-                x = df_q["bin_center"].to_numpy()
+                x = df_q["bin_center"].to_numpy() / time_scale
                 q_obs = df_q["q_obs"].to_numpy()
                 pred_median = df_q["pred_median"].to_numpy()
                 pred_lower = df_q["pred_lower"].to_numpy()
@@ -819,7 +827,7 @@ class PlottingUtility:
                     alpha=0.5,
                 )
 
-            ax.set_xlabel("Time")
+            ax.set_xlabel(xlabel)
             ax.set_ylabel("Observation")
             ax.set_title(f"VPC: {output_name}")
             if i == 0:
