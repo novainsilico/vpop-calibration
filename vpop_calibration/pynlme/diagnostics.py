@@ -281,23 +281,20 @@ class ModelDiagnostics:
             self.model.data.full_obs.obs_index.id.ref_values
         ):
             this_patient_rows = self.model.data.full_obs.obs_index.id.index_values == i
+            this_patient_sim = simulated_tensor[:, this_patient_rows]
             # Discard replicates with non-finite predictions for this patient (e.g. failed simulations or NaN or Inf values)
-            valid_replicates = torch.isfinite(
-                simulated_tensor[:, this_patient_rows]
-            ).all(dim=1)
+            valid_replicates = torch.isfinite(this_patient_sim).all(dim=1)
+            this_patient_data = this_patient_sim[valid_replicates]
             nb_valid = int(valid_replicates.sum())
             if nb_valid < 2:
                 raise ValueError(
                     f"Less than two finite simulated replicates for {patient_id}."
                 )
-            this_patient_data = simulated_tensor[valid_replicates][:, this_patient_rows]
             observations = self.model.data.individual_observations[patient_id]
             mean_patient = this_patient_data.mean(dim=0)
             centered = this_patient_data - mean_patient
             variance_patient = centered.T @ centered / (nb_valid - 1)
-            variance_patient += torch.diag(
-                variance[valid_replicates][:, this_patient_rows].mean(dim=0)
-            )
+            variance_patient += torch.diag(variance[:, this_patient_rows].mean(dim=0))
             if not torch.isfinite(variance_patient).all():
                 raise ValueError(f"Non-finite predictive covariance for {patient_id}.")
 
@@ -314,10 +311,7 @@ class ModelDiagnostics:
             # Center and decorrelate the simulated noisy predictions
             simulated_pwres = torch.linalg.solve_triangular(
                 L,
-                (
-                    noisy_predictions[valid_replicates][:, this_patient_rows]
-                    - mean_patient
-                ).T,
+                (noisy_predictions[:, this_patient_rows] - mean_patient).T,
                 upper=False,
             ).T
             # The indicator function of whether each decorrelated simulated value is
