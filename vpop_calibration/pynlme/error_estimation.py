@@ -49,6 +49,8 @@ def estimate_error_params(
     new_proportional_variance = residual_error.proportional_variance.clone()
 
     for output, error_type in enumerate(residual_error.error_types):
+        if error_type == "survival":
+            continue
         keep = (output_index == output).unsqueeze(0) & finite
         if error_type == "proportional":
             keep = keep & (predictions != 0)
