@@ -59,12 +59,19 @@ class ResidualErrorEstimates(NamedTuple):
     @property
     def error_types(self) -> list[ErrorType]:
         """Error type of each output, recovered from the active components."""
+
+        def to_error_type(additive, proportional):
+            if additive and proportional:
+                return "combined"
+            elif additive:
+                return "additive"
+            elif proportional:
+                return "proportional"
+            else:
+                return "survival"
+
         return [
-            (
-                "combined"
-                if additive and proportional
-                else "additive" if additive else "proportional"
-            )
+            to_error_type(additive, proportional)
             for additive, proportional in zip(
                 self.additive_output.tolist(), self.proportional_output.tolist()
             )
@@ -235,7 +242,7 @@ def compute_normal_likelihood(
     nb_patients = len(observations.obs_index.id.ref_values)
 
     continuous_outputs_indicator = torch.logical_or(
-        residual_error.additive_variance, residual_error.proportional_variance
+        residual_error.additive_output, residual_error.proportional_output
     )
     obs_output_indices = observations.obs_index.output_name.index_values
     continuous_outputs_mask = torch.index_select(

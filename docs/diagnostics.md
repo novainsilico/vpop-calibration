@@ -82,10 +82,11 @@ Note that probabilities are clipped to $[0.5/K,\,1-0.5/K]$, so small $K$ limits 
 
 ## Visual Predictive Checks (VPC)
 
-For each continuous output and each time bin, compare the observed quantiles with the median and interval of the same quantiles across simulated replicates. Typical quantiles are 10/50/90 percentiles.
+For each continuous output and each time bin, compare the observed quantiles with the median and interval of the same quantiles across simulated replicates. 
 Simulations come from the fitted population distribution.
-Each replicate preserves the observed study design and observation times, draws fresh population random effects, and adds residual noise.
-
-The bands show the variation of each sample quantile across simulations (the default precision is 0.9 which means the band include 80% of the simulations, from the 10th to the 90th percentile).
+Each replicate preserves the observed study design and observation times, draws fresh population random effects, and adds residual noise.  
+The bands show the variation of each sample quantile across simulations. The defaults are:
+  * `quantiles = [0.05, 0.5, 0.95]`: 5th, 50th and 95th percentiles.
+  * `precision = 0.95`: bands around each quantiles are central 90% simulation bands: lower bound is the 5th percentile, upper bound is the 95th (= the precision) percentile.
 
 ![vpc](./vpc.png)

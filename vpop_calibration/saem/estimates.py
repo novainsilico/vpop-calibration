@@ -1,4 +1,4 @@
-from typing import NamedTuple, Any
+from typing import NamedTuple, Any, assert_never
 import torch
 import pandas as pd
 
@@ -142,21 +142,28 @@ class IterSummary(NamedTuple):
         for i, (output, error_type) in enumerate(
             zip(output_names, estimates.residual_variance.error_types)
         ):
-            if error_type == "combined":
-                residual_variance_dict[f"{output}_add"] = (
-                    estimates.residual_variance.additive_variance[i].item()
-                )
-                residual_variance_dict[f"{output}_prop"] = (
-                    estimates.residual_variance.proportional_variance[i].item()
-                )
-            elif error_type == "additive":
-                residual_variance_dict[output] = (
-                    estimates.residual_variance.additive_variance[i].item()
-                )
-            else:
-                residual_variance_dict[output] = (
-                    estimates.residual_variance.proportional_variance[i].item()
-                )
+            match error_type:
+                case "combined":
+                    residual_variance_dict[f"{output}_add"] = (
+                        estimates.residual_variance.additive_variance[i].item()
+                    )
+                    residual_variance_dict[f"{output}_prop"] = (
+                        estimates.residual_variance.proportional_variance[i].item()
+                    )
+                case "additive":
+                    residual_variance_dict[output] = (
+                        estimates.residual_variance.additive_variance[i].item()
+                    )
+                case "proportional":
+                    residual_variance_dict[output] = (
+                        estimates.residual_variance.proportional_variance[i].item()
+                    )
+                case "survival":
+                    pass  # no residual error; survival coefficients are reported separately
+                case _:
+                    # This is also known as the "Roman trick": if someone later adds an error
+                    # type and does not update this pattern match, it will raise an Exception
+                    assert_never(error_type)
 
         return IterSummary(
             iteration=iteration,

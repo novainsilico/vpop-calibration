@@ -510,6 +510,10 @@ class PlottingUtility:
         match res_type:
             case "pwres" | "npde":
                 if self.model_diag.population_residuals is None:
+                    print(
+                        "No population residuals in cache. Calling compute_population_residuals() with default "
+                        + "nb_samples=100. Call compute_population_residuals() directly to use another number of samples"
+                    )
                     self.model_diag.compute_population_residuals()
                 assert self.model_diag.population_residuals is not None
                 wres_results = self.model_diag.population_residuals.loc[
@@ -746,18 +750,16 @@ class PlottingUtility:
 
     def vpc(
         self,
-        quantiles: list[float] = [0.05, 0.5, 0.95],
-        nb_bins: int = 10,
         facet_width: int = 10,
         facet_height: int = 6,
     ):
 
         if self.model_diag.vpc is None:
-            print("Calculating VPC for all outputs")
-            self.model_diag.compute_vpc(
-                nb_bins=nb_bins,
-                quantiles=quantiles,
+            print(
+                "No VPC in cache. Calling compute_vpc() with default quantiles, precision and nb_bins. "
+                + "Call compute_vpc() directly to use other settings"
             )
+            self.model_diag.compute_vpc()
 
         vpc_df = self.model_diag.vpc
         assert vpc_df is not None
@@ -779,8 +781,8 @@ class PlottingUtility:
             ax.grid(True, linestyle="--", alpha=0.3, which="both")
             ax.set_facecolor("#fdfdfd")
 
-            for q in quantiles:
-                df_q = df_output[df_output["quantile"] == q].sort_values("bin_center")
+            for q, df_q in df_output.groupby("quantile"):
+                df_q = df_q.sort_values("bin_center")
 
                 x = df_q["bin_center"].to_numpy()
                 q_obs = df_q["q_obs"].to_numpy()
