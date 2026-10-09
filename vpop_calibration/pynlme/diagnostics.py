@@ -307,7 +307,9 @@ class ModelDiagnostics:
             )
             centered = this_patient_data - mean_patient
             variance_patient = centered.T @ centered / (nb_valid - 1)
-            variance_patient += torch.diag(variance[:, this_patient_rows].mean(dim=0))
+            variance_patient += torch.diag(
+                variance[:, this_patient_rows][valid_replicates].mean(dim=0)
+            )
             if not torch.isfinite(variance_patient).all():
                 raise ValueError(f"Non-finite predictive covariance for {patient_id}.")
 
@@ -324,7 +326,10 @@ class ModelDiagnostics:
             # Center and decorrelate the simulated noisy predictions
             simulated_pwres = torch.linalg.solve_triangular(
                 L,
-                (noisy_predictions[:, this_patient_rows] - mean_patient).T,
+                (
+                    noisy_predictions[:, this_patient_rows][valid_replicates]
+                    - mean_patient
+                ).T,
                 upper=False,
             ).T
             # The indicator function of whether each decorrelated simulated value is
