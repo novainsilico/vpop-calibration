@@ -33,7 +33,7 @@ class ModelDiagnostics:
         nlme_model: StatisticalModel,
     ):
         self.model = nlme_model
-        self.population_parameters_predictions_df: pd.DataFrame | None = None
+        self.population_mean_predictions_df: pd.DataFrame | None = None
         self.population_residuals: (
             pa.typing.DataFrame[WeightedResidualsSchema] | None
         ) = None
@@ -249,6 +249,8 @@ class ModelDiagnostics:
         Returns:
             A dataframe with one row per observation and diagnostic, identified
             by residual_type ("pwres" or "npde"). Also stored in population_residuals.
+            The simulated mean predictions E(f_i) used for centering are stored in
+            population_mean_predictions_df.
         """
         if nb_samples < 2:
             raise ValueError("Population diagnostics require at least two simulations.")
@@ -276,6 +278,7 @@ class ModelDiagnostics:
         )
 
         residuals_list = []
+        mean_predictions_list = []
 
         for i, patient_id in enumerate(
             self.model.data.full_obs.obs_index.id.ref_values
@@ -293,6 +296,16 @@ class ModelDiagnostics:
             this_patient_data = simulated_tensor[valid_replicates][:, this_patient_rows]
             observations = self.model.data.individual_observations[patient_id]
             mean_patient = this_patient_data.mean(dim=0)
+            mean_predictions_list.append(
+                pd.DataFrame(
+                    {
+                        "id": patient_id,
+                        "time": observations.obs_index.time.raw_values,
+                        "output_name": observations.obs_index.output_name.raw_values,
+                        "predicted_value": mean_patient.detach().cpu().numpy(),
+                    }
+                )
+            )
             centered = this_patient_data - mean_patient
             variance_patient = centered.T @ centered / (nb_valid - 1)
             variance_patient += torch.diag(
@@ -352,21 +365,10 @@ class ModelDiagnostics:
         self.population_residuals = WeightedResidualsSchema.validate(
             pd.concat(residuals_list, ignore_index=True)
         )
+        self.population_mean_predictions_df = pd.concat(
+            mean_predictions_list, ignore_index=True
+        )
         return self.population_residuals
-
-    def zero_random_effect_predictions(self) -> None:
-        eta = torch.zeros((1, self.model.nb_patients, self.model.nb_pdu))
-        gaussian = self.model.convert_etas_to_gaussian_all_patients(eta)
-        physical = self.model.convert_gaussian_to_physical(
-            psi=gaussian, log_mi=self.model.log_mi, surv_coeffs=self.model.surv_coeffs
-        )
-        theta = self.model.convert_physical_to_thetas_all_patients(
-            physical_params=physical
-        )
-        inputs = self.model.convert_thetas_to_model_parameters_all_patients(theta)
-        pred, _ = self.model.predict_all_patients(inputs)
-        pred_df = self.model.data.full_obs.to_pandas(prediction=pred)
-        self.population_parameters_predictions_df = pred_df
 
     def compute_shrinkage(self, nb_samples: int = 50) -> None:
 

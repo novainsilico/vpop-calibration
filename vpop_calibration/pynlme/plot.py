@@ -532,10 +532,9 @@ class PlottingUtility:
             case _:
                 raise ValueError(f"Not implemented residual type: {res_type}")
         if compare_to_pop_pred:
-            if self.model_diag.population_parameters_predictions_df is None:
-                self.model_diag.zero_random_effect_predictions()
-            assert self.model_diag.population_parameters_predictions_df is not None
-            comparison_df = self.model_diag.population_parameters_predictions_df
+            # Population residuals are centered on the simulated mean predictions E(f_i)
+            assert self.model_diag.population_mean_predictions_df is not None
+            comparison_df = self.model_diag.population_mean_predictions_df
         else:
             if not hasattr(self.model_diag.sampler, "map"):
                 self.model_diag.sample_conditional_distribution()
