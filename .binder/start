@@ -4,4 +4,10 @@ set -e
 export LD_LIBRARY_PATH="${NB_PYTHON_PREFIX}/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
 export PYTHONWARNINGS="ignore::FutureWarning"
 
+# mybinder exposes all the host cores (e.g. 24) but caps the container at 1 CPU via cgroups:
+# without this, torch/BLAS spawn one thread per host core, which then fight over a single CPU
+export OMP_NUM_THREADS=1
+export MKL_NUM_THREADS=1
+export OPENBLAS_NUM_THREADS=1
+
 exec "$@"
