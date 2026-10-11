@@ -78,7 +78,7 @@ def test_state_dict(sample_inputs):
     _new_nlme_model = NlmeModel.from_state_dict(
         state_dict=state_dict, df=df, structural_model=struct_model
     )
-    nlme_model.diagnostics.sample_conditional_distribution()
+    nlme_model.sample_conditional_distribution()
     state_dict = nlme_model.get_state_dict()
     _new_nlme_model = NlmeModel.from_state_dict(
         state_dict=state_dict, df=df, structural_model=struct_model
@@ -89,7 +89,7 @@ def test_save_load(sample_inputs, tmp_path):
     priors, df, struct_model = sample_inputs
     nlme_model = NlmeModel(df=df, input_params=priors, structural_model=struct_model)
     nlme_model.optimizer.run()
-    nlme_model.diagnostics.sample_conditional_distribution()
+    nlme_model.sample_conditional_distribution()
 
     model_path = tmp_path / "model.json"
     nlme_model.save(model_path)

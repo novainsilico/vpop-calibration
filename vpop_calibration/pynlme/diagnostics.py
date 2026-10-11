@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import pandera.pandas as pa
 from vpop_calibration.compatibility import tqdm
+from vpop_calibration.metropolis_hastings import MetropolisHastingsState
 from vpop_calibration.pynlme.model import StatisticalModel
 from vpop_calibration.pynlme.residuals import (
     add_predictive_error,
@@ -71,8 +72,11 @@ class ModelDiagnostics:
     def sample_conditional_distribution(
         self,
         nb_samples: int = 100,
+        optimizer_last_state: MetropolisHastingsState | None = None,
     ) -> None:
-        self.sampler.run_sampler(nb_samples=nb_samples)
+        self.sampler.run_sampler(
+            nb_samples=nb_samples, optimizer_last_state=optimizer_last_state
+        )
 
     def compute_iwres(self) -> None:
         """Compute Individual Weighted Residuals (IWRES), following the formula :

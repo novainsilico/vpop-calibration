@@ -124,7 +124,7 @@ def test_benchmark_synthetic(
         config=synthetic_config,
     )
     nlme_model.optimizer.run()
-    nlme_model.diagnostics.sample_conditional_distribution(nb_samples=500)
+    nlme_model.sample_conditional_distribution(nb_samples=500)
     nlme_model.diagnostics.compute_log_likelihood_importance_sampling(
         nb_proposal_samples=1000
     )

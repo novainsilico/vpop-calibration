@@ -53,36 +53,46 @@ class ConditionalDistribSamples(NamedTuple):
 
 
 class ConditionalDistributionSampler:
-    def __init__(
-        self,
-        nlme_model: StatisticalModel,
-    ):
+    def __init__(self, nlme_model: StatisticalModel):
         self.model = nlme_model
         self.live_plot = self.model.config.live_plot
         self.progress_bar = self.model.config.progress_bar
         self.plot_frequency = self.model.config.plot_frequency
         self.max_samples = self.model.config.max_samples
 
-    def init_samples(self):
-
-        # Initiate samples
-        init_etas = self.model.sample_etas(1)
-        init_predictions = self.model.log_posterior_etas_all_patients(init_etas)
-        self.current_state = MetropolisHastingsState(
-            etas=init_etas,
-            gaussian_params=init_predictions.gaussian_params,
-            prediction=init_predictions.predictions,
-            log_prob=init_predictions.log_posterior,
-            step_size=0.1,
-            complete_likelihood=init_predictions.predictions.sum(dim=0),
-        )
+    def init_samples(self, optimizer_last_state: MetropolisHastingsState | None = None):
+        if optimizer_last_state is not None:
+            # Initialize the MCMC sampler from the SAEM optimizer's last state
+            # Conditional sampling currently operates on a single MCMC chain (this could change)
+            # so we take the first chain of the optimizer's last state (yes, that's arbitrary)
+            self.current_state = MetropolisHastingsState(
+                etas=optimizer_last_state.etas[0:1],
+                gaussian_params=optimizer_last_state.gaussian_params[0:1],
+                prediction=optimizer_last_state.prediction[0:1],
+                log_prob=optimizer_last_state.log_prob[0:1],
+                step_size=optimizer_last_state.step_size,
+                complete_likelihood=optimizer_last_state.complete_likelihood,
+            )
+        else:
+            # No state provided so we just sample fresh etas
+            # Initiate samples
+            init_etas = self.model.sample_etas(1)
+            init_predictions = self.model.log_posterior_etas_all_patients(init_etas)
+            self.current_state = MetropolisHastingsState(
+                etas=init_etas,
+                gaussian_params=init_predictions.gaussian_params,
+                prediction=init_predictions.predictions,
+                log_prob=init_predictions.log_posterior,
+                step_size=0.1,
+                complete_likelihood=init_predictions.predictions.sum(dim=0),
+            )
         init_physical = self.model.convert_gaussian_to_physical(
             psi=self.current_state.gaussian_params,
             log_mi=self.model.log_mi,
             surv_coeffs=self.model.surv_coeffs,
         )
         init_samples = ConditionalDistribSamples(
-            eta_samples=init_etas,
+            eta_samples=self.current_state.etas,
             physical_params_samples=init_physical,
             predictions=self.current_state.prediction,
             log_prob=self.current_state.log_prob,
@@ -125,9 +135,14 @@ class ConditionalDistributionSampler:
 
         return instance
 
-    def run_sampler(self, nb_samples: int = 100):
+    def run_sampler(
+        self,
+        nb_samples: int = 100,
+        optimizer_last_state: MetropolisHastingsState | None = None,
+    ):
         if not hasattr(self, "map"):
-            self.init_samples()
+            self.init_samples(optimizer_last_state)
+            nb_samples -= 1
         else:
             print(f"Sampling already started, adding {nb_samples} new samples.")
 
@@ -135,7 +150,7 @@ class ConditionalDistributionSampler:
             self.build_convergence_plot()
 
         if smoke_test:
-            nb_samples = 2
+            nb_samples = 1
         try:
             for i in self.sampling_stream(nb_samples):
                 if self.live_plot and i % self.plot_frequency == 0:

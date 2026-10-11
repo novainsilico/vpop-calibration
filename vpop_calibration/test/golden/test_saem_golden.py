@@ -80,7 +80,7 @@ def test_saem_golden(sample_nlme_params, obs_data, struct_model, golden, request
         input_params=sample_nlme_params,
     )
     nlme_model.optimizer.run()
-    nlme_model.diagnostics.sample_conditional_distribution()
+    nlme_model.sample_conditional_distribution()
 
     actual = nlme_model.get_state_dict()
     expected = golden.out["output"]

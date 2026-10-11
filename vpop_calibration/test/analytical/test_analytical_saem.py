@@ -28,7 +28,11 @@ def sample_nlme_params() -> dict:
         "error_model": {
             "out_1": {"error_type": "additive", "initial_variance": 0.1},
             "out_2": {"error_type": "proportional", "initial_variance": 0.5},
-            "out_3": {"error_type": "combined", "initial_variance_add": 0.1, "initial_variance_prop": 0.5},
+            "out_3": {
+                "error_type": "combined",
+                "initial_variance_add": 0.1,
+                "initial_variance_prop": 0.5,
+            },
         },
         "pdk": ["pdk_1"],
     }
@@ -79,4 +83,4 @@ def test_analytical_saem(sample_nlme_params, obs_data, struct_model):
         input_params=sample_nlme_params,
     )
     nlme_model.optimizer.run()
-    nlme_model.diagnostics.sample_conditional_distribution()
+    nlme_model.sample_conditional_distribution()
