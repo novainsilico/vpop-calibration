@@ -15,10 +15,128 @@ from vpop_calibration.pynlme.diagnostics import (
     WeightedResidualsSchema,
     ResidualType,
 )
+from vpop_calibration.pynlme.initial_estimates import theoretical_pdf
+from vpop_calibration.pynlme.params import Constraint
+from vpop_calibration.pynlme.utils import inverse_transform_param
 from vpop_calibration.model.gp import GP
 from vpop_calibration.structural_model.gp import StructuralGp
 from vpop_calibration.config import smoke_test
 from vpop_calibration.utils import time_scale_and_label
+
+
+def _population_marginal_log10(
+    means: np.ndarray,
+    std: float,
+    const: Constraint,
+    data_range: tuple[float, float],
+    nb_points: int = 200,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Density of log10(phi) under the population model, for one PDU.
+
+    With covariates, each patient has its own mean in the gaussian space, so the population marginal
+    is the mixture of the individual distributions (averaged over the patients of the dataset).
+
+    Args:
+        means: Population mean of the gaussian parameter, per patient. Size (nb_patients,)
+        std: Standard deviation of the random effect (sqrt of the Omega diagonal term)
+        const: Constraint (transform, shift, scale) of the PDU
+        data_range: (min, max) of the plotted samples, in log10 space, to be included in the grid
+
+    Returns:
+        The log10 grid and the density evaluated on it
+    """
+    # Cover +/- 3.5 SD of the population distribution, as well as the plotted samples
+    psi_bounds = np.array([means.min() - 3.5 * std, means.max() + 3.5 * std])
+    phys_bounds = inverse_transform_param(psi_bounds, const)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        log10_bounds = np.log10(phys_bounds)
+    low = np.nanmin([log10_bounds[0], data_range[0]])
+    high = np.nanmax([log10_bounds[1], data_range[1]])
+    log10_grid = np.linspace(low, high, nb_points)
+    x = 10**log10_grid
+
+    unique_means, counts = np.unique(means, return_counts=True)
+    density_x = sum(
+        count * theoretical_pdf(x, mu=mu, prior_std=std, const=const)
+        for mu, count in zip(unique_means, counts)
+    ) / len(means)
+    # Change of variable x -> log10(x): dx/du = x * ln(10)
+    density_log10 = density_x * x * np.log(10)
+    return log10_grid, density_log10
+
+
+def _log10_to_gaussian(
+    log10_grid: np.ndarray, const: Constraint
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Map log10(phi) values to the gaussian space psi.
+
+    Returns:
+        psi, the Jacobian d(psi)/d(log10 phi), and a validity mask (phi inside the support of the transform)
+    """
+    phi = 10**log10_grid
+    if const.transform == "log":
+        valid = phi > const.shift
+        shifted = np.where(valid, phi - const.shift, 1.0)
+        psi = np.log(shifted)
+        dpsi_dphi = 1.0 / shifted
+    elif const.transform == "logit":
+        s = (phi - const.shift) / const.scale
+        valid = (s > 0) & (s < 1)
+        s = np.where(valid, s, 0.5)
+        psi = np.log(s / (1 - s))
+        dpsi_dphi = 1.0 / (const.scale * s * (1 - s))
+    else:
+        raise NotImplementedError(f"Unsupported transform: {const.transform}")
+    jacobian = dpsi_dphi * phi * np.log(10)
+    return psi, jacobian, valid
+
+
+def _population_joint_log10(
+    means: np.ndarray,
+    cov: np.ndarray,
+    consts: tuple[Constraint, Constraint],
+    grids: tuple[np.ndarray, np.ndarray],
+) -> np.ndarray:
+    """Joint density of (log10(phi_x), log10(phi_y)) under the population model, for a pair of PDUs.
+
+    In the gaussian space, (psi_x, psi_y) ~ N(X_i @ beta, Omega_xy). For log-transformed parameters without
+    lower bound, this is the same bivariate normal (rescaled by 1/ln(10)) in log10 space. Other transforms are
+    handled through the change of variables. With covariates, the density is averaged over patients.
+
+    Args:
+        means: Population means in the gaussian space, per patient. Size (nb_patients, 2)
+        cov: Covariance of the two random effects. Size (2, 2)
+        consts: Constraints of the x and y parameters
+        grids: 1D log10 grids for x and y
+
+    Returns:
+        The density on the meshgrid. Size (len(grids[1]), len(grids[0]))
+    """
+    psi_x, jac_x, valid_x = _log10_to_gaussian(grids[0], consts[0])
+    psi_y, jac_y, valid_y = _log10_to_gaussian(grids[1], consts[1])
+    psi_xx, psi_yy = np.meshgrid(psi_x, psi_y)
+    points = np.stack([psi_xx, psi_yy], axis=-1)
+
+    unique_means, counts = np.unique(means, axis=0, return_counts=True)
+    density_psi = sum(
+        count * stats.multivariate_normal.pdf(points, mean=mu, cov=cov)
+        for mu, count in zip(unique_means, counts)
+    ) / len(means)
+    density = density_psi * np.outer(jac_y, jac_x)
+    return np.where(np.outer(valid_y, valid_x), density, 0.0)
+
+
+def _highest_density_levels(density: np.ndarray, masses: list[float]) -> np.ndarray:
+    """Density levels whose contours enclose the given probability masses (on a uniform grid)."""
+    sorted_density = np.sort(density.ravel())[::-1]
+    cumulative_mass = np.cumsum(sorted_density) / sorted_density.sum()
+    levels = [
+        sorted_density[
+            min(np.searchsorted(cumulative_mass, m), len(sorted_density) - 1)
+        ]
+        for m in masses
+    ]
+    return np.unique(levels)
 
 
 class PlottingUtility:
@@ -858,9 +976,10 @@ class PlottingUtility:
         scaling_indiv_plot: float = 3.0,
         scaling_2by2_plot: float = 2.5,
         n_columns: int = 3,
+        contour_masses: list[float] = [0.5, 0.9, 0.99],
     ) -> None:
         def _value_formatter_log(v, pos):
-            return f"{10**v:.2f}"
+            return f"{10**v:.3g}"
 
         format_log_values = ticker.FuncFormatter(_value_formatter_log)
         pdus = self.model_diag.model.pdu_names
@@ -871,6 +990,17 @@ class PlottingUtility:
 
         map_data = self.model_diag.sampler.map_parameters_df
         cond_data = self.model_diag.sampler.total_samples_parameters_df
+
+        # Population model: psi_i = X_i @ beta + eta_i, eta_i ~ N(0, Omega)
+        model = self.model_diag.model
+        pop_means = (
+            (model.full_design_matrix @ model.population_betas).detach().cpu().numpy()
+        )  # (nb_patients, nb_pdu)
+        pop_cov = model.omega_pop.detach().cpu().numpy()
+        pop_stds = np.sqrt(np.diag(pop_cov))
+        pdu_constraints = [model.input_params.pdu[p].constraint for p in pdus]
+        # Plotting range of each parameter (log10 space), reused for the 2D contours
+        log10_ranges = {}
 
         n_plots = len(pdus)
         n_cols = n_columns
@@ -889,10 +1019,38 @@ class PlottingUtility:
             map_samples = np.log10(map_data[param])
 
             ax = axes1[i, j]
-            ax.hist([cond_samples, map_samples], density=True)
+            ax.hist(
+                [cond_samples, map_samples],
+                density=True,
+                label=["Conditional samples", "MAP"],
+                zorder=2,
+            )
+            log10_grid, pop_density = _population_marginal_log10(
+                means=pop_means[:, k],
+                std=pop_stds[k],
+                const=pdu_constraints[k],
+                data_range=(
+                    min(cond_samples.min(), map_samples.min()),
+                    max(cond_samples.max(), map_samples.max()),
+                ),
+            )
+            log10_ranges[param] = (log10_grid[0], log10_grid[-1])
+            ax.plot(
+                log10_grid,
+                pop_density,
+                color="black",
+                linewidth=1.5,
+                label="Population model ~ N(β, Ω)",
+                zorder=1,
+            )
             ax.set_title(f"{param}")
             ax.xaxis.set_major_formatter(format_log_values)
             ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=3))
+
+        handles, labels = axes1[0, 0].get_legend_handles_labels()
+        fig1.legend(handles, labels, loc="upper center", ncol=3, frameon=False)
+        # Keep ~0.4 inch at the top of the figure for the legend
+        fig1.tight_layout(rect=(0, 0, 1, 1 - 0.4 / fig1.get_figheight()))
 
         fig2, axes2 = plt.subplots(
             n_plots,
@@ -903,35 +1061,74 @@ class PlottingUtility:
             sharey="row",
         )
 
+        # Plot in log10 space on linear axes, so that a few readable ticks can be placed
+        # even when a parameter spans less than a decade
         for k1, param1 in enumerate(pdus):
-            cond_samples_1 = cond_data[param1]
-            map_samples_1 = map_data[param1]
+            cond_samples_1 = np.log10(cond_data[param1])
+            map_samples_1 = np.log10(map_data[param1])
             for k2, param2 in enumerate(pdus):
-                cond_samples_2 = cond_data[param2]
-                map_samples_2 = map_data[param2]
+                cond_samples_2 = np.log10(cond_data[param2])
+                map_samples_2 = np.log10(map_data[param2])
                 ax = axes2[k1, k2]
-                ax.set_xscale("log")
-                ax.set_yscale("log")
                 if k1 != k2:
                     # param 1 is the row -> y axis
                     # param 2 is the column -> x axis
-                    ax.scatter(cond_samples_2, cond_samples_1, alpha=0.5, s=1.0)
-                    ax.scatter(map_samples_2, map_samples_1, s=5)
+                    ax.scatter(
+                        cond_samples_2,
+                        cond_samples_1,
+                        alpha=0.5,
+                        s=1.0,
+                        label="Conditional samples",
+                    )
+                    ax.scatter(map_samples_2, map_samples_1, s=5, label="MAP")
+                    grids = (
+                        np.linspace(*log10_ranges[param2], 100),
+                        np.linspace(*log10_ranges[param1], 100),
+                    )
+                    pop_density_2d = _population_joint_log10(
+                        means=pop_means[:, [k2, k1]],
+                        cov=pop_cov[np.ix_([k2, k1], [k2, k1])],
+                        consts=(pdu_constraints[k2], pdu_constraints[k1]),
+                        grids=grids,
+                    )
+                    ax.contour(
+                        *grids,
+                        pop_density_2d,
+                        levels=_highest_density_levels(pop_density_2d, contour_masses),
+                        colors="black",
+                        linewidths=0.8,
+                    )
                 if k2 == 0:
                     ax.set_ylabel(param1)
                 if k1 == len(pdus) - 1:
                     ax.set_xlabel(param2)
 
-        formatter = ticker.ScalarFormatter()
-        formatter.set_scientific(False)
         for ax in fig2.axes:
-            ax.xaxis.set_major_formatter(formatter)
-            ax.xaxis.set_minor_formatter(formatter)
-            ax.yaxis.set_major_formatter(formatter)
-            ax.yaxis.set_minor_formatter(formatter)
+            for axis in (ax.xaxis, ax.yaxis):
+                axis.set_major_formatter(format_log_values)
+                axis.set_major_locator(ticker.MaxNLocator(nbins=3))
+            ax.tick_params(axis="x", labelrotation=45)
+
+        # Wrap the legend on two rows when the figure is too narrow for a single one
+        legend_ncol = 3
+        legend_height = 0.4
+        if n_plots > 1:
+            # The diagonal is empty, the first off-diagonal subplot carries the labels
+            handles, labels = axes2[0, 1].get_legend_handles_labels()
+            masses_str = "/".join(f"{m:.0%}" for m in contour_masses)
+            handles.append(Line2D([], [], color="black", linewidth=0.8))
+            labels.append(f"Population model ({masses_str})")
+            fig2.legend(
+                handles,
+                labels,
+                loc="upper center",
+                ncol=legend_ncol,
+                frameon=False,
+                markerscale=3,
+            )
+        fig2.tight_layout(rect=(0, 0, 1, 1 - legend_height / fig2.get_figheight()))
 
         if not smoke_test:
-            plt.tight_layout()
             plt.show()
 
         plt.close(fig1)
