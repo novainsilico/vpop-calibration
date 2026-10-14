@@ -100,3 +100,12 @@ class NlmeModel:
         return NlmeModel.from_state_dict(
             state_dict=state_dict, df=df, structural_model=struct_model
         )
+
+    def sample_conditional_distribution(
+        self,
+        nb_samples: int = 100,
+    ) -> None:
+        optimizer_last_state = getattr(self.optimizer, "mh_state", None)
+        self.diagnostics.sample_conditional_distribution(
+            nb_samples=nb_samples, optimizer_last_state=optimizer_last_state
+        )
