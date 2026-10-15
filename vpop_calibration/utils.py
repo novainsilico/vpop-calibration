@@ -35,6 +35,19 @@ def reproducible_uuid4(seed=None):
         random.seed(seed)
     return uuid.UUID(int=random.getrandbits(128), version=4)
 
+def known_patient_uuid4(patient_number: int):
+    """
+    It returns a patient UUID which is reproductible and readable based on the patient number
+
+    The numbers are "encoded" in the uuid in the latest fields, so for example:
+
+    >>> known_patient_uuid(5)
+    UUID('00000000-0000-0000-0000-000000000005')
+
+    Note that the value are encoded in hex, so values >9 can be confusing to read.
+    """
+    return uuid.UUID(int=patient_number, version=4)
+
 
 def from_seconds_time_scale(time_unit: str) -> float:
     match time_unit:

@@ -10,6 +10,7 @@ from vpop_calibration.structural_model.base import StructuralModel
 from vpop_calibration.utils import extend_schema
 from vpop_calibration.config import default_dtype, device
 from vpop_calibration.pynlme.indexing import DataIndex
+from vpop_calibration.utils import known_patient_uuid4
 
 
 def simulate_rr_single_patient(
@@ -176,7 +177,7 @@ class StructuralSbml(StructuralModel):
             columns=self.input_parameters,
         )
         # Add a temp patient id, to cover the fact that a single patient is simulated on each chain
-        temporary_ids = [str(uuid.uuid4()) for _ in range(vpop.shape[0])]
+        temporary_ids = [str(known_patient_uuid4(patient_number)) for patient_number  in range(vpop.shape[0])]
         vpop["id"] = temporary_ids
         return vpop
 
