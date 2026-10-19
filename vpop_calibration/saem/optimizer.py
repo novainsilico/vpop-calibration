@@ -155,7 +155,8 @@ class PySaem:
             # Inititate the SAEM state with current estimates and Metropolis Hastings state
             self.init_state()
         else:
-            print(f"Resuming at iteration {self.scheduler.iteration}:")
+            if self.config.logging:
+               print(f"Resuming at iteration {self.scheduler.iteration}:")
 
         history_dict = defaultdict(list, self.history.to_dict(orient="list"))
         try:
