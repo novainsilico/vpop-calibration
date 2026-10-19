@@ -78,7 +78,7 @@ addopts = [
     "--profile",
     "--durations=5",
 ]
-testpaths = ["vpop_calibration/test", "examples/saem", "examples/benchmarking"]
+testpaths = ["vpop_calibration/test", "examples/benchmarks", "examples/synthetic"]
 filterwarnings = ["error", "ignore::UserWarning", "ignore::DeprecationWarning"]
 env = ["IS_PYTEST_RUNNING=True", "CUDA_VISIBLE_DEVICES=", "MPLBACKEND=agg"]
 enable_assertion_pass_hook = true

@@ -1,7 +1,7 @@
 | Name                                                  |    Stmts |     Miss |   Branch |   BrPart |   Cover |   Missing |
 |------------------------------------------------------ | -------: | -------: | -------: | -------: | ------: | --------: |
 | vpop\_calibration/api/\_\_init\_\_.py                 |        8 |        0 |        0 |        0 |    100% |           |
-| vpop\_calibration/api/interface.py                    |       53 |        0 |        0 |        0 |    100% |           |
+| vpop\_calibration/api/interface.py                    |       56 |        0 |        0 |        0 |    100% |           |
 | vpop\_calibration/compatibility.py                    |       14 |       12 |        0 |        0 |     14% |      3-19 |
 | vpop\_calibration/config.py                           |        9 |        1 |        2 |        1 |     82% |         7 |
 | vpop\_calibration/data\_generation.py                 |       91 |        2 |       12 |        4 |     94% |59, 73, 128-\>131, 167-\>170 |
@@ -11,20 +11,20 @@
 | vpop\_calibration/model/gp.py                         |      227 |       49 |       68 |       20 |     75% |61, 66, 102, 139, 141-142, 146-149, 224-225, 232, 252, 286, 308, 310, 364, 385, 389-394, 401-409, 411-\>346, 435-437, 465, 475-484, 514-\>exit, 589-596 |
 | vpop\_calibration/model/plot.py                       |      122 |       11 |       32 |        8 |     88% |76-77, 147-148, 174-\>177, 219-\>178, 224-225, 244, 253-\>255, 256-259 |
 | vpop\_calibration/pynlme/\_\_init\_\_.py              |        0 |        0 |        0 |        0 |    100% |           |
-| vpop\_calibration/pynlme/conditional\_distribution.py |      187 |       26 |       44 |        5 |     82% |9-10, 13-14, 132, 137-\>139, 145-149, 237, 258-264, 309-327, 346 |
+| vpop\_calibration/pynlme/conditional\_distribution.py |      190 |       26 |       46 |        5 |     83% |9-10, 13-14, 147, 152-\>154, 160-164, 252, 273-279, 324-342, 361 |
 | vpop\_calibration/pynlme/config.py                    |       14 |        0 |        0 |        0 |    100% |           |
 | vpop\_calibration/pynlme/data.py                      |       61 |        0 |       12 |        0 |    100% |           |
-| vpop\_calibration/pynlme/diagnostics.py               |      176 |       11 |       28 |        9 |     90% |87-88, 159-\>162, 204, 218-219, 254, 256, 290, 302, 374, 478 |
+| vpop\_calibration/pynlme/diagnostics.py               |      172 |       11 |       28 |        9 |     90% |91-92, 163-\>166, 208, 222-223, 260, 262, 297, 318, 379, 483 |
 | vpop\_calibration/pynlme/error\_estimation.py         |       40 |        0 |       12 |        0 |    100% |           |
 | vpop\_calibration/pynlme/importance\_sampling.py      |       64 |        0 |       12 |        1 |     99% |   87-\>90 |
 | vpop\_calibration/pynlme/indexing.py                  |       66 |        0 |        8 |        0 |    100% |           |
-| vpop\_calibration/pynlme/initial\_estimates.py        |       79 |       61 |       22 |        0 |     18% |15-37, 45-72, 75-78, 84-102, 115-125, 128-133, 136-142 |
+| vpop\_calibration/pynlme/initial\_estimates.py        |       79 |       46 |       22 |        0 |     35% |45-72, 75-78, 84-102, 115-125, 128-133, 136-142 |
 | vpop\_calibration/pynlme/model.py                     |      250 |        1 |       28 |        3 |     99% |83-\>90, 242-\>238, 463 |
 | vpop\_calibration/pynlme/params.py                    |      180 |        4 |       48 |        4 |     96% |57, 59, 133-\>144, 141, 241 |
-| vpop\_calibration/pynlme/plot.py                      |      429 |       44 |      130 |       36 |     86% |39-\>41, 73, 75-76, 122-123, 134, 159, 192-193, 205-\>209, 210, 219-220, 245, 279-280, 295, 299-\>305, 311, 316, 354, 382-383, 396, 438, 440, 453-454, 499, 513, 521, 525-526, 534, 654, 663, 665-\>668, 695-\>706, 743-744, 756-757, 842-843, 853, 860, 924-925 |
+| vpop\_calibration/pynlme/plot.py                      |      496 |       43 |      134 |       37 |     87% |158-\>160, 192, 194-195, 241-242, 254, 279, 312-313, 325-\>329, 330, 339-340, 365, 399-400, 415, 419-\>425, 431, 436, 474, 502-503, 516, 558, 560, 573-574, 619, 634-638, 646, 650-651, 658, 780, 789, 791-\>794, 821-\>832, 869-870, 881-885, 969-970, 988, 1114-\>1128, 1131 |
 | vpop\_calibration/pynlme/residuals.py                 |      102 |        1 |       10 |        1 |     98% |        51 |
 | vpop\_calibration/pynlme/schemas.py                   |       25 |        0 |        2 |        0 |    100% |           |
-| vpop\_calibration/pynlme/utils.py                     |       26 |        4 |        2 |        0 |     79% |     82-85 |
+| vpop\_calibration/pynlme/utils.py                     |       26 |        0 |        2 |        0 |    100% |           |
 | vpop\_calibration/saem/\_\_init\_\_.py                |        0 |        0 |        0 |        0 |    100% |           |
 | vpop\_calibration/saem/config.py                      |       29 |        0 |        0 |        0 |    100% |           |
 | vpop\_calibration/saem/estimates.py                   |      103 |       21 |       30 |        1 |     74% |161-166, 181-196, 199-206, 226, 230 |
@@ -45,5 +45,5 @@
 | vpop\_calibration/structural\_model/gp.py             |       26 |        0 |        2 |        0 |    100% |           |
 | vpop\_calibration/structural\_model/sbml.py           |       94 |        9 |       14 |        3 |     87% |34-35, 38, 68-73, 76 |
 | vpop\_calibration/structural\_model/simwork.py        |      128 |        7 |       22 |        2 |     91% |72-89, 121 |
-| vpop\_calibration/utils.py                            |       24 |        3 |        6 |        2 |     83% | 29-30, 35 |
-| **TOTAL**                                             | **3406** |  **354** |  **704** |  **129** | **86%** |           |
+| vpop\_calibration/utils.py                            |       45 |       18 |       18 |        3 |     51% |29-30, 35, 40-52, 60-61 |
+| **TOTAL**                                             | **3496** |  **349** |  **722** |  **131** | **86%** |           |

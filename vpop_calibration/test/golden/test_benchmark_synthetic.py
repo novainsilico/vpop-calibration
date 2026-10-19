@@ -15,7 +15,7 @@ from vpop_calibration.api import (
     StructuralAnalytical,
 )
 
-# Mirrors examples/benchmarking/benchmark_synthetic.ipynb: a one-observation-per-output
+# Mirrors examples/synthetic/random_effects.ipynb: a one-observation-per-output
 # log-normal NLME identifiability benchmark (5 correlated PDUs, additive noise).
 DIMENSION = 5
 OUTPUT_NAMES = [f"y_{j + 1}" for j in range(DIMENSION)]
