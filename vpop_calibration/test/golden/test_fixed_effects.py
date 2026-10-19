@@ -15,7 +15,7 @@ from vpop_calibration.api import (
     StructuralAnalytical,
 )
 
-# Mirrors examples/benchmarking/benchmark_fixed_effects.ipynb.
+# Mirrors examples/synthetic/fixed_effects.ipynb.
 PERIOD = 24.0
 MI_NAMES = [f"mi_{j}" for j in range(1, 6)]
 TRUE_MI = dict(zip(MI_NAMES, [0.25, 0.18, 0.15, 0.12, 0.08], strict=True))
