@@ -5,6 +5,7 @@ import numpy as np
 import torch
 import uuid
 
+torch.use_deterministic_algorithms(True)
 
 def extend_schema(
     schema: pa.DataFrameSchema, column_list: list[str], type: str
@@ -22,7 +23,6 @@ def seed_everything(seed: int) -> None:
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
-    torch.use_deterministic_algorithms(True)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
     if torch.cuda.is_available():
