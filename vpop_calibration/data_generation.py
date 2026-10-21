@@ -1,5 +1,4 @@
 import pandas as pd
-import uuid
 import numpy as np
 from scipy.stats.qmc import Sobol, scale
 from pydantic import BaseModel, TypeAdapter
@@ -13,6 +12,7 @@ from vpop_calibration.pynlme.data import ObsData
 from vpop_calibration.pynlme.residuals import add_predictive_error
 from vpop_calibration.pynlme.config import NlmeConfigDict
 from vpop_calibration.config import smoke_test
+from vpop_calibration.utils import known_patient_uuid4
 
 
 class ParamBounds(BaseModel):
@@ -27,7 +27,7 @@ paramRangesAdapter = TypeAdapter(ParamRanges)
 
 def init_patient_ids(nb_individuals: int) -> pd.DataFrame:
     """Initiate a single column data frame with unique patient ids."""
-    ids = [str(uuid.uuid4()) for _ in range(nb_individuals)]
+    ids = [str(known_patient_uuid4(patient_number)) for patient_number in range(nb_individuals)]
     return pd.DataFrame({"id": ids})
 
 
@@ -92,7 +92,7 @@ def cross_join_protocol_arms(
         pd.DataFrame({"protocol_arm": protocol_arms}), how="cross"
     ).rename(columns={"id": "previous_id"})
     # A new id column is created to have the 1:1 patient-protocol arm structure
-    new_patients["id"] = [str(uuid.uuid4()) for _ in range(new_patients.shape[0])]
+    new_patients["id"] = [str(known_patient_uuid4(patient_number)) for patient_number in range(new_patients.shape[0])]
 
     return new_patients
 

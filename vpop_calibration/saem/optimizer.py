@@ -150,12 +150,13 @@ class PySaem:
             )
         return instance
 
-    def run(self):
+    def run(self, progress_callback=None):
         if self.scheduler.iteration == 0:
             # Inititate the SAEM state with current estimates and Metropolis Hastings state
             self.init_state()
         else:
-            print(f"Resuming at iteration {self.scheduler.iteration}:")
+            if self.config.logging:
+               print(f"Resuming at iteration {self.scheduler.iteration}:")
 
         history_dict = defaultdict(list, self.history.to_dict(orient="list"))
         try:
@@ -186,6 +187,11 @@ class PySaem:
                         progress.iteration == self.scheduler.nb_iter_tot - 1
                     ):
                         self.plot_history(history_dict)
+                if progress_callback is not None:
+                    # Force history update, otherwise it does not appear during solving
+                    if history_dict:
+                        self.history = pd.DataFrame(history_dict)
+                    progress_callback(self)
 
             if self.config.live_plot:
                 self.plot.close()

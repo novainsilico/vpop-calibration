@@ -5,6 +5,7 @@ import numpy as np
 import torch
 import uuid
 
+torch.use_deterministic_algorithms(True)
 
 def extend_schema(
     schema: pa.DataFrameSchema, column_list: list[str], type: str
@@ -19,10 +20,22 @@ def extend_schema(
 
 
 def seed_everything(seed: int) -> None:
+    """
+    Try as much as possible to seed the (known) global random generators and
+    force deterministic algorithm when possible.
+
+    Note that this function does not guaranteed reproducibility, especially in
+    a concurrent context: if called concurrently, the seed is set
+    globally and as such the different process won't be reproductible anymore.
+    Moreover, it can completely butcher the randomness properties and lead to
+    incorrect / poor randomness.
+
+    The random generator should instead be carefully seeded per instance and
+    threaded through all the random call to ensure reproducibility.
+    """
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
-    torch.use_deterministic_algorithms(True)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
     if torch.cuda.is_available():
@@ -34,6 +47,19 @@ def reproducible_uuid4(seed=None):
     if seed is not None:
         random.seed(seed)
     return uuid.UUID(int=random.getrandbits(128), version=4)
+
+def known_patient_uuid4(patient_number: int):
+    """
+    It returns a patient UUID which is reproductible and readable based on the patient number
+
+    The numbers are "encoded" in the uuid in the latest fields, so for example:
+
+    >>> known_patient_uuid(5)
+    UUID('00000000-0000-0000-0000-000000000005')
+
+    Note that the value are encoded in hex, so values >9 can be confusing to read.
+    """
+    return uuid.UUID(int=patient_number, version=4)
 
 
 def from_seconds_time_scale(time_unit: str) -> float:
