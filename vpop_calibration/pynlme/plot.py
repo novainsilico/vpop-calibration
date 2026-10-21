@@ -856,12 +856,13 @@ class PlottingUtility:
     ) -> None:
         """
         Produces a n x n grid of plots with:
-           * on the diagonal: histograms of MAP and conditional samples (COND) + theoretical marginal under
-              the SAEM-optimized population model N(0, Omega) (POP)
-           * under the diagonal: pairwise scatter plots of the random effects eta (both COND and MAP)
-             + contour plots of the population model density
-           * empirical pairwise Pearson correlation coefficients for the eta (COND and MAP) and
-             theoretical (POP)
+           * on the diagonal: histograms of MAP and conditional samples (COND) +
+              theoretical marginal under the SAEM-optimized
+              population model N(0, Omega) (POP)
+           * under the diagonal: pairwise scatter plots of the random effects
+             eta (both COND and MAP) + contour plots of the population model density
+           * above the diagonal: pairwise Pearson correlation coefficients
+             for the eta. Empirical for COND and MAP, theoretical for POP
 
         Args:
             figsize : a two-item list with the figure x- and y- dimensions (in inches because why bother with metric)
