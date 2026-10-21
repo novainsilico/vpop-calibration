@@ -20,6 +20,19 @@ def extend_schema(
 
 
 def seed_everything(seed: int) -> None:
+    """
+    Try as much as possible to seed the (known) global random generators and
+    force deterministic algorithm when possible.
+
+    Note that this function does not guaranteed reproducibility, especially in
+    a concurrent context: if called concurrently, the seed is set
+    globally and as such the different process won't be reproductible anymore.
+    Moreover, it can completely butcher the randomness properties and lead to
+    incorrect / poor randomness.
+
+    The random generator should instead be carefully seeded per instance and
+    threaded through all the random call to ensure reproducibility.
+    """
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
