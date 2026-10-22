@@ -388,6 +388,17 @@ class ModelDiagnostics:
 
         self.shrinkage = shrinkage
 
+    def report_shrinkage(self, nb_samples: int = 50) -> None:
+        self.compute_shrinkage(nb_samples=nb_samples)
+        parameter_names = self.model.pdu_names
+        shrinkage_percent = self.shrinkage.detach().cpu().numpy() * 100
+        shrinkage_df = pd.DataFrame(
+            [shrinkage_percent],
+            columns=parameter_names,
+            index=["shrinkage(%)"],
+        )
+        return shrinkage_df
+
     def compute_vpc(
         self,
         nb_samples: int = 100,
