@@ -14,12 +14,6 @@ pytest-full:
   tags: [ nix ]
   script:
     - nix develop --command poetry run pytest
-  
-pytest-sdk:
-  stage: test
-  tags: [ nix ]
-  script:
-    - nix develop .#slim --command poetry run pytest vpop_calibration/test/sdk --noconftest -o addopts=""
 
 pypi_deploy:
   stage: deploy

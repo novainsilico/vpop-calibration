@@ -1,5 +1,7 @@
 from typing import NamedTuple, Literal, Any
 
+from vpop_calibration.pynlme.config import NlmeConfigDict
+
 
 class SaemConfigDict(NamedTuple):
     ## Schedule
@@ -53,3 +55,9 @@ class SaemConfigDict(NamedTuple):
     @classmethod
     def from_state_dict(cls, state_dict: dict[str, Any]) -> "SaemConfigDict":
         return cls(**state_dict)
+
+
+class Config(NamedTuple):
+    seed: int = 0
+    saem: SaemConfigDict = SaemConfigDict()
+    nlme: NlmeConfigDict = NlmeConfigDict()
