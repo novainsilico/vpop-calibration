@@ -1,9 +1,9 @@
 from vpop_calibration.api.interface import (
     NlmeModel,
-    Config,
     NlmeConfigDict,
     SaemConfigDict,
 )
+from vpop_calibration.saem.config import Config
 from vpop_calibration.structural_model.analytical import StructuralAnalytical
 from vpop_calibration.structural_model.gp import StructuralGp
 from vpop_calibration.structural_model.simwork import (

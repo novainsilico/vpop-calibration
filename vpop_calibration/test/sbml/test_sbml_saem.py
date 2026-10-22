@@ -6,10 +6,10 @@ from vpop_calibration.structural_model.sbml import StructuralSbml
 from vpop_calibration.structural_model.base import StructuralModel
 from vpop_calibration.api.interface import (
     NlmeModel,
-    Config,
     SaemConfigDict,
     NlmeConfigDict,
 )
+from vpop_calibration.saem.config import Config
 
 
 @pytest.fixture
