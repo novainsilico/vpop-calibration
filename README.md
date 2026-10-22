@@ -26,6 +26,8 @@ Here is an overview of the proposed workflow:
 - Diagnostics:
   - Post-inference diagnostics are available, and different type sof weighted residuals may be plotted (IWRES, PWRES, NPDE)
 
+Tensor shapes in comments and docs use the notation described in [tensor_shapes.md](./docs/tensor_shapes.md).
+
 ## Getting started
 
 - [Tutorial](./examples/saem/saem_gp_model.ipynb): this notebook demonstrates step-by-step how to create and train a surrogate model, using a reference ODE model and a GP surrogate model. It then showcases how to optimize the surrogate model on synthetic data using SAEM

@@ -1,3 +1,5 @@
+from math import ceil
+
 from vpop_calibration.compatibility import tqdm
 import torch
 import pandas as pd
@@ -15,7 +17,6 @@ except ImportError:
 
 
 from vpop_calibration.pynlme.model import StatisticalModel
-from vpop_calibration.pynlme.residuals import add_predictive_error
 from vpop_calibration.config import smoke_test, device, default_dtype
 from vpop_calibration.metropolis_hastings import MetropolisHastingsState, mh_step
 from vpop_calibration.utils import reproducible_uuid4
@@ -39,18 +40,6 @@ class ConditionalDistribSamples(NamedTuple):
             }
         )
 
-    def __eq__(self, other) -> bool:
-        compared_attributes = [
-            "eta_samples",
-            "physical_params_samples",
-            "predictions",
-            "log_prob",
-        ]
-
-        for elem in compared_attributes:
-            torch.testing.assert_close(getattr(self, elem), getattr(other, elem))
-        return True
-
 
 class ConditionalDistributionSampler:
     def __init__(self, nlme_model: StatisticalModel):
@@ -63,20 +52,18 @@ class ConditionalDistributionSampler:
     def init_samples(self, optimizer_last_state: MetropolisHastingsState | None = None):
         if optimizer_last_state is not None:
             # Initialize the MCMC sampler from the SAEM optimizer's last state
-            # Conditional sampling currently operates on a single MCMC chain (this could change)
-            # so we take the first chain of the optimizer's last state (yes, that's arbitrary)
             self.current_state = MetropolisHastingsState(
-                etas=optimizer_last_state.etas[0:1],
-                gaussian_params=optimizer_last_state.gaussian_params[0:1],
-                prediction=optimizer_last_state.prediction[0:1],
-                log_prob=optimizer_last_state.log_prob[0:1],
+                etas=optimizer_last_state.etas,
+                gaussian_params=optimizer_last_state.gaussian_params,
+                prediction=optimizer_last_state.prediction,
+                log_prob=optimizer_last_state.log_prob,
                 step_size=optimizer_last_state.step_size,
                 complete_likelihood=optimizer_last_state.complete_likelihood,
             )
         else:
             # No state provided so we just sample fresh etas
             # Initiate samples
-            init_etas = self.model.sample_etas(1)
+            init_etas = self.model.sample_etas(self.model.nb_chains)
             init_predictions = self.model.log_posterior_etas_all_patients(init_etas)
             self.current_state = MetropolisHastingsState(
                 etas=init_etas,
@@ -84,7 +71,8 @@ class ConditionalDistributionSampler:
                 prediction=init_predictions.predictions,
                 log_prob=init_predictions.log_posterior,
                 step_size=0.1,
-                complete_likelihood=init_predictions.predictions.sum(dim=0),
+                complete_likelihood=-2
+                * init_predictions.log_posterior.mean(dim=0).sum(dim=0),
             )
         init_physical = self.model.convert_gaussian_to_physical(
             psi=self.current_state.gaussian_params,
@@ -98,9 +86,11 @@ class ConditionalDistributionSampler:
             log_prob=self.current_state.log_prob,
         )
         self.samples: list[ConditionalDistribSamples] = [init_samples]
-        self.map: ConditionalDistribSamples = init_samples
+        self.map: ConditionalDistribSamples = self.best_log_prob_over_chains(
+            init_samples
+        )
         self.nb_improved_history: list[float] = [0]
-        self.indiv_log_prob: np.ndarray = init_samples.log_prob.detach().cpu().numpy()
+        self.indiv_log_prob: np.ndarray = self.map.log_prob.detach().cpu().numpy()
 
     def get_state_dict(self) -> dict[str, Any]:
         if hasattr(self, "map"):
@@ -140,20 +130,34 @@ class ConditionalDistributionSampler:
         nb_samples: int = 100,
         optimizer_last_state: MetropolisHastingsState | None = None,
     ):
+        # How many MCMC chains
+        if optimizer_last_state is not None:
+            nc = optimizer_last_state.etas.shape[0]
+        else:
+            nc = self.model.nb_chains
+        # We will run the conditional sampler for nb_iter which will
+        # produce nc x nb_iter samples >= nb_samples. All of them are kept, as
+        # the MAP may be among the extra ones
+        nb_iter = ceil(nb_samples / nc)
         if not hasattr(self, "map"):
             self.init_samples(optimizer_last_state)
-            nb_samples -= 1
+            # we reuse the last optimizer state to initialize the list of
+            # samples so we need one fewer iteration
+            nb_iter -= 1
         else:
-            print(f"Sampling already started, adding {nb_samples} new samples.")
+            nb_existing_samples = len(self.samples) * nc
+            print(
+                f"{nb_existing_samples} conditional samples already in cache, running the sampler for {nb_iter} more iterations."
+            )
 
         if self.live_plot:
             self.build_convergence_plot()
 
         if smoke_test:
-            nb_samples = 1
+            nb_iter = 1
         try:
-            for i in self.sampling_stream(nb_samples):
-                if self.live_plot and i % self.plot_frequency == 0:
+            for i in self.sampling_stream(nb_iter):
+                if self.live_plot and i % ceil(self.plot_frequency / nc) == 0:
                     self.update_convergence_plot()
             if self.live_plot:
                 plt.close(self.fig)
@@ -163,8 +167,8 @@ class ConditionalDistributionSampler:
                 self.update_convergence_plot()
                 plt.close(self.fig)
 
-    def sampling_stream(self, nb_samples: int):
-        for i in tqdm(range(nb_samples), disable=not self.progress_bar):
+    def sampling_stream(self, nb_iter: int):
+        for i in tqdm(range(nb_iter), disable=not self.progress_bar):
             self.current_state = mh_step(
                 self.model, previous_state=self.current_state, learning_rate=0.0
             )
@@ -180,44 +184,74 @@ class ConditionalDistributionSampler:
                 log_prob=self.current_state.log_prob,
             )
             self.samples.append(new_samples)
+            best_over_chains = self.best_log_prob_over_chains(new_samples)
+            self.update_map(best_over_chains)
             # Clip the list of samples to keep only the last max_samples values
-            self.update_map(new_samples)
             self.clip_samples()
             yield i
 
-    def update_map(self, new_samples: ConditionalDistribSamples):
-        # Assemble as mask to accept or reject new MAPs
-        accept_mask = self.map.log_prob < new_samples.log_prob
-        # size (nb_patients)
+    def best_log_prob_over_chains(self, samples: ConditionalDistribSamples):
+        """
+        Takes a sample with etas @ (C, P, D) and returns a sample with etas @ (1, P, D) that
+        maximizes the log_prob for each patient across all chains
+        """
+        best_log_prob, best_indices = samples.log_prob.max(dim=0)  # (P,)
+        best_indices_obs = best_indices.index_select(
+            dim=0, index=self.model.data.full_obs.obs_index.id.index_values
+        )  # (Y,)
+        return ConditionalDistribSamples(
+            eta_samples=samples.eta_samples.take_along_dim(
+                indices=best_indices[None, :, None], dim=0
+            ),  # (1, P, D)
+            physical_params_samples=samples.physical_params_samples.take_along_dim(
+                indices=best_indices[None, :, None], dim=0
+            ),  # (1, P, D + F)
+            predictions=samples.predictions.take_along_dim(
+                indices=best_indices_obs[None, :], dim=0
+            ),  # (1, Y)
+            log_prob=best_log_prob.unsqueeze(0),  # (1, P)
+        )
+
+    def update_map(self, best_over_chains: ConditionalDistribSamples):
+        accept_mask = self.map.log_prob < best_over_chains.log_prob  # (1, P)
+        assert accept_mask.shape == (1, self.model.nb_patients), f"{accept_mask.shape=}"
+        # Update the eta samples of the MAP:
+        # take any sample across the chains that is better than MAP, otherwise
+        # keep the current MAP
         new_eta = torch.where(
-            accept_mask.view(-1, 1), new_samples.eta_samples, self.map.eta_samples
-        )
+            accept_mask[:, :, None],  # (1, P, 1)
+            best_over_chains.eta_samples,
+            self.map.eta_samples,
+        )  # (1, P, D)
         new_physical = torch.where(
-            accept_mask.view(-1, 1),
-            new_samples.physical_params_samples,
+            accept_mask[:, :, None],  # (1, P, 1)
+            best_over_chains.physical_params_samples,
             self.map.physical_params_samples,
-        )
+        )  # (1, P, D + F)
         accept_mask_predictions = accept_mask.index_select(
-            1, self.model.data.full_obs.obs_index.id.index_values
-        )
+            dim=1, index=self.model.data.full_obs.obs_index.id.index_values
+        )  # (1, Y)
         new_pred = torch.where(
-            accept_mask_predictions, new_samples.predictions, self.map.predictions
-        )
-        new_log_prob = torch.where(accept_mask, new_samples.log_prob, self.map.log_prob)
+            accept_mask_predictions, best_over_chains.predictions, self.map.predictions
+        )  # (1, Y)
+        new_log_prob = torch.where(
+            accept_mask, best_over_chains.log_prob, self.map.log_prob
+        )  # (1, P)
         self.map = ConditionalDistribSamples(
             eta_samples=new_eta,
             physical_params_samples=new_physical,
             predictions=new_pred,
             log_prob=new_log_prob,
         )
-
-        nb_improved = accept_mask.double().sum().item()
+        # How many patients have had their MAP improved this time, used for progress plot
+        nb_improved = accept_mask.int().sum().item()
         self.nb_improved_history.append(nb_improved)
         self.indiv_log_prob = np.concat(
             (self.indiv_log_prob, new_log_prob.detach().cpu().numpy()), axis=0
-        )
+        )  # (N, P)
 
     def clip_samples(self):
+        # max_samples counts iterations: up to C * max_samples samples are kept
         self.nb_improved_history = self.nb_improved_history[-self.max_samples :]
         self.indiv_log_prob = self.indiv_log_prob[-self.max_samples :, :]
         self.samples = self.samples[-self.max_samples :]
@@ -293,64 +327,48 @@ class ConditionalDistributionSampler:
 
     @property
     def total_samples(self) -> ConditionalDistribSamples:
-        eta = torch.cat([s.eta_samples for s in self.samples], dim=0)
-        physical = torch.cat([s.physical_params_samples for s in self.samples])
-        pred = torch.stack([s.predictions for s in self.samples], dim=0)
-        log_prob = torch.stack([s.log_prob for s in self.samples])
-        out = ConditionalDistribSamples(
+        """All samples, from every iteration and chain, concatenated along dim 0"""
+        eta = torch.cat([s.eta_samples for s in self.samples], dim=0)  # (N, P, D)
+        physical = torch.cat(
+            [s.physical_params_samples for s in self.samples], dim=0
+        )  # (N, P, D + F)
+        pred = torch.cat([s.predictions for s in self.samples], dim=0)  # (N, Y)
+        log_prob = torch.cat([s.log_prob for s in self.samples], dim=0)  # (N, P)
+        return ConditionalDistribSamples(
             eta_samples=eta,
             physical_params_samples=physical,
             predictions=pred,
             log_prob=log_prob,
         )
-        return out
 
     @property
     def total_samples_parameters_df(self) -> pd.DataFrame:
+        """A data-frame with physical parameters sampled from the conditional
+        distributions from every sampler iteration and chain, concatenated along dim 0
+        """
         all_df = []
-        for sample in self.samples:
-            this_sample_theta = self.model.convert_physical_to_thetas_all_patients(
+        for iteration, sample in enumerate(self.samples):
+            theta = self.model.convert_physical_to_thetas_all_patients(
                 sample.physical_params_samples
-            )
-            this_sample_df = self.add_unique_id(
-                self.model.convert_theta_to_dataframe(this_sample_theta)
-            )
-            all_df.append(this_sample_df)
-        total_df = pd.concat(all_df)
-        return total_df
-
-    @property
-    def total_samples_predictions_df(self) -> pd.DataFrame:
-        all_df = []
-        for i, sample in enumerate(self.samples):
-            this_sample_df = self.add_unique_id(
-                self.model.data.full_obs.to_pandas(prediction=sample.predictions)
-            )
-            # Add the calibrated residual/observation noise to the simulated outputs
-            simulated_value_with_noise = add_predictive_error(
-                observations=self.model.data.full_obs,
-                predictions=sample.predictions,
-                residual_error=self.model.residual_var,
-                min_variance=self.model.config.residual_min_variance,
-            )
-
-            this_sample_df["simulated_value_with_noise"] = (
-                simulated_value_with_noise.squeeze(0).detach().cpu().numpy()
-            )
-            this_sample_df["batch_id"] = i
-            all_df.append(this_sample_df)
-        return pd.concat(all_df, ignore_index=True)
+            )  # (C, P, nb_descriptors)
+            df = self.model.convert_theta_to_dataframe(theta)  # C x P rows
+            nb_chains = theta.shape[0]
+            df["iteration"] = iteration
+            df["chain"] = np.repeat(np.arange(nb_chains), self.model.nb_patients)
+            all_df.append(df)
+        return self.add_unique_id(pd.concat(all_df, ignore_index=True))
 
     def add_unique_id(self, df: pd.DataFrame) -> pd.DataFrame:
         """Create  a new `id` column with unique values, store the patient id in `id_ref`.
 
-        This function is intended to be used on dataframes before concatenating rows together.
+        Each (iteration, chain, patient) triplet gets its own id when the dataframe has
+        `iteration` and `chain` columns, so that samples of a same patient can be told apart.
         """
         out_df = df.rename(columns={"id": "id_ref"})
-        new_ids = {
-            patient: str(reproducible_uuid4()) for patient in self.model.patients
-        }
-        out_df["id"] = out_df["id_ref"].map(new_ids)
+        keys = [col for col in ("iteration", "chain") if col in out_df] + ["id_ref"]
+        groups = out_df.groupby(keys, sort=False).ngroup().to_numpy()
+        new_ids = np.array([str(reproducible_uuid4()) for _ in range(groups.max() + 1)])
+        out_df["id"] = new_ids[groups]
         return out_df
 
 
