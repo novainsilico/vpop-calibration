@@ -1,5 +1,6 @@
 import torch
 from typing import NamedTuple, Any
+import numpy as np
 import pandas as pd
 
 from vpop_calibration.structural_model.base import StructuralModel
@@ -635,11 +636,20 @@ class StatisticalModel:
         )
 
     def convert_theta_to_dataframe(self, theta: torch.Tensor) -> pd.DataFrame:
-        assert theta.shape[0] == 1, "Cannot convert batched parameters to dataframe."
+        """Convert patient physical parameters to a dataframe, one row per patient.
+
+        Args:
+            theta (torch.Tensor): Patient parameters @ (N, P, nb_descriptors). For
+                N > 1, the P patient rows are repeated for each of the N batch elements,
+                in order.
+        """
+        nb_batches = theta.shape[0]  # N
+        reshaped_theta = theta.flatten(0, 1)  # (N*P, nb_descriptors)
         vpop = pd.DataFrame(
-            theta.squeeze(0).detach().cpu().numpy(), columns=self.descriptors
+            reshaped_theta.detach().cpu().numpy(),
+            columns=self.descriptors,
         )
-        vpop["id"] = self.patients
+        vpop["id"] = np.tile(self.patients, nb_batches)
 
         return vpop
 
