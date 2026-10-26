@@ -75,7 +75,10 @@ def sample_nlme_params() -> dict:
 
 
 def test_simwork_saem(sample_nlme_params, obs_data, simwork_model):
-    config = Config(saem=SaemConfigDict(), nlme=NlmeConfigDict(nb_chains=1))
+    config = Config(
+        saem=SaemConfigDict(nb_iter_burnin=1, nb_iter_learning=1, nb_iter_smoothing=1),
+        nlme=NlmeConfigDict(nb_chains=1, live_plot=False, progress_bar=False),
+    )
     nlme_model = NlmeModel(
         structural_model=simwork_model,
         df=obs_data,
@@ -83,4 +86,4 @@ def test_simwork_saem(sample_nlme_params, obs_data, simwork_model):
         config=config,
     )
     nlme_model.optimizer.run()
-    nlme_model.sample_conditional_distribution()
+    nlme_model.sample_conditional_distribution(nb_samples=5)

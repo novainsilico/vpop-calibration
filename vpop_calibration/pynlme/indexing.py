@@ -17,9 +17,9 @@ class TensorIndexing(NamedTuple):
 def remap_single_index(
     input_index: torch.Tensor, mapping: dict[int, int]
 ) -> torch.Tensor:
-    assert input_index.dim() == 1, (
-        f"Unexpected indexing tensor dimension {input_index.dim()}"
-    )
+    assert (
+        input_index.dim() == 1
+    ), f"Unexpected indexing tensor dimension {input_index.dim()}"
     new_index = torch.as_tensor(
         [mapping[int(i.item())] for i in input_index],
         device=input_index.device,
@@ -35,9 +35,9 @@ def remap_indexed_values(
     if dest_ref_values is None:
         return source_index
 
-    assert set(source_index.ref_values) <= set(dest_ref_values), (
-        f"Incompatible indexing lists provided:\nSource: {source_index.ref_values}\nDestination: {dest_ref_values}"
-    )
+    assert set(source_index.ref_values) <= set(
+        dest_ref_values
+    ), f"Incompatible indexing lists provided:\nSource: {source_index.ref_values}\nDestination: {dest_ref_values}"
     mapping = {
         i: dest_ref_values.index(val) for i, val in enumerate(source_index.ref_values)
     }
@@ -119,17 +119,20 @@ class ObservationsDataSet(BaseModel):
         self,
         prediction: torch.Tensor | None = None,
     ) -> pd.DataFrame:
-        nb_obs = self.obs_values.shape[0]
+        """Convert the observations to a long dataframe, one row per observation.
+        Also adds the predictions to the dataframe, if any
+
+        Args:
+            prediction (torch.Tensor | None): Predictions @ (1, Y)
+        """
         if prediction is not None:
-            assert prediction.dim() == 2, (
-                "Don't squeeze predictions before turning them into a dataframe."
-            )
-            assert prediction.shape[0] == 1, (
-                "Cannot convert batched predictions to dataframe."
-            )
-            assert prediction.shape[1] == nb_obs, (
-                f"Incompatible number of self ({nb_obs}) and predictions ({prediction.shape[1]})"
-            )
+            assert (
+                prediction.dim() == 2
+            ), f"prediction should have shape (1, Y) but got {prediction.dim()} dimensions instead"
+            expected_shape = torch.Size([1, self.obs_values.shape[0]])
+            assert (
+                prediction.shape == expected_shape
+            ), f"prediction should have shape (1, {expected_shape}) but got {prediction.shape} instead"
 
         id_col = self.obs_index.id.raw_values
         output_name_col = self.obs_index.output_name.raw_values
@@ -146,6 +149,6 @@ class ObservationsDataSet(BaseModel):
             }
         )
         if prediction is not None:
-            df_long["predicted_value"] = prediction.squeeze(0).detach().cpu().numpy()
+            df_long["predicted_value"] = prediction.reshape(-1).detach().cpu().numpy()
 
         return df_long
