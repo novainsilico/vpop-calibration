@@ -5,6 +5,8 @@ from pandera.typing import DataFrame
 import torch
 import math
 
+from torch.testing import assert_close
+
 from vpop_calibration.pynlme.data import ObsData
 from vpop_calibration.pynlme.params import MixedEffectParameters
 from vpop_calibration.pynlme.model import StatisticalModel
@@ -82,7 +84,7 @@ def test_nlme_init(sample_nlme_params, obs_data, struct_model, tmp_path):
     assert nlme_model.descriptors == ["pdk_1", "pdu_1", "pdu_2", "mi_1"]
 
     # Ensure the initial omega matrix is diagonal with correct values
-    torch.testing.assert_close(
+    assert_close(
         nlme_model.omega_pop,
         torch.diag(
             torch.as_tensor(
@@ -98,7 +100,7 @@ def test_nlme_init(sample_nlme_params, obs_data, struct_model, tmp_path):
     assert nlme_model.eta_distribution.event_shape == torch.Size([nlme_model.nb_pdu])
 
     # Ensure the residual error tensor is properly initialized
-    torch.testing.assert_close(
+    assert_close(
         nlme_model.residual_var,
         ResidualErrorEstimates(
             additive_variance=torch.as_tensor(
@@ -117,20 +119,16 @@ def test_nlme_init(sample_nlme_params, obs_data, struct_model, tmp_path):
     expected_design_matrix_p1 = torch.as_tensor(
         [[1.0, p1_foo, 0.0, 0.0], [0.0, 0.0, 1.0, p1_foo]]
     )
-    torch.testing.assert_close(
-        nlme_model.design_matrices["p1"], expected_design_matrix_p1
-    )
+    assert_close(nlme_model.design_matrices["p1"], expected_design_matrix_p1)
 
     p2_foo = obs_data.patients_df.loc[obs_data.patients_df["id"] == "p2", "foo"].iloc[0]
     expected_design_matrix_p2 = torch.as_tensor(
         [[1.0, p2_foo, 0.0, 0.0], [0.0, 0.0, 1.0, p2_foo]]
     )
-    torch.testing.assert_close(
-        nlme_model.design_matrices["p2"], expected_design_matrix_p2
-    )
+    assert_close(nlme_model.design_matrices["p2"], expected_design_matrix_p2)
 
     # Ensure full design matrix is properly stacked
-    torch.testing.assert_close(
+    assert_close(
         nlme_model.full_design_matrix,
         torch.stack((expected_design_matrix_p1, expected_design_matrix_p2)),
     )
@@ -139,19 +137,15 @@ def test_nlme_init(sample_nlme_params, obs_data, struct_model, tmp_path):
     p1_pdk = obs_data.patients_df.loc[obs_data.patients_df["id"] == "p1", "pdk_1"].iloc[
         0
     ]
-    torch.testing.assert_close(
-        nlme_model.data.patients_pdk["p1"], torch.tensor([[p1_pdk]])
-    )
+    assert_close(nlme_model.data.patients_pdk["p1"], torch.tensor([[p1_pdk]]))
 
     p2_pdk = obs_data.patients_df.loc[obs_data.patients_df["id"] == "p2", "pdk_1"].iloc[
         0
     ]
-    torch.testing.assert_close(
+    assert_close(
         nlme_model.data.patients_pdk["p1"], torch.tensor([[p2_pdk]]), check_dtype=False
     )
-    torch.testing.assert_close(
-        nlme_model.data.patients_pdk_full, torch.tensor([[p1_pdk], [p2_pdk]])
-    )
+    assert_close(nlme_model.data.patients_pdk_full, torch.tensor([[p1_pdk], [p2_pdk]]))
 
 
 def test_nlme_simulate(sample_nlme_params, obs_data, struct_model):
@@ -180,11 +174,16 @@ def test_nlme_simulate(sample_nlme_params, obs_data, struct_model):
     assert phi[0, 0, 2].item() == pytest.approx(mi_1_prior)
 
     theta = nlme_model.convert_physical_to_thetas_all_patients(phi)
+
+    # Check convert_etas_to_thetas is the same as
+    # convert_etas_to_gaussian_all_patients . convert_gaussian_to_physical . convert_physical_to_thetas_all_patients
+    theta_from_etas = nlme_model.convert_etas_to_thetas(etas=etas)
+    assert_close(theta, theta_from_etas)
     # Double check the thetas are properly assembled and correspond to the priors for patient 1 (0 random effect, 0 covariate effect)
     p1_pdk = obs_data.patients_df.loc[obs_data.patients_df["id"] == "p1", "pdk_1"].iloc[
         0
     ]
-    torch.testing.assert_close(
+    assert_close(
         theta[0, 0, :],
         torch.tensor([p1_pdk, pdu_1_prior, pdu_2_prior, mi_1_prior]),
         check_dtype=False,
@@ -213,7 +212,7 @@ def test_log_prior(sample_nlme_params, obs_data, struct_model):
     k = nlme_model.nb_pdu
     # Analytical formula for the log probability with samples all = 0
     expected_log_prior = -0.5 * (k * np.log(2 * math.pi) + np.log(omega_det))
-    torch.testing.assert_close(
+    assert_close(
         log_prior_etas,
         torch.tensor(expected_log_prior).expand(nb_samples, nlme_model.nb_patients),
     )

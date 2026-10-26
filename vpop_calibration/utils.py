@@ -7,6 +7,7 @@ import uuid
 
 torch.use_deterministic_algorithms(True)
 
+
 def extend_schema(
     schema: pa.DataFrameSchema, column_list: list[str], type: str
 ) -> pa.DataFrameSchema:
@@ -48,6 +49,7 @@ def reproducible_uuid4(seed=None):
         random.seed(seed)
     return uuid.UUID(int=random.getrandbits(128), version=4)
 
+
 def known_patient_uuid4(patient_number: int):
     """
     It returns a patient UUID which is reproductible and readable based on the patient number
@@ -86,3 +88,17 @@ def time_scale_and_label(time_unit: str | None) -> tuple[str, float]:
         xlabel = f"Time ({time_unit})"
         time_scale = from_seconds_time_scale(time_unit)
     return (xlabel, time_scale)
+
+
+def add_unique_id(df: pd.DataFrame) -> pd.DataFrame:
+    """Create a new `id` column with unique values, store the patient id in `id_ref`.
+
+    Args:
+        - `df`: a pandas DataFrame
+
+    Returns:
+        pd.DataFrame: a pandas DataFrame
+    """
+    out_df = df.rename(columns={"id": "id_ref"})
+    out_df["id"] = [str(reproducible_uuid4()) for _ in range(len(out_df))]
+    return out_df

@@ -14,6 +14,7 @@ from vpop_calibration.pynlme.residuals import (
 )
 from vpop_calibration.pynlme.config import NlmeConfigDict
 from vpop_calibration.config import device, smoke_test, default_dtype
+from vpop_calibration.utils import add_unique_id
 
 
 class LogPosteriorPrediction(NamedTuple):
@@ -547,7 +548,18 @@ class StatisticalModel:
 
         return struct_model_inputs
 
-    # @torch.compile
+    def convert_etas_to_thetas(self, etas: torch.Tensor) -> torch.Tensor:
+        """Converts etas (population model samples) to thetas (physical parameters
+        values)
+        """
+        gaussian = self.convert_etas_to_gaussian_all_patients(etas)
+        physical = self.convert_gaussian_to_physical(
+            psi=gaussian,
+            log_mi=self.log_mi,
+            surv_coeffs=self.surv_coeffs,
+        )
+        return self.convert_physical_to_thetas_all_patients(physical_params=physical)
+
     def convert_thetas_to_model_parameters_all_patients(
         self, theta: torch.Tensor
     ) -> torch.Tensor:
@@ -662,3 +674,27 @@ class StatisticalModel:
     def has_fixed_effects(self) -> bool:
         """Whether there are fixed effects in the statistical model"""
         return self.num_fixed_effects() > 0
+
+    def to_jinko_vpop(self, input_df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Takes a dataframe containing samples and converts it to a
+        jinko-compatible vpop format:
+
+           1. Only keeps the columns corresponding to model parameters
+           2. renames the "id" column to "patientIndex" which is the expected
+           column name for a jinko vpop
+
+        Args:
+            - `input_df`: a pandas DataFrame
+
+        Returns:
+            pd.DataFrame: a pandas DataFrame in a jinko-compatible vpop format
+        """
+        id_and_descriptors = input_df[["id"] + [*self.descriptors]]
+        jinko_vpop = id_and_descriptors.rename(columns={"id": "patientIndex"})
+        return jinko_vpop
+
+    def population_model_samples(self, nb_samples: int) -> pd.DataFrame:
+        etas = self.sample_etas(nb_samples)
+        thetas = self.convert_etas_to_thetas(etas=etas)
+        return add_unique_id(self.convert_theta_to_dataframe(thetas))
