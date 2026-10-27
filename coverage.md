@@ -11,13 +11,13 @@
 | vpop\_calibration/model/gp.py                         |      227 |       49 |       68 |       20 |     75% |61, 66, 102, 139, 141-142, 146-149, 224-225, 232, 252, 286, 308, 310, 364, 385, 389-394, 401-409, 411-\>346, 435-437, 465, 475-484, 514-\>exit, 589-596 |
 | vpop\_calibration/model/plot.py                       |      122 |       11 |       32 |        8 |     88% |76-77, 147-148, 174-\>177, 219-\>178, 224-225, 244, 253-\>255, 256-259 |
 | vpop\_calibration/pynlme/\_\_init\_\_.py              |        0 |        0 |        0 |        0 |    100% |           |
-| vpop\_calibration/pynlme/conditional\_distribution.py |      189 |       19 |       44 |        5 |     86% |11-12, 15-16, 148-149, 156-\>158, 164-168, 286, 307-313, 379 |
+| vpop\_calibration/pynlme/conditional\_distribution.py |      189 |       19 |       44 |        5 |     86% |11-12, 15-16, 148-150, 157-\>159, 165-169, 287, 308-314, 380 |
 | vpop\_calibration/pynlme/config.py                    |       14 |        0 |        0 |        0 |    100% |           |
 | vpop\_calibration/pynlme/data.py                      |       61 |        0 |       12 |        0 |    100% |           |
 | vpop\_calibration/pynlme/diagnostics.py               |      178 |       16 |       28 |        9 |     88% |91-92, 163-\>166, 208, 222-223, 260, 262, 297, 318, 379, 392-400, 494 |
 | vpop\_calibration/pynlme/error\_estimation.py         |       40 |        0 |       12 |        0 |    100% |           |
 | vpop\_calibration/pynlme/importance\_sampling.py      |       64 |        0 |       12 |        1 |     99% |   87-\>90 |
-| vpop\_calibration/pynlme/indexing.py                  |       64 |        0 |        8 |        0 |    100% |           |
+| vpop\_calibration/pynlme/indexing.py                  |       65 |        0 |        8 |        0 |    100% |           |
 | vpop\_calibration/pynlme/initial\_estimates.py        |       79 |       61 |       22 |        0 |     18% |15-37, 45-72, 75-78, 84-102, 115-125, 128-133, 136-142 |
 | vpop\_calibration/pynlme/model.py                     |      252 |        1 |       28 |        3 |     99% |84-\>91, 243-\>239, 464 |
 | vpop\_calibration/pynlme/params.py                    |      180 |        4 |       48 |        4 |     96% |57, 59, 133-\>144, 141, 241 |
@@ -28,7 +28,7 @@
 | vpop\_calibration/saem/\_\_init\_\_.py                |        0 |        0 |        0 |        0 |    100% |           |
 | vpop\_calibration/saem/config.py                      |       34 |        0 |        0 |        0 |    100% |           |
 | vpop\_calibration/saem/estimates.py                   |      103 |       21 |       30 |        1 |     74% |161-166, 181-196, 199-206, 226, 230 |
-| vpop\_calibration/saem/fixed\_effects.py              |       32 |        1 |        4 |        1 |     94% |        54 |
+| vpop\_calibration/saem/fixed\_effects.py              |       31 |        0 |        4 |        0 |    100% |           |
 | vpop\_calibration/saem/m\_step.py                     |       53 |        0 |        2 |        0 |    100% |           |
 | vpop\_calibration/saem/optimizer.py                   |      170 |       22 |       56 |        7 |     82% |158-159, 180-183, 186-189, 192-194, 197-204, 206-\>exit, 442-443, 459-468 |
 | vpop\_calibration/saem/plot.py                        |       50 |       39 |       20 |        0 |     16% |3-4, 7-8, 24-59, 62-70, 73-74 |
@@ -41,4 +41,4 @@
 | vpop\_calibration/structural\_model/sbml.py           |       94 |        9 |       14 |        3 |     87% |34-35, 38, 68-73, 76 |
 | vpop\_calibration/structural\_model/simwork.py        |      128 |        7 |       22 |        2 |     91% |72-89, 121 |
 | vpop\_calibration/utils.py                            |       47 |       18 |       18 |        3 |     52% |42-43, 48, 66-78, 86-87 |
-| **TOTAL**                                             | **3339** |  **368** |  **704** |  **125** | **85%** |           |
+| **TOTAL**                                             | **3339** |  **367** |  **704** |  **124** | **85%** |           |

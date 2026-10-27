@@ -10816,8 +10816,7 @@ output:
       model_intrinsic: []
       surv_coeffs: []
       complete_likelihood: 865.1616376316288
-      fixed_effects_loss:
-      - .nan
+      fixed_effects_loss: .nan
       residual_variance:
         additive_variance:
         - 0.02023850339381201

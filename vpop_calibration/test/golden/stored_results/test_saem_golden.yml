@@ -246,8 +246,7 @@ output:
       - 2.2868416013664166
       surv_coeffs: []
       complete_likelihood: 69.25162791257813
-      fixed_effects_loss:
-      - 58.599645771226676
+      fixed_effects_loss: 58.599645771226676
       residual_variance:
         additive_variance:
         - 4285.419610398957

@@ -76,7 +76,7 @@ class PySaem:
         init_step_size = self.config.init_step_size_unscaled / np.sqrt(
             self.model.nb_pdu
         )
-        fixed_effects_loss = torch.tensor([np.nan], device=device, dtype=default_dtype)
+        fixed_effects_loss = torch.tensor(np.nan, device=device, dtype=default_dtype)
         # Initialize the Metropolis Hastings state variables
         self.mh_state = MetropolisHastingsState(
             etas=init_samples,
@@ -156,7 +156,7 @@ class PySaem:
             self.init_state()
         else:
             if self.config.logging:
-               print(f"Resuming at iteration {self.scheduler.iteration}:")
+                print(f"Resuming at iteration {self.scheduler.iteration}:")
 
         history_dict = defaultdict(list, self.history.to_dict(orient="list"))
         try:
