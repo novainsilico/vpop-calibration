@@ -1,3 +1,6 @@
+from pathlib import Path
+
+from pandas.testing import assert_frame_equal
 import pytest
 import pandas as pd
 import numpy as np
@@ -14,6 +17,7 @@ from vpop_calibration.pynlme.plot import PlottingUtility
 from vpop_calibration.pynlme.conditional_distribution import (
     ConditionalDistributionSampler,
 )
+from vpop_calibration.utils import seed_everything
 
 
 @pytest.fixture
@@ -78,7 +82,13 @@ def struct_model() -> StructuralModel:
     return struct_model
 
 
-def test_diagnostics(sample_nlme_params, obs_data, struct_model):
+GOLDEN_MAP_PATH = Path(__file__).parent / "stored_results" / "map_jinko_vpop.csv"
+GOLDEN_COND_PATH = Path(__file__).parent / "stored_results" / "cond_jinko_vpop.csv"
+GOLDEN_POP_PATH = Path(__file__).parent / "stored_results" / "pop_jinko_vpop.csv"
+
+
+def test_diagnostics(sample_nlme_params, obs_data, struct_model, request):
+    seed_everything(0)
     nlme_model = StatisticalModel(
         structural_model=struct_model, dataset=obs_data, input_params=sample_nlme_params
     )
@@ -104,3 +114,27 @@ def test_diagnostics(sample_nlme_params, obs_data, struct_model):
     cond_sampler = ConditionalDistributionSampler(nlme_model)
     cond_sampler.live_plot = True
     cond_sampler.run_sampler()
+
+    map_jinko_vpop = nlme_model.to_jinko_vpop(
+        input_df=diagnostics.sampler.map_parameters_df
+    )
+    if request.config.getoption("--update-goldens"):
+        map_jinko_vpop.to_csv(GOLDEN_MAP_PATH, index=False)
+    expected_map = pd.read_csv(GOLDEN_MAP_PATH)
+    assert_frame_equal(map_jinko_vpop, expected_map)
+
+    cond_jinko_vpop = nlme_model.to_jinko_vpop(
+        input_df=diagnostics.sampler.total_samples_parameters_df
+    )
+    if request.config.getoption("--update-goldens"):
+        cond_jinko_vpop.to_csv(GOLDEN_COND_PATH, index=False)
+    expected_cond = pd.read_csv(GOLDEN_COND_PATH)
+    assert_frame_equal(cond_jinko_vpop, expected_cond)
+
+    pop_jinko_vpop = nlme_model.to_jinko_vpop(
+        input_df=nlme_model.population_model_samples(nb_samples=5)
+    )
+    if request.config.getoption("--update-goldens"):
+        pop_jinko_vpop.to_csv(GOLDEN_POP_PATH, index=False)
+    expected_pop = pd.read_csv(GOLDEN_POP_PATH)
+    assert_frame_equal(pop_jinko_vpop, expected_pop)

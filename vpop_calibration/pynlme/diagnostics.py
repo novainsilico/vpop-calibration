@@ -172,15 +172,7 @@ class ModelDiagnostics:
             disable=not self.model.config.progress_bar,
         ) as pbar:
             for etas_chunk in chunks:
-                gaussian = self.model.convert_etas_to_gaussian_all_patients(etas_chunk)
-                physical = self.model.convert_gaussian_to_physical(
-                    psi=gaussian,
-                    log_mi=self.model.log_mi,
-                    surv_coeffs=self.model.surv_coeffs,
-                )
-                thetas = self.model.convert_physical_to_thetas_all_patients(
-                    physical_params=physical
-                )
+                thetas = self.model.convert_etas_to_thetas(etas=etas_chunk)
                 patients_inputs = (
                     self.model.convert_thetas_to_model_parameters_all_patients(
                         theta=thetas

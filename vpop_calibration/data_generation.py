@@ -27,7 +27,10 @@ paramRangesAdapter = TypeAdapter(ParamRanges)
 
 def init_patient_ids(nb_individuals: int) -> pd.DataFrame:
     """Initiate a single column data frame with unique patient ids."""
-    ids = [str(known_patient_uuid4(patient_number)) for patient_number in range(nb_individuals)]
+    ids = [
+        str(known_patient_uuid4(patient_number))
+        for patient_number in range(nb_individuals)
+    ]
     return pd.DataFrame({"id": ids})
 
 
@@ -92,7 +95,10 @@ def cross_join_protocol_arms(
         pd.DataFrame({"protocol_arm": protocol_arms}), how="cross"
     ).rename(columns={"id": "previous_id"})
     # A new id column is created to have the 1:1 patient-protocol arm structure
-    new_patients["id"] = [str(known_patient_uuid4(patient_number)) for patient_number in range(new_patients.shape[0])]
+    new_patients["id"] = [
+        str(known_patient_uuid4(patient_number))
+        for patient_number in range(new_patients.shape[0])
+    ]
 
     return new_patients
 
@@ -189,12 +195,8 @@ def generate_synthetic_data(
         structural_model=struct_model, dataset=data, input_params=params, config=config
     )
     # Prepare model inputs
-    eta = nlme_model.sample_etas(1)
-    gaussian = nlme_model.convert_etas_to_gaussian_all_patients(eta)
-    physical = nlme_model.convert_gaussian_to_physical(
-        psi=gaussian, log_mi=nlme_model.log_mi, surv_coeffs=nlme_model.surv_coeffs
-    )
-    theta = nlme_model.convert_physical_to_thetas_all_patients(physical_params=physical)
+    etas = nlme_model.sample_etas(1)
+    theta = nlme_model.convert_etas_to_thetas(etas=etas)
     inputs = nlme_model.convert_thetas_to_model_parameters_all_patients(theta)
     # Run the model
     outputs, _ = nlme_model.predict_all_patients(inputs)

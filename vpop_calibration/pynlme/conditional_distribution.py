@@ -19,7 +19,7 @@ except ImportError:
 from vpop_calibration.pynlme.model import StatisticalModel
 from vpop_calibration.config import smoke_test, device, default_dtype
 from vpop_calibration.metropolis_hastings import MetropolisHastingsState, mh_step
-from vpop_calibration.utils import reproducible_uuid4
+from vpop_calibration.utils import add_unique_id
 
 
 class ConditionalDistribSamples(NamedTuple):
@@ -318,7 +318,7 @@ class ConditionalDistributionSampler:
         theta = self.model.convert_physical_to_thetas_all_patients(
             self.map.physical_params_samples
         )
-        df = self.add_unique_id(self.model.convert_theta_to_dataframe(theta))
+        df = add_unique_id(self.model.convert_theta_to_dataframe(theta))
         return df
 
     @property
@@ -357,20 +357,7 @@ class ConditionalDistributionSampler:
             df["iteration"] = iteration
             df["chain"] = np.repeat(np.arange(nb_chains), self.model.nb_patients)
             all_df.append(df)
-        return self.add_unique_id(pd.concat(all_df, ignore_index=True))
-
-    def add_unique_id(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Create  a new `id` column with unique values, store the patient id in `id_ref`.
-
-        Each (iteration, chain, patient) triplet gets its own id when the dataframe has
-        `iteration` and `chain` columns, so that samples of a same patient can be told apart.
-        """
-        out_df = df.rename(columns={"id": "id_ref"})
-        keys = [col for col in ("iteration", "chain") if col in out_df] + ["id_ref"]
-        groups = out_df.groupby(keys, sort=False).ngroup().to_numpy()
-        new_ids = np.array([str(reproducible_uuid4()) for _ in range(groups.max() + 1)])
-        out_df["id"] = new_ids[groups]
-        return out_df
+        return add_unique_id(pd.concat(all_df, ignore_index=True))
 
 
 def moving_average(x: list[float], window: int = 20) -> np.ndarray:
