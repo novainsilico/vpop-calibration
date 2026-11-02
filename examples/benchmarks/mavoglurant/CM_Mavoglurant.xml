@@ -43,6 +43,12 @@
           <unit kind="gram" exponent="1" scale="-3" multiplier="1"/>
         </listOfUnits>
       </unitDefinition>
+      <unitDefinition id="MilliGramPerHour">
+        <listOfUnits>
+          <unit kind="gram" exponent="1" scale="-3" multiplier="1"/>
+          <unit kind="second" exponent="-1" scale="0" multiplier="3600"/>
+        </listOfUnits>
+      </unitDefinition>
       <unitDefinition id="MilliLiterPerNanoGram">
         <listOfUnits>
           <unit kind="gram" exponent="-1" scale="-9" multiplier="1"/>
@@ -71,6 +77,12 @@
       <unitDefinition id="PerKiloGram">
         <listOfUnits>
           <unit kind="gram" exponent="-1" scale="3" multiplier="1"/>
+        </listOfUnits>
+      </unitDefinition>
+      <unitDefinition id="SecondPerHour">
+        <listOfUnits>
+          <unit kind="second" exponent="-1" scale="0" multiplier="3600"/>
+          <unit kind="second" exponent="1" scale="0" multiplier="1"/>
         </listOfUnits>
       </unitDefinition>
     </listOfUnitDefinitions>
@@ -192,112 +204,112 @@
       <species id="A__Adipose" compartment="Adipose" substanceUnits="mole" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false">
         <annotation>
           <jinko:metadata xmlns:jinko="https://jinko.ai">
-            <scale formula="(1 * OneNanoGram / Masse__Molaire) * GramPerNanoGramP"/>
+            <scale formula="(1 * OneNanoGram / Molar__Mass) * GramPerNanoGramP"/>
           </jinko:metadata>
         </annotation>
       </species>
       <species id="A__Arterial__Blood" compartment="Arterial__Blood" substanceUnits="mole" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false">
         <annotation>
           <jinko:metadata xmlns:jinko="https://jinko.ai">
-            <scale formula="(1 * OneNanoGram / Masse__Molaire) * GramPerNanoGramP"/>
+            <scale formula="(1 * OneNanoGram / Molar__Mass) * GramPerNanoGramP"/>
           </jinko:metadata>
         </annotation>
       </species>
       <species id="A__Bones" compartment="Bones" substanceUnits="mole" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false">
         <annotation>
           <jinko:metadata xmlns:jinko="https://jinko.ai">
-            <scale formula="(1 * OneNanoGram / Masse__Molaire) * GramPerNanoGramP"/>
+            <scale formula="(1 * OneNanoGram / Molar__Mass) * GramPerNanoGramP"/>
           </jinko:metadata>
         </annotation>
       </species>
       <species id="A__Brain" compartment="Brain" substanceUnits="mole" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false">
         <annotation>
           <jinko:metadata xmlns:jinko="https://jinko.ai">
-            <scale formula="(1 * OneNanoGram / Masse__Molaire) * GramPerNanoGramP"/>
+            <scale formula="(1 * OneNanoGram / Molar__Mass) * GramPerNanoGramP"/>
           </jinko:metadata>
         </annotation>
       </species>
       <species id="A__Gut" compartment="Gut" substanceUnits="mole" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false">
         <annotation>
           <jinko:metadata xmlns:jinko="https://jinko.ai">
-            <scale formula="(1 * OneNanoGram / Masse__Molaire) * GramPerNanoGramP"/>
+            <scale formula="(1 * OneNanoGram / Molar__Mass) * GramPerNanoGramP"/>
           </jinko:metadata>
         </annotation>
       </species>
       <species id="A__Heart" compartment="Heart" substanceUnits="mole" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false">
         <annotation>
           <jinko:metadata xmlns:jinko="https://jinko.ai">
-            <scale formula="(1 * OneNanoGram / Masse__Molaire) * GramPerNanoGramP"/>
+            <scale formula="(1 * OneNanoGram / Molar__Mass) * GramPerNanoGramP"/>
           </jinko:metadata>
         </annotation>
       </species>
       <species id="A__Kidneys" compartment="Kidneys" substanceUnits="mole" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false">
         <annotation>
           <jinko:metadata xmlns:jinko="https://jinko.ai">
-            <scale formula="(1 * OneNanoGram / Masse__Molaire) * GramPerNanoGramP"/>
+            <scale formula="(1 * OneNanoGram / Molar__Mass) * GramPerNanoGramP"/>
           </jinko:metadata>
         </annotation>
       </species>
       <species id="A__Liver" compartment="Liver" substanceUnits="mole" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false">
         <annotation>
           <jinko:metadata xmlns:jinko="https://jinko.ai">
-            <scale formula="(1 * OneNanoGram / Masse__Molaire) * GramPerNanoGramP"/>
+            <scale formula="(1 * OneNanoGram / Molar__Mass) * GramPerNanoGramP"/>
           </jinko:metadata>
         </annotation>
       </species>
       <species id="A__Lungs" compartment="Lungs" substanceUnits="mole" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false">
         <annotation>
           <jinko:metadata xmlns:jinko="https://jinko.ai">
-            <scale formula="(1 * OneNanoGram / Masse__Molaire) * GramPerNanoGramP"/>
+            <scale formula="(1 * OneNanoGram / Molar__Mass) * GramPerNanoGramP"/>
           </jinko:metadata>
         </annotation>
       </species>
       <species id="A__Muscles" compartment="Muscles" substanceUnits="mole" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false">
         <annotation>
           <jinko:metadata xmlns:jinko="https://jinko.ai">
-            <scale formula="(1 * OneNanoGram / Masse__Molaire) * GramPerNanoGramP"/>
+            <scale formula="(1 * OneNanoGram / Molar__Mass) * GramPerNanoGramP"/>
           </jinko:metadata>
         </annotation>
       </species>
       <species id="A__Pancreas" compartment="Pancreas" substanceUnits="mole" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false">
         <annotation>
           <jinko:metadata xmlns:jinko="https://jinko.ai">
-            <scale formula="(1 * OneNanoGram / Masse__Molaire) * GramPerNanoGramP"/>
+            <scale formula="(1 * OneNanoGram / Molar__Mass) * GramPerNanoGramP"/>
           </jinko:metadata>
         </annotation>
       </species>
       <species id="A__Rest__of__Body" compartment="Rest__of__Body" substanceUnits="mole" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false">
         <annotation>
           <jinko:metadata xmlns:jinko="https://jinko.ai">
-            <scale formula="(1 * OneNanoGram / Masse__Molaire) * GramPerNanoGramP"/>
+            <scale formula="(1 * OneNanoGram / Molar__Mass) * GramPerNanoGramP"/>
           </jinko:metadata>
         </annotation>
       </species>
       <species id="A__Skin" compartment="Skin" substanceUnits="mole" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false">
         <annotation>
           <jinko:metadata xmlns:jinko="https://jinko.ai">
-            <scale formula="(1 * OneNanoGram / Masse__Molaire) * GramPerNanoGramP"/>
+            <scale formula="(1 * OneNanoGram / Molar__Mass) * GramPerNanoGramP"/>
           </jinko:metadata>
         </annotation>
       </species>
       <species id="A__Spleen" compartment="Spleen" substanceUnits="mole" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false">
         <annotation>
           <jinko:metadata xmlns:jinko="https://jinko.ai">
-            <scale formula="(1 * OneNanoGram / Masse__Molaire) * GramPerNanoGramP"/>
+            <scale formula="(1 * OneNanoGram / Molar__Mass) * GramPerNanoGramP"/>
           </jinko:metadata>
         </annotation>
       </species>
       <species id="A__Stomach" compartment="Stomach" substanceUnits="mole" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false">
         <annotation>
           <jinko:metadata xmlns:jinko="https://jinko.ai">
-            <scale formula="(1 * OneNanoGram / Masse__Molaire) * GramPerNanoGramP"/>
+            <scale formula="(1 * OneNanoGram / Molar__Mass) * GramPerNanoGramP"/>
           </jinko:metadata>
         </annotation>
       </species>
       <species id="A__Venous__Blood" compartment="Venous__Blood" substanceUnits="mole" hasOnlySubstanceUnits="true" boundaryCondition="false" constant="false">
         <annotation>
           <jinko:metadata xmlns:jinko="https://jinko.ai">
-            <scale formula="(1 * OneMilliGram / Masse__Molaire) * GramPerMilliGramP"/>
+            <scale formula="(1 * OneMilliGram / Molar__Mass) * GramPerMilliGramP"/>
           </jinko:metadata>
         </annotation>
       </species>
@@ -307,7 +319,7 @@
         <notes>
           <body xmlns="http://www.w3.org/1999/xhtml">
             <div>
-              <p>rapport sang/plasma</p>
+              <p>Blood-to-plasma ratio</p>
             </div>
           </body>
         </notes>
@@ -316,7 +328,7 @@
         <notes>
           <body xmlns="http://www.w3.org/1999/xhtml">
             <div>
-              <p>Concentration observe</p>
+              <p>Observed concentration</p>
             </div>
           </body>
         </notes>
@@ -325,7 +337,7 @@
         <notes>
           <body xmlns="http://www.w3.org/1999/xhtml">
             <div>
-              <p>Clairance intrinsque hpatique</p>
+              <p>Hepatic intrinsic clearance</p>
             </div>
           </body>
         </notes>
@@ -334,7 +346,7 @@
         <notes>
           <body xmlns="http://www.w3.org/1999/xhtml">
             <div>
-              <p>Dbit cardiaque</p>
+              <p>Cardiac output</p>
             </div>
           </body>
         </notes>
@@ -367,11 +379,13 @@
           </body>
         </notes>
       </parameter>
+      <parameter id="InfusionFlag" value="1" units="dimensionless" constant="false"/>
+      <parameter id="InfusionRate" value="300" units="MilliGramPerHour" constant="false"/>
       <parameter id="KbAD" value="7.39" units="dimensionless" constant="false">
         <notes>
           <body xmlns="http://www.w3.org/1999/xhtml">
             <div>
-              <p>Coefficient de partage tissu / sang du tissu adipeux</p>
+              <p>Tissue-to-blood partition coefficient of adipose tissue</p>
             </div>
           </body>
         </notes>
@@ -380,7 +394,7 @@
         <notes>
           <body xmlns="http://www.w3.org/1999/xhtml">
             <div>
-              <p>Coefficient de partage tissu / sang des os</p>
+              <p>Tissue-to-blood partition coefficient of bones</p>
             </div>
           </body>
         </notes>
@@ -389,7 +403,7 @@
         <notes>
           <body xmlns="http://www.w3.org/1999/xhtml">
             <div>
-              <p>coefficient de partage tissu/sang</p>
+              <p>Tissue-to-blood partition coefficient of the brain</p>
             </div>
           </body>
         </notes>
@@ -398,7 +412,7 @@
         <notes>
           <body xmlns="http://www.w3.org/1999/xhtml">
             <div>
-              <p>Coefficient de partage tissu / sang de l&apos;Intestin</p>
+              <p>Tissue-to-blood partition coefficient of the gut</p>
             </div>
           </body>
         </notes>
@@ -407,7 +421,7 @@
         <notes>
           <body xmlns="http://www.w3.org/1999/xhtml">
             <div>
-              <p>Coefficient de partage tissu / sang du Coeur</p>
+              <p>Tissue-to-blood partition coefficient of the heart</p>
             </div>
           </body>
         </notes>
@@ -416,7 +430,7 @@
         <notes>
           <body xmlns="http://www.w3.org/1999/xhtml">
             <div>
-              <p>Coefficient de partage tissu / sang des Reins</p>
+              <p>Tissue-to-blood partition coefficient of the kidneys</p>
             </div>
           </body>
         </notes>
@@ -425,7 +439,7 @@
         <notes>
           <body xmlns="http://www.w3.org/1999/xhtml">
             <div>
-              <p>Coefficient de partage tissu / sang du Foie</p>
+              <p>Tissue-to-blood partition coefficient of the liver</p>
             </div>
           </body>
         </notes>
@@ -434,7 +448,7 @@
         <notes>
           <body xmlns="http://www.w3.org/1999/xhtml">
             <div>
-              <p>coefficient de partage tissu / sang des Poumons</p>
+              <p>Tissue-to-blood partition coefficient of the lungs</p>
             </div>
           </body>
         </notes>
@@ -443,7 +457,7 @@
         <notes>
           <body xmlns="http://www.w3.org/1999/xhtml">
             <div>
-              <p>Coefficient de partage tissu / sang des muscles</p>
+              <p>Tissue-to-blood partition coefficient of muscles</p>
             </div>
           </body>
         </notes>
@@ -452,7 +466,7 @@
         <notes>
           <body xmlns="http://www.w3.org/1999/xhtml">
             <div>
-              <p>Coefficient de partage tissu /  sang du Pancras</p>
+              <p>Tissue-to-blood partition coefficient of the pancreas</p>
             </div>
           </body>
         </notes>
@@ -461,7 +475,7 @@
         <notes>
           <body xmlns="http://www.w3.org/1999/xhtml">
             <div>
-              <p>Coefficient de partage tissu / sang du reste du corps</p>
+              <p>Tissue-to-blood partition coefficient of the rest of body</p>
             </div>
           </body>
         </notes>
@@ -470,7 +484,7 @@
         <notes>
           <body xmlns="http://www.w3.org/1999/xhtml">
             <div>
-              <p>Coefficient de partage tissu / sang de la Peau</p>
+              <p>Tissue-to-blood partition coefficient of the skin</p>
             </div>
           </body>
         </notes>
@@ -479,7 +493,7 @@
         <notes>
           <body xmlns="http://www.w3.org/1999/xhtml">
             <div>
-              <p>Coefficient de partage tissu / sang de la Rate</p>
+              <p>Tissue-to-blood partition coefficient of the spleen</p>
             </div>
           </body>
         </notes>
@@ -488,12 +502,12 @@
         <notes>
           <body xmlns="http://www.w3.org/1999/xhtml">
             <div>
-              <p>Coefficient de partage tissu / sang de l&apos;Estomac</p>
+              <p>Tissue-to-blood partition coefficient of the stomach</p>
             </div>
           </body>
         </notes>
       </parameter>
-      <parameter id="Masse__Molaire" value="313.397" units="GramPerMole" constant="false"/>
+      <parameter id="Molar__Mass" value="313.397" units="GramPerMole" constant="false"/>
       <parameter id="OneLiter" value="1" units="litre" constant="true">
         <notes>
           <body xmlns="http://www.w3.org/1999/xhtml">
@@ -570,7 +584,7 @@
         <notes>
           <body xmlns="http://www.w3.org/1999/xhtml">
             <div>
-              <p>Dbit des Adipeux</p>
+              <p>Adipose tissue blood flow</p>
             </div>
           </body>
         </notes>
@@ -579,7 +593,7 @@
         <notes>
           <body xmlns="http://www.w3.org/1999/xhtml">
             <div>
-              <p>Dbit des Os</p>
+              <p>Bone blood flow</p>
             </div>
           </body>
         </notes>
@@ -588,7 +602,7 @@
         <notes>
           <body xmlns="http://www.w3.org/1999/xhtml">
             <div>
-              <p>Dbit du Cerveau</p>
+              <p>Brain blood flow</p>
             </div>
           </body>
         </notes>
@@ -597,7 +611,7 @@
         <notes>
           <body xmlns="http://www.w3.org/1999/xhtml">
             <div>
-              <p>Dbit de l&apos;Intestin</p>
+              <p>Gut blood flow</p>
             </div>
           </body>
         </notes>
@@ -606,7 +620,7 @@
         <notes>
           <body xmlns="http://www.w3.org/1999/xhtml">
             <div>
-              <p>Dbit de l&apos;artre hpatique</p>
+              <p>Hepatic artery blood flow</p>
             </div>
           </body>
         </notes>
@@ -615,7 +629,7 @@
         <notes>
           <body xmlns="http://www.w3.org/1999/xhtml">
             <div>
-              <p>Dbit du Coeur</p>
+              <p>Heart blood flow</p>
             </div>
           </body>
         </notes>
@@ -624,7 +638,7 @@
         <notes>
           <body xmlns="http://www.w3.org/1999/xhtml">
             <div>
-              <p>Dbit des Reins</p>
+              <p>Kidney blood flow</p>
             </div>
           </body>
         </notes>
@@ -633,7 +647,7 @@
         <notes>
           <body xmlns="http://www.w3.org/1999/xhtml">
             <div>
-              <p>Dbit du Foie</p>
+              <p>Liver blood flow</p>
             </div>
           </body>
         </notes>
@@ -642,7 +656,7 @@
         <notes>
           <body xmlns="http://www.w3.org/1999/xhtml">
             <div>
-              <p>Dbit pulmonaire</p>
+              <p>Pulmonary blood flow</p>
             </div>
           </body>
         </notes>
@@ -651,7 +665,7 @@
         <notes>
           <body xmlns="http://www.w3.org/1999/xhtml">
             <div>
-              <p>Dbit des Muscles</p>
+              <p>Muscle blood flow</p>
             </div>
           </body>
         </notes>
@@ -660,7 +674,7 @@
         <notes>
           <body xmlns="http://www.w3.org/1999/xhtml">
             <div>
-              <p>Dbit du Pancras</p>
+              <p>Pancreas blood flow</p>
             </div>
           </body>
         </notes>
@@ -669,7 +683,7 @@
         <notes>
           <body xmlns="http://www.w3.org/1999/xhtml">
             <div>
-              <p>Dbit du reste du corps</p>
+              <p>Rest of body blood flow</p>
             </div>
           </body>
         </notes>
@@ -678,7 +692,7 @@
         <notes>
           <body xmlns="http://www.w3.org/1999/xhtml">
             <div>
-              <p>Dbit de la Peau</p>
+              <p>Skin blood flow</p>
             </div>
           </body>
         </notes>
@@ -687,7 +701,7 @@
         <notes>
           <body xmlns="http://www.w3.org/1999/xhtml">
             <div>
-              <p>Dbit de la Rate</p>
+              <p>Spleen blood flow</p>
             </div>
           </body>
         </notes>
@@ -696,7 +710,7 @@
         <notes>
           <body xmlns="http://www.w3.org/1999/xhtml">
             <div>
-              <p>Dbit de l&apos;estomac</p>
+              <p>Stomach blood flow</p>
             </div>
           </body>
         </notes>
@@ -705,7 +719,16 @@
         <notes>
           <body xmlns="http://www.w3.org/1999/xhtml">
             <div>
-              <p>Volume du sang veineux</p>
+              <p>Venous blood volume</p>
+            </div>
+          </body>
+        </notes>
+      </parameter>
+      <parameter id="SecondPerHourP" value="3600" units="SecondPerHour" constant="true">
+        <notes>
+          <body xmlns="http://www.w3.org/1999/xhtml">
+            <div>
+              <p>An auxiliary parameter to handle unit conversions</p>
             </div>
           </body>
         </notes>
@@ -714,7 +737,7 @@
         <notes>
           <body xmlns="http://www.w3.org/1999/xhtml">
             <div>
-              <p>Volume du Sang artriel</p>
+              <p>Arterial blood volume</p>
             </div>
           </body>
         </notes>
@@ -723,7 +746,7 @@
         <notes>
           <body xmlns="http://www.w3.org/1999/xhtml">
             <div>
-              <p>Volume de l&apos;Adipeux</p>
+              <p>Adipose tissue volume</p>
             </div>
           </body>
         </notes>
@@ -732,7 +755,7 @@
         <notes>
           <body xmlns="http://www.w3.org/1999/xhtml">
             <div>
-              <p>Volume de l&apos;Os</p>
+              <p>Bone volume</p>
             </div>
           </body>
         </notes>
@@ -741,7 +764,7 @@
         <notes>
           <body xmlns="http://www.w3.org/1999/xhtml">
             <div>
-              <p>Volume du Cerveau</p>
+              <p>Brain volume</p>
             </div>
           </body>
         </notes>
@@ -750,7 +773,7 @@
         <notes>
           <body xmlns="http://www.w3.org/1999/xhtml">
             <div>
-              <p>Volume de l&apos;Intestin</p>
+              <p>Gut volume</p>
             </div>
           </body>
         </notes>
@@ -759,7 +782,7 @@
         <notes>
           <body xmlns="http://www.w3.org/1999/xhtml">
             <div>
-              <p>Volume du coeur</p>
+              <p>Heart volume</p>
             </div>
           </body>
         </notes>
@@ -768,7 +791,7 @@
         <notes>
           <body xmlns="http://www.w3.org/1999/xhtml">
             <div>
-              <p>Volume des Reins</p>
+              <p>Kidney volume</p>
             </div>
           </body>
         </notes>
@@ -777,7 +800,7 @@
         <notes>
           <body xmlns="http://www.w3.org/1999/xhtml">
             <div>
-              <p>Volume du Foie</p>
+              <p>Liver volume</p>
             </div>
           </body>
         </notes>
@@ -786,7 +809,7 @@
         <notes>
           <body xmlns="http://www.w3.org/1999/xhtml">
             <div>
-              <p>Volume des Poumons</p>
+              <p>Lung volume</p>
             </div>
           </body>
         </notes>
@@ -795,7 +818,7 @@
         <notes>
           <body xmlns="http://www.w3.org/1999/xhtml">
             <div>
-              <p>Volume des Muscles</p>
+              <p>Muscle volume</p>
             </div>
           </body>
         </notes>
@@ -804,7 +827,7 @@
         <notes>
           <body xmlns="http://www.w3.org/1999/xhtml">
             <div>
-              <p>Volume du Pancras</p>
+              <p>Pancreas volume</p>
             </div>
           </body>
         </notes>
@@ -813,7 +836,7 @@
         <notes>
           <body xmlns="http://www.w3.org/1999/xhtml">
             <div>
-              <p>Volume du Reste du corps</p>
+              <p>Rest of body volume</p>
             </div>
           </body>
         </notes>
@@ -822,7 +845,7 @@
         <notes>
           <body xmlns="http://www.w3.org/1999/xhtml">
             <div>
-              <p>Volume de la Peau</p>
+              <p>Skin volume</p>
             </div>
           </body>
         </notes>
@@ -831,7 +854,7 @@
         <notes>
           <body xmlns="http://www.w3.org/1999/xhtml">
             <div>
-              <p>Volume de la Rate</p>
+              <p>Spleen volume</p>
             </div>
           </body>
         </notes>
@@ -840,7 +863,7 @@
         <notes>
           <body xmlns="http://www.w3.org/1999/xhtml">
             <div>
-              <p>Volume de l&apos;Estomac</p>
+              <p>Stomach volume</p>
             </div>
           </body>
         </notes>
@@ -849,7 +872,7 @@
         <notes>
           <body xmlns="http://www.w3.org/1999/xhtml">
             <div>
-              <p>Volume du sang Veineux</p>
+              <p>Venous blood volume</p>
             </div>
           </body>
         </notes>
@@ -858,7 +881,7 @@
         <notes>
           <body xmlns="http://www.w3.org/1999/xhtml">
             <div>
-              <p>Poids corporel</p>
+              <p>Body weight</p>
             </div>
           </body>
         </notes>
@@ -867,7 +890,7 @@
         <notes>
           <body xmlns="http://www.w3.org/1999/xhtml">
             <div>
-              <p>fraction libre sang</p>
+              <p>Fraction unbound in blood</p>
             </div>
           </body>
         </notes>
@@ -876,7 +899,7 @@
         <notes>
           <body xmlns="http://www.w3.org/1999/xhtml">
             <div>
-              <p>fraction libre plasma</p>
+              <p>Fraction unbound in plasma</p>
             </div>
           </body>
         </notes>
@@ -895,7 +918,7 @@
                 <cn> 0 </cn>
                 <ci> OneNanoGram </ci>
               </apply>
-              <ci> Masse__Molaire </ci>
+              <ci> Molar__Mass </ci>
             </apply>
             <ci> GramPerNanoGramP </ci>
           </apply>
@@ -912,7 +935,7 @@
                 <cn> 0 </cn>
                 <ci> OneNanoGram </ci>
               </apply>
-              <ci> Masse__Molaire </ci>
+              <ci> Molar__Mass </ci>
             </apply>
             <ci> GramPerNanoGramP </ci>
           </apply>
@@ -929,7 +952,7 @@
                 <cn> 0 </cn>
                 <ci> OneNanoGram </ci>
               </apply>
-              <ci> Masse__Molaire </ci>
+              <ci> Molar__Mass </ci>
             </apply>
             <ci> GramPerNanoGramP </ci>
           </apply>
@@ -946,7 +969,7 @@
                 <cn> 0 </cn>
                 <ci> OneNanoGram </ci>
               </apply>
-              <ci> Masse__Molaire </ci>
+              <ci> Molar__Mass </ci>
             </apply>
             <ci> GramPerNanoGramP </ci>
           </apply>
@@ -963,7 +986,7 @@
                 <cn> 0 </cn>
                 <ci> OneNanoGram </ci>
               </apply>
-              <ci> Masse__Molaire </ci>
+              <ci> Molar__Mass </ci>
             </apply>
             <ci> GramPerNanoGramP </ci>
           </apply>
@@ -980,7 +1003,7 @@
                 <cn> 0 </cn>
                 <ci> OneNanoGram </ci>
               </apply>
-              <ci> Masse__Molaire </ci>
+              <ci> Molar__Mass </ci>
             </apply>
             <ci> GramPerNanoGramP </ci>
           </apply>
@@ -997,7 +1020,7 @@
                 <cn> 0 </cn>
                 <ci> OneNanoGram </ci>
               </apply>
-              <ci> Masse__Molaire </ci>
+              <ci> Molar__Mass </ci>
             </apply>
             <ci> GramPerNanoGramP </ci>
           </apply>
@@ -1014,7 +1037,7 @@
                 <cn> 0 </cn>
                 <ci> OneNanoGram </ci>
               </apply>
-              <ci> Masse__Molaire </ci>
+              <ci> Molar__Mass </ci>
             </apply>
             <ci> GramPerNanoGramP </ci>
           </apply>
@@ -1031,7 +1054,7 @@
                 <cn> 0 </cn>
                 <ci> OneNanoGram </ci>
               </apply>
-              <ci> Masse__Molaire </ci>
+              <ci> Molar__Mass </ci>
             </apply>
             <ci> GramPerNanoGramP </ci>
           </apply>
@@ -1048,7 +1071,7 @@
                 <cn> 0 </cn>
                 <ci> OneNanoGram </ci>
               </apply>
-              <ci> Masse__Molaire </ci>
+              <ci> Molar__Mass </ci>
             </apply>
             <ci> GramPerNanoGramP </ci>
           </apply>
@@ -1065,7 +1088,7 @@
                 <cn> 0 </cn>
                 <ci> OneNanoGram </ci>
               </apply>
-              <ci> Masse__Molaire </ci>
+              <ci> Molar__Mass </ci>
             </apply>
             <ci> GramPerNanoGramP </ci>
           </apply>
@@ -1082,7 +1105,7 @@
                 <cn> 0 </cn>
                 <ci> OneNanoGram </ci>
               </apply>
-              <ci> Masse__Molaire </ci>
+              <ci> Molar__Mass </ci>
             </apply>
             <ci> GramPerNanoGramP </ci>
           </apply>
@@ -1099,7 +1122,7 @@
                 <cn> 0 </cn>
                 <ci> OneNanoGram </ci>
               </apply>
-              <ci> Masse__Molaire </ci>
+              <ci> Molar__Mass </ci>
             </apply>
             <ci> GramPerNanoGramP </ci>
           </apply>
@@ -1116,7 +1139,7 @@
                 <cn> 0 </cn>
                 <ci> OneNanoGram </ci>
               </apply>
-              <ci> Masse__Molaire </ci>
+              <ci> Molar__Mass </ci>
             </apply>
             <ci> GramPerNanoGramP </ci>
           </apply>
@@ -1133,7 +1156,7 @@
                 <cn> 0 </cn>
                 <ci> OneNanoGram </ci>
               </apply>
-              <ci> Masse__Molaire </ci>
+              <ci> Molar__Mass </ci>
             </apply>
             <ci> GramPerNanoGramP </ci>
           </apply>
@@ -1145,8 +1168,12 @@
             <times/>
             <apply>
               <divide/>
-              <ci> Dose </ci>
-              <ci> Masse__Molaire </ci>
+              <apply>
+                <times/>
+                <cn> 0 </cn>
+                <ci> OneMilliGram </ci>
+              </apply>
+              <ci> Molar__Mass </ci>
             </apply>
             <ci> GramPerMilliGramP </ci>
           </apply>
@@ -2325,135 +2352,151 @@
           <apply>
             <times/>
             <apply>
-              <minus/>
+              <plus/>
               <apply>
-                <plus/>
+                <minus/>
                 <apply>
-                  <divide/>
+                  <plus/>
                   <apply>
-                    <times/>
-                    <ci> QHT </ci>
-                    <ci> A__Heart </ci>
+                    <divide/>
+                    <apply>
+                      <times/>
+                      <ci> QHT </ci>
+                      <ci> A__Heart </ci>
+                    </apply>
+                    <apply>
+                      <times/>
+                      <ci> KbHT </ci>
+                      <ci> VHT </ci>
+                    </apply>
                   </apply>
                   <apply>
-                    <times/>
-                    <ci> KbHT </ci>
-                    <ci> VHT </ci>
+                    <divide/>
+                    <apply>
+                      <times/>
+                      <ci> QBR </ci>
+                      <ci> A__Brain </ci>
+                    </apply>
+                    <apply>
+                      <times/>
+                      <ci> KbBR </ci>
+                      <ci> VBR </ci>
+                    </apply>
+                  </apply>
+                  <apply>
+                    <divide/>
+                    <apply>
+                      <times/>
+                      <ci> QMU </ci>
+                      <ci> A__Muscles </ci>
+                    </apply>
+                    <apply>
+                      <times/>
+                      <ci> KbMU </ci>
+                      <ci> VMU </ci>
+                    </apply>
+                  </apply>
+                  <apply>
+                    <divide/>
+                    <apply>
+                      <times/>
+                      <ci> QAD </ci>
+                      <ci> A__Adipose </ci>
+                    </apply>
+                    <apply>
+                      <times/>
+                      <ci> KbAD </ci>
+                      <ci> VAD </ci>
+                    </apply>
+                  </apply>
+                  <apply>
+                    <divide/>
+                    <apply>
+                      <times/>
+                      <ci> QSK </ci>
+                      <ci> A__Skin </ci>
+                    </apply>
+                    <apply>
+                      <times/>
+                      <ci> KbSK </ci>
+                      <ci> VSK </ci>
+                    </apply>
+                  </apply>
+                  <apply>
+                    <divide/>
+                    <apply>
+                      <times/>
+                      <ci> QLI </ci>
+                      <ci> A__Liver </ci>
+                    </apply>
+                    <apply>
+                      <times/>
+                      <ci> KbLI </ci>
+                      <ci> VLI </ci>
+                    </apply>
+                  </apply>
+                  <apply>
+                    <divide/>
+                    <apply>
+                      <times/>
+                      <ci> QBO </ci>
+                      <ci> A__Bones </ci>
+                    </apply>
+                    <apply>
+                      <times/>
+                      <ci> KbBO </ci>
+                      <ci> VBO </ci>
+                    </apply>
+                  </apply>
+                  <apply>
+                    <divide/>
+                    <apply>
+                      <times/>
+                      <ci> QKI </ci>
+                      <ci> A__Kidneys </ci>
+                    </apply>
+                    <apply>
+                      <times/>
+                      <ci> KbKI </ci>
+                      <ci> VKI </ci>
+                    </apply>
+                  </apply>
+                  <apply>
+                    <divide/>
+                    <apply>
+                      <times/>
+                      <ci> QRB </ci>
+                      <ci> A__Rest__of__Body </ci>
+                    </apply>
+                    <apply>
+                      <times/>
+                      <ci> KbRB </ci>
+                      <ci> VRB </ci>
+                    </apply>
                   </apply>
                 </apply>
                 <apply>
                   <divide/>
                   <apply>
                     <times/>
-                    <ci> QBR </ci>
-                    <ci> A__Brain </ci>
+                    <ci> QLU </ci>
+                    <ci> A__Venous__Blood </ci>
                   </apply>
-                  <apply>
-                    <times/>
-                    <ci> KbBR </ci>
-                    <ci> VBR </ci>
-                  </apply>
-                </apply>
-                <apply>
-                  <divide/>
-                  <apply>
-                    <times/>
-                    <ci> QMU </ci>
-                    <ci> A__Muscles </ci>
-                  </apply>
-                  <apply>
-                    <times/>
-                    <ci> KbMU </ci>
-                    <ci> VMU </ci>
-                  </apply>
-                </apply>
-                <apply>
-                  <divide/>
-                  <apply>
-                    <times/>
-                    <ci> QAD </ci>
-                    <ci> A__Adipose </ci>
-                  </apply>
-                  <apply>
-                    <times/>
-                    <ci> KbAD </ci>
-                    <ci> VAD </ci>
-                  </apply>
-                </apply>
-                <apply>
-                  <divide/>
-                  <apply>
-                    <times/>
-                    <ci> QSK </ci>
-                    <ci> A__Skin </ci>
-                  </apply>
-                  <apply>
-                    <times/>
-                    <ci> KbSK </ci>
-                    <ci> VSK </ci>
-                  </apply>
-                </apply>
-                <apply>
-                  <divide/>
-                  <apply>
-                    <times/>
-                    <ci> QLI </ci>
-                    <ci> A__Liver </ci>
-                  </apply>
-                  <apply>
-                    <times/>
-                    <ci> KbLI </ci>
-                    <ci> VLI </ci>
-                  </apply>
-                </apply>
-                <apply>
-                  <divide/>
-                  <apply>
-                    <times/>
-                    <ci> QBO </ci>
-                    <ci> A__Bones </ci>
-                  </apply>
-                  <apply>
-                    <times/>
-                    <ci> KbBO </ci>
-                    <ci> VBO </ci>
-                  </apply>
-                </apply>
-                <apply>
-                  <divide/>
-                  <apply>
-                    <times/>
-                    <ci> QKI </ci>
-                    <ci> A__Kidneys </ci>
-                  </apply>
-                  <apply>
-                    <times/>
-                    <ci> KbKI </ci>
-                    <ci> VKI </ci>
-                  </apply>
-                </apply>
-                <apply>
-                  <divide/>
-                  <apply>
-                    <times/>
-                    <ci> QRB </ci>
-                    <ci> A__Rest__of__Body </ci>
-                  </apply>
-                  <apply>
-                    <times/>
-                    <ci> KbRB </ci>
-                    <ci> VRB </ci>
-                  </apply>
+                  <ci> VVB </ci>
                 </apply>
               </apply>
               <apply>
-                <divide/>
+                <times/>
                 <apply>
-                  <times/>
-                  <ci> QLU </ci>
-                  <ci> A__Venous__Blood </ci>
+                  <divide/>
+                  <apply>
+                    <times/>
+                    <ci> InfusionFlag </ci>
+                    <ci> InfusionRate </ci>
+                  </apply>
+                  <ci> Molar__Mass </ci>
                 </apply>
-                <ci> VVB </ci>
+                <ci> GramPerMilliGramP </ci>
               </apply>
             </apply>
             <ci> HourPerSecondP </ci>
@@ -2461,5 +2504,33 @@
         </math>
       </rateRule>
     </listOfRules>
+    <listOfEvents>
+      <event id="DoseInfusion" useValuesFromTriggerTime="false">
+        <trigger initialValue="false" persistent="true">
+          <math xmlns="http://www.w3.org/1998/Math/MathML">
+            <apply>
+              <geq/>
+              <csymbol encoding="text" definitionURL="http://www.sbml.org/sbml/symbols/time"/>
+              <apply>
+                <times/>
+                <apply>
+                  <divide/>
+                  <ci> Dose </ci>
+                  <ci> InfusionRate </ci>
+                </apply>
+                <ci> SecondPerHourP </ci>
+              </apply>
+            </apply>
+          </math>
+        </trigger>
+        <listOfEventAssignments>
+          <eventAssignment variable="InfusionFlag">
+            <math xmlns="http://www.w3.org/1998/Math/MathML">
+              <cn> 0 </cn>
+            </math>
+          </eventAssignment>
+        </listOfEventAssignments>
+      </event>
+    </listOfEvents>
   </model>
 </sbml>
