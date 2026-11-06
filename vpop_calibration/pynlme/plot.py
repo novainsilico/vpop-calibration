@@ -1,3 +1,4 @@
+from matplotlib.offsetbox import AnchoredText
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -13,6 +14,7 @@ from vpop_calibration.pynlme.diagnostics import (
     ResidualType,
 )
 from vpop_calibration.model.gp import GP
+from vpop_calibration.pynlme.utils import inverse_transform_param
 from vpop_calibration.structural_model.gp import StructuralGp
 from vpop_calibration.config import smoke_test
 from vpop_calibration.utils import time_scale_and_label
@@ -661,69 +663,67 @@ class PlottingUtility:
         plt.close(fig)
 
     def map_vs_covariates(
-        self,
+        self, additional_covariates = []
     ):
         if not hasattr(self.model_diag.sampler, "map"):
-            self.model_diag.sample_conditional_distribution()
-
-        # Get MAP estimates for descriptors
-        map_theta = self.model_diag.model.convert_physical_to_thetas_all_patients(
-            self.model_diag.sampler.map.physical_params_samples
+            raise Exception("Call sample_conditional_distribution() first")
+        # Get MAP estimates and input covariates for descriptors
+        model = self.model_diag.model
+        betas = model.population_betas.detach().cpu().numpy()
+        map_params = self.model_diag.sampler.map_parameters_df
+        input_df = model.data.patients_df.rename(
+            {"id": "id_ref"},
+            axis = "columns"
         )
-        assert map_theta is not None
+
+        assert map_params is not None
+
+        patients = pd.merge(map_params, input_df, on="id_ref", suffixes=("", "_input"))
         
         # Get covariate and PDU names and counts 
-        cov_names = self.model_diag.model.covariate_names
-        pdu_names = self.model_diag.model.pdu_names
-        pdu_nb = self.model_diag.model.nb_pdu
-        pdk_nb = self.model_diag.model.nb_pdk
-        cov_nb = self.model_diag.model.nb_covariates
+        cov_names = set(model.covariate_names + additional_covariates)
+        cov_names = list(set.intersection(
+            cov_names,
+            set(patients.columns)
+        ))
+        pdu_names = model.pdu_names
+        pdu_nb = model.nb_pdu
+        cov_nb = len(cov_names)
 
-        assert cov_nb != 0 and pdu_nb != 0
+        assert cov_nb != 0 and pdu_nb != 0, "Model needs to have at least one covariate and one PDU to plot MAP against covariates."
 
         n_cols = 3
         n_rows = (pdu_nb * cov_nb + n_cols - 1) // n_cols
         fig, axes = plt.subplots(n_rows, n_cols, figsize=(15, 4 * n_rows))
         axes = np.atleast_1d(axes).flatten()
         
-        for cov_name in cov_names:
-            cov_vals = self.model_diag.model.data.patients_df.get(cov_name)
-            for i in range(len(axes)):
-                pdu_name = pdu_names[i]
+        for i in range(len(cov_names)):
+            cov_name = cov_names[i]
+            cov_vals = patients.get(cov_name)
+            for j in range(len(pdu_names)):
+                pdu_name = pdu_names[j]
+                pdu_def = model.input_params.pdu[pdu_name]
+                ax = axes[j + i * pdu_nb]
+                map = patients.get(pdu_name)
+                phi_ref = betas[model.beta_names.index(pdu_name)]
+                slope = 0.0
+                for c, cov in (pdu_def.covariates or {}).items():
+                    coef = betas[model.beta_names.index(cov.coef_name)]
+                    if c == cov_name:
+                        slope = coef
+                    else:
+                        phi_ref += coef * patients[c].median()
 
-                pdu_pop_value = self.model_diag.model.population_betas[
-                    self.model_diag.model.beta_names.index(pdu_name)
-                ].cpu().numpy()
-
-                pdu_design_structure = self.model_diag.model.input_params.pdu[pdu_name]
-                pdu_cov_coeff_value = None
-                if pdu_design_structure.covariates and \
-                    cov_name in pdu_design_structure.covariates.keys():
-                    cov_pdu_coeff_name = self.model_diag.model.input_params.pdu[pdu_name].covariates[cov_name].coef_name
-                    pdu_cov_coeff_value = self.model_diag.model.population_betas[self.model_diag.model.beta_names.index(cov_pdu_coeff_name)].cpu().numpy()
-                    print(pdu_cov_coeff_value)
-
-                ax = axes[i]
-                map = map_theta[0][:,i + pdk_nb]
-                if not pdu_cov_coeff_value:
-                    ax.axhline(
-                        np.exp(pdu_pop_value),
-                        linestyle = "--",
-                        color = "green",
-                        label = "Fixed effect value"
-                    )
-                else:
-                    plot_range = np.linspace(min(cov_vals), max(cov_vals), 100)
-                    ax.plot(
-                        plot_range,
-                        np.exp(pdu_pop_value + plot_range * pdu_cov_coeff_value),
-                        linestyle = "--",
-                        marker = "",
-                        color = "green",
-                        label = f"Fixed effect value\nWith {cov_name} relationship"
-                    )
+                x = np.linspace(cov_vals.min(), cov_vals.max(), 100)
+                ax.plot(
+                    x,
+                    inverse_transform_param(phi_ref + slope * x, pdu_def.constraint),
+                    linestyle="--", color="green",
+                    label="Typical value\n(other covariates at median)",
+                )
+                # a dummy categorical test: if a variable has 5 of fewer values, then it's probably a categorical
                 if len(cov_vals.unique()) <= 5:
-                    data = [map.detach().cpu().numpy()[cov_vals == key] for key in cov_vals.unique()] 
+                    data = [patients.loc[cov_vals == key, pdu_name] for key in cov_vals.unique()] 
                     ax.boxplot(
                         data,
                         positions = cov_vals.unique(),
@@ -738,12 +738,23 @@ class PlottingUtility:
                         linestyle = "",
                         label = "MAP estimates"
                     )
+
+                    ### Add Pearson correlation
+                    correlations = pd.DataFrame({"map": map, "covariate": cov_vals}).corr(method="pearson")
+                    map_cov_corr = correlations["map"]["covariate"]
+                    
+                    anchored_text = AnchoredText(
+                        f"Pearson r: {map_cov_corr:.2f}",
+                        loc=1
+                    )
+                    ax.add_artist(anchored_text)
+
                 ax.set_title(
                     f"{pdu_name} as a function of {cov_name}"
                 )
                 ax.set_xlabel(f"{cov_name} (covariate)")
                 ax.set_ylabel(f"{pdu_name} (MAP)")
-                ax.legend(fontsize="small")
+                ax.legend(fontsize="small", loc=2)
         if not smoke_test:
             plt.tight_layout()
             plt.show()
