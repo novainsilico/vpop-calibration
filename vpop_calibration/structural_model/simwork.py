@@ -55,7 +55,7 @@ def nix_run_command(
     return cmd
 
 
-class SimworkModelBinding:
+class JinkoModelBinding:
     def __init__(
         self,
         path_to_model: str,
@@ -156,10 +156,10 @@ class SimworkModelBinding:
         return vpop
 
     def parse_output_to_pandas(
-        self, simwork_output: ModelOutput, timepoints: list[float]
+        self, jinko_output: ModelOutput, timepoints: list[float]
     ) -> pd.DataFrame:
         df_list = []
-        for patient_id, patient_data in simwork_output.items():
+        for patient_id, patient_data in jinko_output.items():
             if patient_data is None:
                 # Solving failed for this patient so let's fill the output timeseries Inf values
                 for output_name in self.outputs:
@@ -190,10 +190,10 @@ class SimworkModelBinding:
         return full_df_wide
 
 
-class StructuralSimwork(StructuralModel):
+class StructuralJinko(StructuralModel):
     def __init__(
         self,
-        model: SimworkModelBinding,
+        model: JinkoModelBinding,
         protocol_design: Optional[pd.DataFrame] = None,
         categorical_attributes: pd.DataFrame | None = None,
     ):
@@ -217,11 +217,11 @@ class StructuralSimwork(StructuralModel):
         )
         self.protocol_design = self.protocol_schema.validate(protocol_design)
         protocol_arms = protocol_design["protocol_arm"].drop_duplicates().tolist()
-        # the parameters of the simwork model which are NOT protocol overrides
+        # the parameters of the jinko model which are NOT protocol overrides
         parameter_names_without_protocol_overrides = [
             p for p in model.inputs if p not in protocol_overrides
         ]
-        # the parameters of the simwork model which are protocol overrides
+        # the parameters of the jinko model which are protocol overrides
         self.protocol_parameters = [p for p in model.inputs if p in protocol_overrides]
         self.nb_protocol_overrides = len(self.protocol_parameters)
 

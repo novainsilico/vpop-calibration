@@ -3,8 +3,8 @@ from vpop_calibration.data_generation import (
     generate_synthetic_data,
 )
 from vpop_calibration.structural_model.simwork import (
-    StructuralSimwork,
-    SimworkModelBinding,
+    StructuralJinko,
+    JinkoModelBinding,
 )
 from vpop_calibration.structural_model.base import StructuralModel
 
@@ -13,13 +13,13 @@ import pytest
 
 @pytest.fixture
 def structural_model() -> StructuralModel:
-    model = SimworkModelBinding(
+    model = JinkoModelBinding(
         path_to_model="vpop_calibration/test/simwork_model/assets/model.json",
         path_to_solving_options="vpop_calibration/test/simwork_model/assets/options.json",
         inputs=["k_12", "k_21"],
         outputs=["A0", "A1", "A2"],
     )
-    struct_model = StructuralSimwork(model=model, protocol_design=None)
+    struct_model = StructuralJinko(model=model, protocol_design=None)
     return struct_model
 
 

@@ -7,8 +7,8 @@ from vpop_calibration.saem.config import Config
 from vpop_calibration.structural_model.analytical import StructuralAnalytical
 from vpop_calibration.structural_model.gp import StructuralGp
 from vpop_calibration.structural_model.simwork import (
-    StructuralSimwork,
-    SimworkModelBinding,
+    StructuralJinko,
+    JinkoModelBinding,
 )
 from vpop_calibration.structural_model.sbml import StructuralSbml
 from vpop_calibration.model import GP
@@ -21,8 +21,8 @@ __all__ = [
     "GP",
     "StructuralGp",
     "StructuralAnalytical",
-    "StructuralSimwork",
-    "SimworkModelBinding",
+    "StructuralJinko",
+    "JinkoModelBinding",
     "StructuralSbml",
     "NlmeModel",
     "Config",

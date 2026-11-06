@@ -90,11 +90,11 @@ class StructuralSbml(StructuralModel):
         )
         self.protocol_design = self.protocol_schema.validate(protocol_design)
         protocol_arms = protocol_design["protocol_arm"].drop_duplicates().tolist()
-        # the parameters of the simwork model which are NOT protocol overrides
+        # the parameters of the jinko model which are NOT protocol overrides
         parameter_names_without_protocol_overrides = [
             p for p in inputs if p not in protocol_overrides
         ]
-        # the parameters of the simwork model which are protocol overrides
+        # the parameters of the jinko model which are protocol overrides
         self.protocol_parameters = [p for p in inputs if p in protocol_overrides]
         self.nb_protocol_overrides = len(self.protocol_parameters)
 
