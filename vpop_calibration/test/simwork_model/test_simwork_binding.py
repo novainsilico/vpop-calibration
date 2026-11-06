@@ -2,7 +2,7 @@ from numpy import inf
 import os
 
 from vpop_calibration.structural_model.simwork import (
-    SimworkModelBinding,
+    JinkoModelBinding,
     model_output_adapter,
 )
 
@@ -11,8 +11,8 @@ import pandas as pd
 
 
 @pytest.fixture
-def dummy_simwork_model() -> SimworkModelBinding:
-    model = SimworkModelBinding(
+def dummy_jinko_model() -> JinkoModelBinding:
+    model = JinkoModelBinding(
         path_to_model="vpop_calibration/test/simwork_model/assets/model.json",
         path_to_solving_options="vpop_calibration/test/simwork_model/assets/options.json",
         inputs=["k_12", "k_21"],
@@ -21,15 +21,15 @@ def dummy_simwork_model() -> SimworkModelBinding:
     return model
 
 
-def test_simwork_binding(dummy_simwork_model):
+def test_simwork_binding(dummy_jinko_model):
     vpop = pd.DataFrame({"id": ["p1", "p2"], "k_12": [0, 0], "k_21": [1, 0]})
-    _json = dummy_simwork_model.df_to_json_vpop(vpop_df=vpop)
+    _json = dummy_jinko_model.df_to_json_vpop(vpop_df=vpop)
 
     time = [0, 1, 2]
-    _out = dummy_simwork_model.run(vpop=vpop, time=time)
+    _out = dummy_jinko_model.run(vpop=vpop, time=time)
 
 
-def test_handle_payload(dummy_simwork_model):
+def test_handle_payload(dummy_jinko_model):
     timepoints = [0, 1, 2]
     model_output_json = {
         "p1": (
@@ -52,7 +52,7 @@ def test_handle_payload(dummy_simwork_model):
     }
     validated_output = model_output_adapter.validate_python(model_output_json)
 
-    parsed_output = dummy_simwork_model.parse_output_to_pandas(
+    parsed_output = dummy_jinko_model.parse_output_to_pandas(
         validated_output, timepoints
     )
     expected_output = pd.DataFrame(
@@ -72,7 +72,7 @@ def test_handle_payload(dummy_simwork_model):
 
 
 def test_simwork_model_explicit_path():
-    model = SimworkModelBinding(
+    model = JinkoModelBinding(
         path_to_model="vpop_calibration/test/simwork_model/assets/model.json",
         path_to_solving_options="vpop_calibration/test/simwork_model/assets/options.json",
         inputs=["k_12", "k_21"],

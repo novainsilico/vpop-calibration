@@ -3,8 +3,8 @@ import pandas as pd
 import numpy as np
 
 from vpop_calibration.structural_model.simwork import (
-    SimworkModelBinding,
-    StructuralSimwork,
+    JinkoModelBinding,
+    StructuralJinko,
 )
 from vpop_calibration.structural_model.base import StructuralModel
 from vpop_calibration.api.interface import (
@@ -16,8 +16,8 @@ from vpop_calibration.saem.config import Config
 
 
 @pytest.fixture
-def simwork_model() -> StructuralModel:
-    model = SimworkModelBinding(
+def jinko_model() -> StructuralModel:
+    model = JinkoModelBinding(
         path_to_model="vpop_calibration/test/simwork_model/assets/model.json",
         path_to_solving_options="vpop_calibration/test/simwork_model/assets/options.json",
         inputs=["k_12", "k_21", "k_el", "dose", "k_a"],
@@ -27,7 +27,7 @@ def simwork_model() -> StructuralModel:
     protocol_design = pd.DataFrame(
         {"protocol_arm": ["dose-1", "dose-10"], "dose": [1, 10]}
     )
-    struct_model = StructuralSimwork(model=model, protocol_design=protocol_design)
+    struct_model = StructuralJinko(model=model, protocol_design=protocol_design)
     return struct_model
 
 
@@ -74,13 +74,13 @@ def sample_nlme_params() -> dict:
     return input
 
 
-def test_simwork_saem(sample_nlme_params, obs_data, simwork_model):
+def test_simwork_saem(sample_nlme_params, obs_data, jinko_model):
     config = Config(
         saem=SaemConfigDict(nb_iter_burnin=1, nb_iter_learning=1, nb_iter_smoothing=1),
         nlme=NlmeConfigDict(nb_chains=1, live_plot=False, progress_bar=False),
     )
     nlme_model = NlmeModel(
-        structural_model=simwork_model,
+        structural_model=jinko_model,
         df=obs_data,
         input_params=sample_nlme_params,
         config=config,

@@ -26,7 +26,7 @@ For the moment, four instances can be used:
 1. `StructuralAnalytical`: an analytical model
 2. `StructuralGp`: a Gaussian process surrogate
 3. `StructuralSbml`: an SBML model, will be solved using the roadrunner[^roadrunner] library
-4. `StructuralSimwork`: a simwork model (loaded from a CM.json file), will use a simwork executable for solving
+4. `StructuralJinko`: a Jinko model (loaded from a CM.json file), will use a Jinko (formerly simwork) executable for solving
 
 ### Patient descriptors
 

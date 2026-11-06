@@ -5,7 +5,7 @@ import os
 
 print(f"Initializing test pipeline. {smoke_test=}")
 
-# Build simwork executable once for all tests
+# Build jinko executable once for all tests
 build_result = subprocess.run(
     [
         "nix",
@@ -17,7 +17,7 @@ build_result = subprocess.run(
 )
 if build_result.returncode != 0:
     raise RuntimeError(build_result.stderr)
-simwork_executable_tests = (
+jinko_executable_tests = (
     build_result.stdout.decode().strip("\n") + "/bin/scripts.run-model-simple"
 )
-os.environ["SIMWORK_EXE"] = simwork_executable_tests
+os.environ["SIMWORK_EXE"] = jinko_executable_tests

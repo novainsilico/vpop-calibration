@@ -1,6 +1,6 @@
 from vpop_calibration.structural_model.simwork import (
-    SimworkModelBinding,
-    StructuralSimwork,
+    JinkoModelBinding,
+    StructuralJinko,
 )
 from vpop_calibration.pynlme.indexing import DataIndex
 from vpop_calibration.pynlme.schemas import ObsDataSchema
@@ -11,8 +11,8 @@ import pandas as pd
 
 
 @pytest.fixture
-def dummy_simwork_model() -> SimworkModelBinding:
-    model = SimworkModelBinding(
+def dummy_jinko_model() -> JinkoModelBinding:
+    model = JinkoModelBinding(
         path_to_model="vpop_calibration/test/simwork_model/assets/model.json",
         path_to_solving_options="vpop_calibration/test/simwork_model/assets/options.json",
         inputs=["k_12", "k_21"],
@@ -21,7 +21,7 @@ def dummy_simwork_model() -> SimworkModelBinding:
     return model
 
 
-def test_analytical_simwork_no_protocol_override(dummy_simwork_model):
+def test_analytical_simwork_no_protocol_override(dummy_jinko_model):
     df = (
         pd.DataFrame({"id": ["p1", "p2"], "protocol_arm": "identity"})
         .merge(pd.DataFrame({"time": [0, 1, 2]}), how="cross")
@@ -30,7 +30,7 @@ def test_analytical_simwork_no_protocol_override(dummy_simwork_model):
     df["value"] = 0.0
     obs_index = DataIndex.from_dataframe(ObsDataSchema.validate(df))
 
-    struct_model = StructuralSimwork(model=dummy_simwork_model)
+    struct_model = StructuralJinko(model=dummy_jinko_model)
     X = torch.tensor(
         [
             [  # k_12 k_21 time
@@ -42,7 +42,7 @@ def test_analytical_simwork_no_protocol_override(dummy_simwork_model):
     _out = struct_model.simulate(X=X, prediction_index=obs_index)
 
 
-def test_analytical_simwork_two_chains(dummy_simwork_model):
+def test_analytical_simwork_two_chains(dummy_jinko_model):
     df = (
         pd.DataFrame({"id": ["p1", "p2"], "protocol_arm": "identity"})
         .merge(pd.DataFrame({"time": [0, 1, 2]}), how="cross")
@@ -51,7 +51,7 @@ def test_analytical_simwork_two_chains(dummy_simwork_model):
     df["value"] = 0.0
     obs_index = DataIndex.from_dataframe(ObsDataSchema.validate(df))
 
-    struct_model = StructuralSimwork(model=dummy_simwork_model)
+    struct_model = StructuralJinko(model=dummy_jinko_model)
     X = torch.tensor(
         [  # Chain 1
             [  # k_12 k_21 time
@@ -68,7 +68,7 @@ def test_analytical_simwork_two_chains(dummy_simwork_model):
     _out = struct_model.simulate(X=X, prediction_index=obs_index)
 
 
-def test_analytical_simwork_one_protocol_override(dummy_simwork_model):
+def test_analytical_simwork_one_protocol_override(dummy_jinko_model):
     df = (
         pd.DataFrame({"id": ["p1", "p2"], "protocol_arm": ["arm-B", "arm-A"]})
         .merge(pd.DataFrame({"time": [0, 1, 2]}), how="cross")
@@ -82,8 +82,8 @@ def test_analytical_simwork_one_protocol_override(dummy_simwork_model):
     categorical_attributes = pd.DataFrame(
         {"id": ["p1", "p2"], "foo": ["truc", "muche"]}
     )
-    struct_model = StructuralSimwork(
-        model=dummy_simwork_model,
+    struct_model = StructuralJinko(
+        model=dummy_jinko_model,
         protocol_design=protocol_design,
         categorical_attributes=categorical_attributes,
     )
@@ -94,7 +94,7 @@ def test_analytical_simwork_one_protocol_override(dummy_simwork_model):
     _out = struct_model.simulate(X=X, prediction_index=obs_index)
 
 
-def test_categorical_override(dummy_simwork_model):
+def test_categorical_override(dummy_jinko_model):
     df = (
         pd.DataFrame({"id": ["p1", "p2"], "protocol_arm": ["arm-B", "arm-A"]})
         .merge(pd.DataFrame({"time": [0, 1, 2]}), how="cross")
@@ -108,8 +108,8 @@ def test_categorical_override(dummy_simwork_model):
     categorical_attributes = pd.DataFrame(
         {"id": ["p1", "p2"], "PatientId": ["Totoro", "Pikachu"]}
     )
-    struct_model = StructuralSimwork(
-        model=dummy_simwork_model,
+    struct_model = StructuralJinko(
+        model=dummy_jinko_model,
         protocol_design=protocol_design,
         categorical_attributes=categorical_attributes,
     )
