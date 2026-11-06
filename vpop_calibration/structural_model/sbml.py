@@ -19,14 +19,23 @@ def simulate_rr_single_patient(
     outputs: list[str],
 ) -> pd.DataFrame:
     patient_id, patient_overrides = input
+    # rr.resetToOrigin()
+    # # Sets patient overrides (MI, PDK and PDU) as starting values.
+    # # The important subtlety here is buried in the docs of libroadrunner
+    # # rr.setValues({"k": 1}) only sets the value of parameter k but that won't
+    # # impact another construct referencing "k" through an initial assignment.
+    # # By contrast, rr.setValues({"init(k)": 1}) will make rr.rest() recompute
+    # # initial assignments referencing "k" based on that new value of "k".
+    # # see https://libroadrunner.readthedocs.io/en/latest/selecting_values.html#selecting-values
+    # rr.setValues({f"init({k})": v for k, v in patient_overrides.items()})
+    # # Full reset: time, states, parameters, re-evaluating initial assignments
+    # rr.reset(roadrunner.SelectionRecord.ALL)
     rr.resetToOrigin()
-    # Change the patient overrides
     rr.setValues(patient_overrides)
-    # Reset the floating species to their init value
     rr.reset()
 
     prepend_zero = time_steps[0] > 0
-    # roadrunner starts the simulation at t = min(time_steps) so if it isn't t=0, 
+    # roadrunner starts the simulation at t = min(time_steps) so if it isn't t=0,
     # it will shift the whole results! So we prepend 0 if it is not there already.
     simulation_times = [0.0, *time_steps] if prepend_zero else time_steps
     try:
@@ -71,6 +80,13 @@ class StructuralSbml(StructuralModel):
 
             for key, val in config.get("settings", {}).items():
                 integrator.setSetting(key, val)
+        else:
+            self.rr.setIntegrator("cvode")
+            integrator = self.rr.integrator
+            integrator.setValue("stiff", True)  # sets BDF as ODE solver scheme
+            integrator.setValue("relative_tolerance", 1e-6)
+            integrator.setValue("absolute_tolerance", 1e-6)
+            integrator.setValue("initial_time_step", 1e-6)
 
         if protocol_design is None:
             protocol_design = pd.DataFrame({"protocol_arm": ["identity"]})
@@ -176,7 +192,10 @@ class StructuralSbml(StructuralModel):
             columns=self.input_parameters,
         )
         # Add a temp patient id, to cover the fact that a single patient is simulated on each chain
-        temporary_ids = [str(known_patient_uuid4(patient_number)) for patient_number  in range(vpop.shape[0])]
+        temporary_ids = [
+            str(known_patient_uuid4(patient_number))
+            for patient_number in range(vpop.shape[0])
+        ]
         vpop["id"] = temporary_ids
         return vpop
 

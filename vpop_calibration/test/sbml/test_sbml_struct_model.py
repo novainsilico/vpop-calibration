@@ -1,4 +1,5 @@
 import pandas as pd
+import roadrunner
 import torch
 import pytest
 
@@ -63,3 +64,46 @@ def test_sbml_model():
     )
 
     _out = struct_model.simulate(X=X, prediction_index=obs_index)
+
+
+INITIAL_ASSIGNMENT_SBML = """<?xml version="1.0" encoding="UTF-8"?>
+<sbml xmlns="http://www.sbml.org/sbml/level3/version2/core" level="3" version="2">
+  <model id="initial_assignment">
+    <listOfParameters>
+      <parameter id="a" value="5" constant="false"/>
+      <parameter id="b" constant="false"/>
+    </listOfParameters>
+    <listOfInitialAssignments>
+      <initialAssignment symbol="b">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply><times/><cn> 2 </cn><ci> a </ci></apply>
+        </math>
+      </initialAssignment>
+    </listOfInitialAssignments>
+  </model>
+</sbml>
+"""
+
+
+def test_roadrunner_initial_assignment_set_value_vs_init():
+    """b = 2 * a is an initial assignment. Setting `a` does not propagate to b,
+    while setting `init(a)` does."""
+    rr = roadrunner.RoadRunner(INITIAL_ASSIGNMENT_SBML)
+
+    # same call sequence as simulate_rr_single_patient
+    rr.resetToOrigin()
+    rr.setValues({"a": 1})
+    rr.reset()
+    value_a, value_b_from_value = rr["a"], rr["b"]
+
+    rr.resetToOrigin()
+    rr.setValues({"init(a)": 1})
+    rr.reset()
+    init_a, value_b_from_init = rr["a"], rr["b"]
+
+    # setting `a` directly: b still reflects the original a = 5
+    assert value_a == 1
+    assert value_b_from_value == 10
+    # setting `init(a)`: the initial assignment is re-evaluated with a = 1
+    assert init_a == 1
+    assert value_b_from_init == 2
