@@ -660,6 +660,56 @@ class PlottingUtility:
 
         plt.close(fig)
 
+    def map_vs_covariates(
+        self,
+    ):
+        if not hasattr(self.model_diag.sampler, "map"):
+            self.model_diag.sample_conditional_distribution()
+
+        # Get MAP estimates for descriptors
+        map_theta = self.model_diag.model.convert_physical_to_thetas_all_patients(
+            self.model_diag.sampler.map.physical_params_samples
+        )
+        assert map_theta is not None
+        
+        # Get covariate and PDU names and counts 
+        cov_names = self.model_diag.model.covariate_names
+        pdu_names = self.model_diag.model.pdu_names
+        pdu_nb = self.model_diag.model.nb_pdu
+        cov_nb = self.model_diag.model.nb_covariates
+
+        assert cov_nb != 0 and pdu_nb != 0
+
+        n_cols = 3
+        n_rows = (pdu_nb * cov_nb + n_cols - 1) // n_cols
+        fig, axes = plt.subplots(n_rows, n_cols, figsize=(15, 4 * n_rows))
+        axes = np.atleast_1d(axes).flatten()
+        
+        for cov_name in cov_names:
+            cov_vals = self.model_diag.model.data.patients_df.get(cov_name)
+            for i in range(len(axes)):
+                pdu_name = pdu_names[i]
+                ax = axes[i]
+                map = map_theta[0][:,i]
+                ax.plot(
+                    cov_vals, 
+                    map,
+                    marker = "+",
+                    markersize = 12,
+                    linestyle = "",
+                    label = "MAP estimates"
+                )
+                ax.set_title(
+                    f"{pdu_name} as a function of {cov_name}"
+                )
+                ax.set_xlabel(f"{cov_name} (covariate)")
+                ax.set_ylabel(f"{pdu_name} (MAP)")
+                ax.legend(fontsize="small")
+        if not smoke_test:
+            plt.tight_layout()
+            plt.show()
+        plt.close(fig)
+
     def vpc(
         self,
         facet_width: int = 10,
