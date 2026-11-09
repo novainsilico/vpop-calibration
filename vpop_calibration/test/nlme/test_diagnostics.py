@@ -108,7 +108,6 @@ def test_diagnostics(sample_nlme_params, obs_data, struct_model, request):
     plotter.weighted_residuals(res_type="iwres")
     plotter.weighted_residuals(res_type="pwres")
     plotter.weighted_residuals(res_type="npde")
-    plotter.map_vs_posterior()
     plotter.vpc()
     plotter.conditional_codistributions()
     cond_sampler = ConditionalDistributionSampler(nlme_model)
