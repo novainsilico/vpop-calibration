@@ -691,8 +691,37 @@ class PlottingUtility:
             cov_vals = self.model_diag.model.data.patients_df.get(cov_name)
             for j in range(len(pdu_names)):
                 pdu_name = pdu_names[j]
+
+                pdu_pop_value = self.model_diag.model.population_betas[
+                    self.model_diag.model.beta_names.index(pdu_name)
+                ].cpu().numpy()
+
+                pdu_design_structure = self.model_diag.model.input_params.pdu[pdu_name]
+                pdu_cov_coeff_value = None
+                if pdu_design_structure.covariates and \
+                    cov_name in pdu_design_structure.covariates.keys():
+                    cov_pdu_coeff_name = self.model_diag.model.input_params.pdu[pdu_name].covariates[cov_name].coef_name
+                    pdu_cov_coeff_value = self.model_diag.model.population_betas[self.model_diag.model.beta_names.index(cov_pdu_coeff_name)].cpu().numpy()
+
                 ax = axes[j + i * pdu_nb]
                 map = map_theta[0][:,j + pdk_nb]
+                if not pdu_cov_coeff_value:
+                    ax.axhline(
+                        np.exp(pdu_pop_value),
+                        linestyle = "--",
+                        color = "green",
+                        label = "Fixed effect value"
+                    )
+                else:
+                    plot_range = np.linspace(min(cov_vals), max(cov_vals), 100)
+                    ax.plot(
+                        plot_range,
+                        np.exp(pdu_pop_value + plot_range * pdu_cov_coeff_value),
+                        linestyle = "--",
+                        marker = "",
+                        color = "green",
+                        label = f"Fixed effect value\nWith {cov_name} relationship"
+                    )
                 if len(cov_vals.unique()) <= 5:
                     data = [map.detach().cpu().numpy()[cov_vals == key] for key in cov_vals.unique()] 
                     ax.boxplot(
