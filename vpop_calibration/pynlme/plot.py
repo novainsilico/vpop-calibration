@@ -676,6 +676,7 @@ class PlottingUtility:
         cov_names = self.model_diag.model.covariate_names
         pdu_names = self.model_diag.model.pdu_names
         pdu_nb = self.model_diag.model.nb_pdu
+        pdk_nb = self.model_diag.model.nb_pdk
         cov_nb = self.model_diag.model.nb_covariates
 
         assert cov_nb != 0 and pdu_nb != 0, "Model needs to have at least one covariate and one PDU to plot MAP against covariates."
@@ -691,15 +692,23 @@ class PlottingUtility:
             for j in range(len(pdu_names)):
                 pdu_name = pdu_names[j]
                 ax = axes[j + i * pdu_nb]
-                map = map_theta[0][:,j]
-                ax.plot(
-                    cov_vals, 
-                    map,
-                    marker = "+",
-                    markersize = 12,
-                    linestyle = "",
-                    label = "MAP estimates"
-                )
+                map = map_theta[0][:,j + pdk_nb]
+                if len(cov_vals.unique()) <= 5:
+                    data = [map.detach().cpu().numpy()[cov_vals == key] for key in cov_vals.unique()] 
+                    ax.boxplot(
+                        data,
+                        positions = cov_vals.unique(),
+                        label = "MAP estimates"
+                    )
+                else:   
+                    ax.plot(
+                        cov_vals, 
+                        map,
+                        marker = "+",
+                        markersize = 12,
+                        linestyle = "",
+                        label = "MAP estimates"
+                    )
                 ax.set_title(
                     f"{pdu_name} as a function of {cov_name}"
                 )
