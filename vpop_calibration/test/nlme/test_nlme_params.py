@@ -105,7 +105,66 @@ def test_duplicate_names():
         "pdk": ["foo"],
     }
 
+    # A covariate cannot share its name with a PDU...
     input3 = {
+        "pdu": {
+            "pdu_1": {
+                "prior": 10.0,
+                "prior_omega": 0.1,
+                "covariates": {"pdu_2": {"coef_name": "coef_pdu2_pdu1", "prior": 0.5}},
+            },
+            "pdu_2": {
+                "prior": 10.0,
+                "prior_omega": 0.1,
+            },
+        },
+        "error_model": {
+            "out_1": {"error_type": "additive", "initial_variance": 0.1},
+        },
+    }
+
+    # ... nor with a model intrinsic parameter...
+    input4 = {
+        "model_intrinsic": {"foo": {"prior": 10.0}},
+        "pdu": {
+            "pdu_1": {
+                "prior": 10.0,
+                "prior_omega": 0.1,
+                "covariates": {"foo": {"coef_name": "coef_foo_pdu1", "prior": 0.5}},
+            },
+        },
+        "error_model": {
+            "out_1": {"error_type": "additive", "initial_variance": 0.1},
+        },
+    }
+
+    # ... nor with a covariate coefficient
+    input5 = {
+        "pdu": {
+            "pdu_1": {
+                "prior": 10.0,
+                "prior_omega": 0.1,
+                "covariates": {"foo": {"coef_name": "bar", "prior": 0.5}},
+            },
+            "pdu_2": {
+                "prior": 10.0,
+                "prior_omega": 0.1,
+                "covariates": {"bar": {"coef_name": "coef_bar_pdu2", "prior": 0.5}},
+            },
+        },
+        "error_model": {
+            "out_1": {"error_type": "additive", "initial_variance": 0.1},
+        },
+    }
+
+    for input in [input1, input2, input3, input4, input5]:
+        with pytest.raises(ValidationError):
+            _params = MixedEffectParameters.model_validate(input)
+
+
+def test_pdk_as_covariate():
+    """A known patient descriptor can be both a PDK and a covariate."""
+    input = {
         "pdu": {
             "pdu_1": {
                 "prior": 10.0,
@@ -118,10 +177,9 @@ def test_duplicate_names():
         },
         "pdk": ["foo"],
     }
-
-    for input in [input1, input2, input3]:
-        with pytest.raises(ValidationError):
-            _params = MixedEffectParameters.model_validate(input)
+    params = MixedEffectParameters.model_validate(input)
+    assert params.pdk == ["foo"]
+    assert params.covariate_names == ["foo"]
 
 
 def test_state_dict(sample_nlme_params):

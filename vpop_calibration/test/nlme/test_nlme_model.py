@@ -148,6 +148,51 @@ def test_nlme_init(sample_nlme_params, obs_data, struct_model, tmp_path):
     assert_close(nlme_model.data.patients_pdk_full, torch.tensor([[p1_pdk], [p2_pdk]]))
 
 
+def test_nlme_pdk_as_covariate(np_rng):
+    """A known patient descriptor used both as PDK and covariate feeds both the
+    structural model inputs and the design matrix."""
+    params = MixedEffectParameters.model_validate(
+        {
+            "pdu": {
+                "pdu_1": {
+                    "prior": 10.0,
+                    "prior_omega": 0.1,
+                    "covariates": {"wt": {"coef_name": "coef_wt_pdu1", "prior": 0.5}},
+                },
+            },
+            "error_model": {
+                "out_1": {"error_type": "additive", "initial_variance": 0.1},
+            },
+            "pdk": ["wt"],
+        }
+    )
+    df = pd.DataFrame({"id": ["p1", "p2"], "wt": [60.0, 80.0]})
+    df = df.merge(pd.DataFrame({"output_name": ["out_1"]}), how="cross")
+    df = df.merge(pd.DataFrame({"time": np.arange(0, 3.0, 1.0)}), how="cross")
+    df["value"] = np.abs(np_rng.normal(0, 1, df.shape[0]))
+    data = ObsData(DataFrame(df))
+
+    def equations(pdu_1, wt, t):
+        return pdu_1 * wt * torch.ones_like(t)
+
+    struct_model = StructuralAnalytical(equations=equations, variable_names=["out_1"])
+    nlme_model = StatisticalModel(
+        structural_model=struct_model, dataset=data, input_params=params
+    )
+
+    assert nlme_model.descriptors == ["wt", "pdu_1"]
+    assert_close(
+        nlme_model.data.patients_pdk_full,
+        torch.tensor([[60.0], [80.0]]),
+        check_dtype=False,
+    )
+    assert_close(
+        nlme_model.full_design_matrix,
+        torch.tensor([[[1.0, 60.0]], [[1.0, 80.0]]]),
+        check_dtype=False,
+    )
+
+
 def test_nlme_simulate(sample_nlme_params, obs_data, struct_model):
     nlme_model = StatisticalModel(
         structural_model=struct_model, dataset=obs_data, input_params=sample_nlme_params
