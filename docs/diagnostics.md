@@ -20,7 +20,7 @@ All diagnostics use the fitted population parameters, held fixed.
 | VPC | quantiles over time | observed within simulated bands | 
 | Log-likelihood | overall fit (model comparison) | only relative to other models | 
 | Shrinkage | informativeness of individual data | lower values support interpretation of individual estimates | 
-
+| MAP vs covariate | completeness of model fixed effects | absence of unmanaged correlations support model completeness |
 
 ## Individual Weighted Residuals (IWRES)
 
@@ -90,3 +90,10 @@ The bands show the variation of each sample quantile across simulations. The def
   * `precision = 0.95`: bands around each quantiles are central 90% simulation bands: lower bound is the 5th percentile, upper bound is the 95th (= the precision) percentile.
 
 ![vpc](./vpc.png)
+
+
+## MAP against covariates
+
+For each population parameter, for each model covariate, plot the parameter's MAP of each patient against the value of the covariate. A variation of the MAP along the covariate axis indicates a correlation that might be added to the model.
+
+![map-vs-covariates](./map-vs-covariates.png)
