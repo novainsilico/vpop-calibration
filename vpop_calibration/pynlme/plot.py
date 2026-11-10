@@ -666,17 +666,21 @@ class PlottingUtility:
         if not hasattr(self.model_diag.sampler, "map"):
             self.model_diag.sample_conditional_distribution()
 
-        # Get MAP estimates for descriptors
-        map_theta = self.model_diag.model.convert_physical_to_thetas_all_patients(
-            self.model_diag.sampler.map.physical_params_samples
+        # Get MAP estimates and input covariates for descriptors
+        map_params = self.model_diag.sampler.map_parameters_df
+        input_df = self.model_diag.model.data.patients_df.rename(
+            {"id": "id_ref"},
+            axis = "columns"
         )
-        assert map_theta is not None
+
+        assert map_params is not None
+
+        patients = pd.merge(map_params, input_df)
         
         # Get covariate and PDU names and counts 
         cov_names = self.model_diag.model.covariate_names
         pdu_names = self.model_diag.model.pdu_names
         pdu_nb = self.model_diag.model.nb_pdu
-        pdk_nb = self.model_diag.model.nb_pdk
         cov_nb = self.model_diag.model.nb_covariates
 
         assert cov_nb != 0 and pdu_nb != 0, "Model needs to have at least one covariate and one PDU to plot MAP against covariates."
@@ -688,7 +692,7 @@ class PlottingUtility:
         
         for i in range(len(cov_names)):
             cov_name = cov_names[i]
-            cov_vals = self.model_diag.model.data.patients_df.get(cov_name)
+            cov_vals = patients.get(cov_name)
             for j in range(len(pdu_names)):
                 pdu_name = pdu_names[j]
 
@@ -704,7 +708,7 @@ class PlottingUtility:
                     pdu_cov_coeff_value = self.model_diag.model.population_betas[self.model_diag.model.beta_names.index(cov_pdu_coeff_name)].cpu().numpy()
 
                 ax = axes[j + i * pdu_nb]
-                map = map_theta[0][:,j + pdk_nb]
+                map = patients.get(pdu_name)
                 if not pdu_cov_coeff_value:
                     ax.axhline(
                         np.exp(pdu_pop_value),
