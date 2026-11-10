@@ -663,7 +663,13 @@ class PlottingUtility:
 
     def map_vs_covariates(
         self,
+        additional_covariates = []
     ):
+        """Plot MAP against covariate value for each covariate-PDU pair
+
+        Args:
+            additional_covariates (str[]): A list of covariate labels that, if found in patient input data, will be considered in addition to covariates explicitly included in the model.
+        """
         if not hasattr(self.model_diag.sampler, "map"):
             self.model_diag.sample_conditional_distribution()
 
@@ -679,10 +685,14 @@ class PlottingUtility:
         patients = pd.merge(map_params, input_df)
         
         # Get covariate and PDU names and counts 
-        cov_names = self.model_diag.model.covariate_names
+        cov_names = set(self.model_diag.model.covariate_names + additional_covariates)
+        cov_names = list(set.intersection(
+            cov_names,
+            set(patients.columns)
+        ))
         pdu_names = self.model_diag.model.pdu_names
         pdu_nb = self.model_diag.model.nb_pdu
-        cov_nb = self.model_diag.model.nb_covariates
+        cov_nb = len(cov_names)
 
         assert cov_nb != 0 and pdu_nb != 0, "Model needs to have at least one covariate and one PDU to plot MAP against covariates."
 
