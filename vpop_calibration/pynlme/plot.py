@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
+from matplotlib.offsetbox import AnchoredText
 from sklearn.metrics import r2_score
 import random as rand
 import scipy.stats as stats
@@ -742,12 +743,24 @@ class PlottingUtility:
                         linestyle = "",
                         label = "MAP estimates"
                     )
+
+                ### Add Pearson correlation
+                correlations = pd.DataFrame({"map": map, "covariate": cov_vals}).corr(method="pearson")
+                map_cov_corr = correlations["map"]["covariate"]
+                
+                anchored_text = AnchoredText(
+                    f"Pearson r: {map_cov_corr:.2f}",
+                    loc=1
+                )
+                ax.add_artist(anchored_text)
+
+
                 ax.set_title(
                     f"{pdu_name} as a function of {cov_name}"
                 )
                 ax.set_xlabel(f"{cov_name} (covariate)")
                 ax.set_ylabel(f"{pdu_name} (MAP)")
-                ax.legend(fontsize="small")
+                ax.legend(fontsize="small", loc=2)
         if not smoke_test:
             plt.tight_layout()
             plt.show()
