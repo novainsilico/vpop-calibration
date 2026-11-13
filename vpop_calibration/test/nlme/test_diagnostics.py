@@ -137,3 +137,50 @@ def test_diagnostics(sample_nlme_params, obs_data, struct_model, request):
         pop_jinko_vpop.to_csv(GOLDEN_POP_PATH, index=False)
     expected_pop = pd.read_csv(GOLDEN_POP_PATH)
     assert_frame_equal(pop_jinko_vpop, expected_pop)
+
+
+def test_fisher_information(sample_nlme_params, obs_data, struct_model):
+    seed_everything(0)
+    nlme_model = StatisticalModel(
+        structural_model=struct_model, dataset=obs_data, input_params=sample_nlme_params
+    )
+    diagnostics = ModelDiagnostics(nlme_model)
+    diagnostics.sample_conditional_distribution()
+    diagnostics.compute_fisher_information()
+
+    nb_variances = int(
+        nlme_model.residual_var.additive_output.sum()
+        + nlme_model.residual_var.proportional_output.sum()
+    )
+    nb_parameters = (
+        nlme_model.nb_betas
+        + nlme_model.nb_pdu * (nlme_model.nb_pdu + 1) // 2
+        + nlme_model.nb_mi
+        + nlme_model.nb_surv_coeffs
+        + nb_variances
+    )
+    assert diagnostics.covariance.shape == (nb_parameters, nb_parameters)
+    assert diagnostics.fisher_information.shape == (nb_parameters, nb_parameters)
+    assert list(diagnostics.fisher_information.index) == list(
+        diagnostics.fisher_information.columns
+    )
+    assert list(diagnostics.covariance.index) == list(diagnostics.covariance.columns)
+    assert list(diagnostics.covariance.index) == list(diagnostics.standard_errors.index)
+    assert list(diagnostics.standard_errors.columns) == [
+        "estimate",
+        "se",
+        "rse",
+        "ci_low",
+        "ci_high",
+        "convergence_score",
+    ]
+    assert list(diagnostics.convergence_score_history.columns) == list(
+        diagnostics.standard_errors.index
+    )
+    assert diagnostics.correlation.shape == diagnostics.covariance.shape
+    PlottingUtility(diagnostics=diagnostics).convergence_score()
+    assert diagnostics.normalized_fisher_information.shape == (
+        nb_parameters,
+        nb_parameters,
+    )
+    PlottingUtility(diagnostics=diagnostics).report_fisher_information()

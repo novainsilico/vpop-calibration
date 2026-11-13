@@ -16,6 +16,11 @@ from vpop_calibration.pynlme.conditional_distribution import (
     ConditionalDistributionSampler,
 )
 from vpop_calibration.pynlme.importance_sampling import ImportanceSampler
+from vpop_calibration.pynlme.fim import (
+    FimAccumulator,
+    compute_estimates_uncertainty,
+    normalize_matrix,
+)
 
 ResidualType = Literal["pwres", "iwres", "npde"]
 
@@ -47,6 +52,12 @@ class ModelDiagnostics:
         self.shrinkage: torch.Tensor | None = None
         self.vpc: pd.DataFrame | None = None
         self.cached_population_predictions: torch.Tensor | None = None
+        self.fisher_information: pd.DataFrame | None = None
+        self.covariance: pd.DataFrame | None = None
+        self.normalized_fisher_information: pd.DataFrame | None = None
+        self.correlation: pd.DataFrame | None = None
+        self.standard_errors: pd.DataFrame | None = None
+        self.convergence_score_history: pd.DataFrame | None = None
 
     def get_state_dict(self) -> dict[str, Any]:
         state_dict = {
@@ -490,3 +501,28 @@ class ModelDiagnostics:
             conditional_samples=self.sampler.total_samples
         )
         self.importance_sampler.compute_likelihood(nb_samples=nb_proposal_samples)
+
+    def compute_fisher_information(
+        self, finite_difference_step: float = 1e-3, batch_size: int = 100
+    ) -> None:
+        if not hasattr(self.sampler, "samples"):
+            raise ValueError(
+                "The conditional distribution has not yet been sampled from. Use `sample_conditional_distribution` first."
+            )
+        accumulator = FimAccumulator(
+            model=self.model, finite_difference_step=finite_difference_step
+        )
+        samples = self.sampler.total_samples
+        for start in range(0, samples.eta_samples.shape[0], batch_size):
+            accumulator.accumulate(
+                eta_samples=samples.eta_samples[start : start + batch_size],
+                predictions=samples.predictions[start : start + batch_size],
+            )
+        (
+            self.fisher_information,
+            self.covariance,
+            self.standard_errors,
+            self.convergence_score_history,
+        ) = compute_estimates_uncertainty(accumulator=accumulator, model=self.model)
+        self.normalized_fisher_information = normalize_matrix(self.fisher_information)
+        self.correlation = normalize_matrix(self.covariance)

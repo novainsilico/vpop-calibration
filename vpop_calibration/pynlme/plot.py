@@ -1,4 +1,5 @@
 import pandas as pd
+from IPython.display import display
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
@@ -916,3 +917,138 @@ class PlottingUtility:
         if not smoke_test:
             plt.show()
         plt.close(fig)
+
+    def convergence_score(
+        self,
+        facet_width: float = 5.0,
+        facet_height: float = 3.5,
+        reference_band: float = 0.5,
+    ) -> None:
+        if self.model_diag.convergence_score_history is None:
+            print(
+                "No convergence score in cache. Calling compute_fisher_information() "
+                + "with default settings."
+            )
+            self.model_diag.compute_fisher_information()
+        history = self.model_diag.convergence_score_history
+        assert history is not None
+
+        model = self.model_diag.model
+        groups = {
+            "Population parameters": list(model.beta_names),
+            "Omega standard deviations": [f"omega_{pdu}" for pdu in model.pdu_names],
+            "Omega correlations": [c for c in history.columns if c.startswith("corr_")],
+            "Fixed effects": list(model.mi_names) + list(model.surv_coeff_names),
+            "Residual standard deviations": [
+                c for c in history.columns if c.startswith("sd_")
+            ],
+        }
+        groups = {title: names for title, names in groups.items() if names}
+
+        fig, axes = plt.subplots(
+            1,
+            len(groups),
+            figsize=(facet_width * len(groups), facet_height),
+            squeeze=False,
+        )
+        for ax, (title, names) in zip(axes[0], groups.items()):
+            ax.axhspan(-reference_band, reference_band, color="grey", alpha=0.15)
+            ax.axhline(0.0, color="black", linewidth=0.8)
+            for name in names:
+                ax.plot(history.index, history[name], linewidth=1.2, label=name)
+            ax.set_title(title)
+            ax.set_xlabel("Number of conditional samples")
+            ax.grid(True, linestyle="--", alpha=0.3)
+            if len(names) <= 10:
+                ax.legend(fontsize="small")
+        axes[0, 0].set_ylabel("Convergence score (SE units)")
+        fig.suptitle(
+            "Convergence score: Newton step to the maximum likelihood, in SE units"
+        )
+
+        if not smoke_test:
+            plt.tight_layout()
+            plt.show()
+        plt.close(fig)
+
+    def fisher_information_matrices(
+        self,
+        cell_size: float = 0.45,
+        annotate: bool | None = None,
+    ) -> None:
+        if self.model_diag.correlation is None:
+            print(
+                "No Fisher information in cache. Calling compute_fisher_information() "
+                + "with default settings."
+            )
+            self.model_diag.compute_fisher_information()
+        normalized_fim = self.model_diag.normalized_fisher_information
+        correlation = self.model_diag.correlation
+        assert normalized_fim is not None and correlation is not None
+
+        nb_parameters = correlation.shape[0]
+        if annotate is None:
+            annotate = nb_parameters <= 15
+        size = max(4.0, cell_size * nb_parameters + 2.0)
+        fig, axes = plt.subplots(1, 2, figsize=(2 * size + 1.0, size))
+        panels = [
+            (
+                normalized_fim,
+                "Normalized Fisher information\n"
+                + r"$r_{qr} = I_{qr} / \sqrt{I_{qq} I_{rr}}$, $I = J^{-T} \hat I J^{-1}$",
+            ),
+            (
+                correlation,
+                "Correlation of the estimates\n"
+                + r"$R_{qr} = C_{qr} / \sqrt{C_{qq} C_{rr}}$, $C = J I^{-1} J^T$",
+            ),
+        ]
+        for ax, (matrix, title) in zip(axes, panels):
+            image = ax.imshow(matrix.to_numpy(), cmap="RdBu_r", vmin=-1.0, vmax=1.0)
+            ax.set_xticks(range(nb_parameters))
+            ax.set_yticks(range(nb_parameters))
+            ax.set_xticklabels(matrix.columns, rotation=90)
+            ax.set_yticklabels(matrix.index)
+            ax.set_title(title)
+            if annotate:
+                for row in range(nb_parameters):
+                    for col in range(nb_parameters):
+                        value = matrix.iat[row, col]
+                        ax.text(
+                            col,
+                            row,
+                            f"{value:.2f}",
+                            ha="center",
+                            va="center",
+                            fontsize="small",
+                            color="white" if abs(value) > 0.6 else "black",
+                        )
+        fig.colorbar(image, ax=axes, fraction=0.025, pad=0.04)
+
+        if not smoke_test:
+            plt.show()
+        plt.close(fig)
+
+    def report_fisher_information(
+        self, finite_difference_step: float = 1e-3, batch_size: int = 100
+    ) -> None:
+        if self.model_diag.fisher_information is None:
+            self.model_diag.compute_fisher_information(
+                finite_difference_step=finite_difference_step, batch_size=batch_size
+            )
+        fisher_information = self.model_diag.fisher_information
+        standard_errors = self.model_diag.standard_errors
+        assert fisher_information is not None and standard_errors is not None
+
+        display(
+            fisher_information.style.set_caption(
+                "Fisher information matrix (reported scale)"
+            ).format(precision=3)
+        )
+        self.fisher_information_matrices()
+        display(
+            standard_errors.style.set_caption(
+                "Estimates, standard errors, 95% confidence intervals and convergence score"
+            ).format(precision=3)
+        )
+        self.convergence_score()
