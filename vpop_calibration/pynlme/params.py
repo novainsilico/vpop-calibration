@@ -191,7 +191,6 @@ class MixedEffectParameters(BaseModel):
             self.mi_names,
             self.pdk,
             self.covariate_coeff_names,
-            self.covariate_names,
         ]
         for i, params1 in enumerate(unique_param_lists):
             for params2 in unique_param_lists[i + 1 :]:
@@ -200,6 +199,17 @@ class MixedEffectParameters(BaseModel):
                     raise ValueError(
                         f"Some parameters are defined multiple times: {intersect}"
                     )
+        # Covariates are data columns, not parameters: a known patient descriptor may
+        # be used both as a PDK (structural model input) and as a covariate (design
+        # matrix input). It must however not clash with an estimated parameter name.
+        estimated_names = set(
+            self.pdu_names + self.mi_names + self.covariate_coeff_names
+        )
+        intersect = estimated_names.intersection(self.covariate_names)
+        if intersect != set():
+            raise ValueError(
+                f"Some covariates share their name with a model parameter: {intersect}"
+            )
         return self
 
     @property
