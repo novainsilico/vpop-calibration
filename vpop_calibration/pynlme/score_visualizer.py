@@ -65,8 +65,9 @@ def to_tensor(values):
 
 
 def get_displayed_estimates(model: StatisticalModel) -> pd.Series:
-    """get current estimates : beta, omega (sd and correlations),
-    MI, survival coefficients, sigma²."""
+    """Current estimates on the natural scale: typical values and covariate effects,
+    omega (standard deviations and correlations), MI, survival coefficients,
+    residual standard deviations (sqrt of the additive / proportional variances)."""
     omega = model.omega_pop
     omega_sd = torch.sqrt(torch.diagonal(omega))
     estimates = {}
@@ -101,9 +102,10 @@ def get_displayed_estimates(model: StatisticalModel) -> pd.Series:
 
 
 def displayed_to_model_state(values: pd.Series, model: StatisticalModel):
-    """Inverse of get_displayed_estimates: values  ->
-    
-    """
+    """Inverse of get_displayed_estimates: natural-scale values (indexed by name) ->
+    NlmeModelState (beta, Omega, log MI, survival coefficients, residual variances).
+    Returns None if a value is non-finite once transformed or Omega is not positive
+    definite."""
 
     def to_internal(names, links):
         return to_tensor(
@@ -230,6 +232,65 @@ def compute_log_likelihood_around_estimates(
     return pd.DataFrame(rows)
 
 
+def compute_score_samples(diagnostics, relative_step: float = 1e-3):
+    """Score g_ik(m) = d/d theta_k log p(y_i, phi_i(m); theta) at the estimates,
+    by finite differences, per (sample m, patient i, parameter k).
+    """
+    model = diagnostics.model
+    estimates = get_displayed_estimates(model)
+    samples = diagnostics.sampler.total_samples
+    gaussian_params = model.convert_etas_to_gaussian_all_patients(
+        samples.eta_samples
+    )
+    scores = []
+    for name, estimate in estimates.items():
+        step = relative_step * max(abs(estimate), 0.1)
+        log_likelihoods = []
+        for sign in (1, -1):
+            values = estimates.copy()
+            values[name] += sign * step
+            state = displayed_to_model_state(values, model)
+            if state is None: #could be an infinite value or Omega not being positive
+                log_likelihoods.append(
+                    torch.full(
+                        gaussian_params.shape[:2],
+                        torch.nan,
+                        device=device,
+                        dtype=default_dtype,
+                    )
+                )
+            else:
+                log_likelihoods.append(
+                    complete_log_likelihood(
+                        model, state, gaussian_params, samples.predictions
+                    )
+                )
+        scores.append((log_likelihoods[0] - log_likelihoods[1]) / (2 * step))
+    return torch.stack(scores, dim=-1), list(estimates.index)
+
+
+def compute_normalized_scores(diagnostics, relative_step: float = 1e-3) -> pd.DataFrame:
+    """ sum_i mean_m g_ik(m) normalized by its noise:
+    z_k = sum_i mean_m g_ik(m) / sqrt(sum_i var_m(g_ik) / M), which should follow N(0, 1) at the optimum.
+    """
+    scores, names = compute_score_samples(diagnostics, relative_step)
+    nb_samples = scores.shape[0]
+    if nb_samples < 2:
+        raise ValueError(
+            "At least 2 conditional samples per patient are needed to compute the score."
+        )
+
+    total_score = scores.mean(dim=0).sum(dim=0) #g_k
+    score_sd = torch.sqrt(scores.var(dim=0).sum(dim=0) / nb_samples) #Var(g_k)
+
+    return pd.DataFrame(
+        {
+            "total_score": total_score.cpu().numpy(),
+            "z_score": (total_score / score_sd).cpu().numpy(),
+        },
+        index=names,
+    )
+
 
 # a boring tool for improving label visualization :
 def compact_tick_label(value, _position=None) -> str:
@@ -264,30 +325,56 @@ def plot_log_likelihood_around_estimates(
     for ax, name in zip(axes.flat, names):
         data = log_likelihood_variations[log_likelihood_variations["parameter"] == name]
         estimate = data["value"].iloc[len(data) // 2]
-        reference = np.round(data["complete_log_likelihood"].iloc[len(data) // 2])
+        reference = data["complete_log_likelihood"].iloc[len(data) // 2]
         ax.plot(data["value"], data["complete_log_likelihood"] - reference, "o-")
         ax.axvline(estimate, color="red", linewidth=1.2)
         ax.xaxis.set_major_locator(MaxNLocator(nbins=3))
         ax.xaxis.set_major_formatter(FuncFormatter(compact_tick_label))
         ax.yaxis.set_major_locator(MaxNLocator(nbins=4))
         ax.yaxis.set_major_formatter(FuncFormatter(compact_tick_label))
-        ax.text(
-            0.0,
-            1.0,
-            f"{reference:+.0f}",
-            transform=ax.transAxes,
-            ha="left",
-            va="bottom",
-            fontsize="small",
-        )
         ax.set_title(name)
         ax.grid(True, linestyle="--", alpha=0.3)
     for ax in list(axes.flat)[len(names) :]:
         ax.axis("off")
-    axes[0, 0].set_ylabel("Log-likelihood")
+    axes[0, 0].set_ylabel("Δ log-likelihood")
     fig.suptitle("Log-likelihood around the estimates")
 
     if not smoke_test:
         plt.tight_layout()
         plt.show()
     plt.close(fig)
+
+
+def plot_normalized_scores(
+    diagnostics,
+    relative_step: float = 1e-3,
+    bounds: tuple = (-2, -1, 1, 2),
+    max_parameters: int = 40,
+    bar_height: float = 0.3,
+) -> pd.DataFrame:
+    """Compute the normalized scores z_k and plot them as horizontal bars, with
+    reference lines at 0 and at the given bounds. The figure grows with the number of
+    parameters; beyond max_parameters, only those with the largest |z_k| are shown.
+    Returns all the scores."""
+    normalized_scores = compute_normalized_scores(diagnostics, relative_step)
+    z = normalized_scores["z_score"]
+    title = "Normalized score at the estimates"
+    if len(z) > max_parameters:
+        largest = z.abs().sort_values(ascending=False).index[:max_parameters]
+        z = z[z.index.isin(largest)]
+        title += f"\n({max_parameters} largest |z| out of {len(normalized_scores)})"
+
+    fig, ax = plt.subplots(figsize=(6, max(2.0, 1.0 + bar_height * len(z))))
+    ax.barh(z.index, z)
+    for bound in bounds:
+        ax.axvline(bound, color="grey", linestyle="--", linewidth=0.8)
+    ax.axvline(0, color="black", linewidth=1)
+    ax.set_ylim(len(z) - 0.5, -0.5)
+    ax.set_xlabel("normalized score")
+    ax.set_title(title)
+
+    if not smoke_test:
+        plt.tight_layout()
+        plt.show()
+    plt.close(fig)
+    return normalized_scores
