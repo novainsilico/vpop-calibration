@@ -294,7 +294,6 @@ def compute_normalized_scores(diagnostics, relative_step: float = 1e-3) -> pd.Da
 
 # a boring tool for improving label visualization :
 def compact_tick_label(value, _position=None) -> str:
-    """Tick label of at most 4 characters: 0.55, -.55, 1.74, .005, 1e-4, 2e3."""
     for precision in (3, 2, 1):
         label = f"{value:.{precision}g}"
         label = label.replace("-0.", "-.") if len(label) > 4 else label
@@ -312,8 +311,8 @@ def plot_log_likelihood_around_estimates(
     nb_columns: int = 5,
     facet_width: float = 3.5,
     facet_height: float = 2.8,
+    normalized_scores: pd.DataFrame | None = None,
 ) -> None:
-    """One panel per parameter: the log-likelihood and the estimate (red line)."""
     names = list(dict.fromkeys(log_likelihood_variations["parameter"]))
     nb_rows = int(np.ceil(len(names) / nb_columns))
     fig, axes = plt.subplots(
@@ -326,8 +325,24 @@ def plot_log_likelihood_around_estimates(
         data = log_likelihood_variations[log_likelihood_variations["parameter"] == name]
         estimate = data["value"].iloc[len(data) // 2]
         reference = data["complete_log_likelihood"].iloc[len(data) // 2]
-        ax.plot(data["value"], data["complete_log_likelihood"] - reference, "o-")
-        ax.axvline(estimate, color="red", linewidth=1.2)
+        ax.plot(
+            data["value"],
+            data["complete_log_likelihood"] - reference,
+            "o-",
+            
+        )
+        ax.axvline(estimate, color="red", linewidth=1.2, label="SAEM estimate")
+        if normalized_scores is not None:
+            y_limits = ax.get_ylim()
+            slope = normalized_scores.loc[name, "total_score"]
+            ax.plot(
+                data["value"],
+                slope * (data["value"] - estimate),
+                "--",
+                color="orange",
+                label="Tangent from the score (slope = score)",
+            )
+            ax.set_ylim(y_limits)
         ax.xaxis.set_major_locator(MaxNLocator(nbins=3))
         ax.xaxis.set_major_formatter(FuncFormatter(compact_tick_label))
         ax.yaxis.set_major_locator(MaxNLocator(nbins=4))
@@ -338,9 +353,12 @@ def plot_log_likelihood_around_estimates(
         ax.axis("off")
     axes[0, 0].set_ylabel("Δ log-likelihood")
     fig.suptitle("Log-likelihood around the estimates")
+    handles, labels = axes[0, 0].get_legend_handles_labels()
+    fig.legend(handles, labels, loc="lower center", ncol=len(labels), frameon=False)
+    legend_height = 0.45 / fig.get_figheight()
 
     if not smoke_test:
-        plt.tight_layout()
+        plt.tight_layout(rect=(0, legend_height, 1, 1))
         plt.show()
     plt.close(fig)
 
@@ -348,14 +366,10 @@ def plot_log_likelihood_around_estimates(
 def plot_normalized_scores(
     diagnostics,
     relative_step: float = 1e-3,
-    bounds: tuple = (-2, -1, 1, 2),
+    bounds: tuple = ( -1, 1),
     max_parameters: int = 40,
     bar_height: float = 0.3,
 ) -> pd.DataFrame:
-    """Compute the normalized scores z_k and plot them as horizontal bars, with
-    reference lines at 0 and at the given bounds. The figure grows with the number of
-    parameters; beyond max_parameters, only those with the largest |z_k| are shown.
-    Returns all the scores."""
     normalized_scores = compute_normalized_scores(diagnostics, relative_step)
     z = normalized_scores["z_score"]
     title = "Normalized score at the estimates"
