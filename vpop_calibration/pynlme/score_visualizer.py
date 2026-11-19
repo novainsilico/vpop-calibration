@@ -39,6 +39,7 @@ def get_mi_links(model: StatisticalModel) -> list:
         for name in model.mi_names
     ]
 
+
 # little boring tools to display parameter names
 def correlation_name(model: StatisticalModel, row: int, col: int) -> str:
     return f"corr_{model.pdu_names[row]}_{model.pdu_names[col]}"
@@ -150,13 +151,9 @@ def displayed_to_model_state(values: pd.Series, model: StatisticalModel):
     )
 
 
-
-
-
 # Here starts the juicy part of the code
 def complete_log_likelihood(model, state, gaussian_params, predictions):
-    """log p(y_i, phi_i; state) per (sample, patient), with phi_i fixed.
-    """
+    """log p(y_i, phi_i; state) per (sample, patient), with phi_i fixed."""
     if not (
         torch.equal(state.log_mi, model.log_mi)
         and torch.equal(state.surv_coeffs, model.surv_coeffs)
@@ -171,15 +168,17 @@ def complete_log_likelihood(model, state, gaussian_params, predictions):
     log_prior_etas_term = torch.distributions.MultivariateNormal(
         loc=torch.zeros(model.nb_pdu, device=device, dtype=default_dtype),
         covariance_matrix=state.omega,
-    ).log_prob(etas) # computes log p(etas ; omega) but we cannot call log_prior_etas() because it's using omega
-                    # as it is in the StatisticalModel, not the perturbed one
+    ).log_prob(
+        etas
+    )  # computes log p(etas ; omega) but we cannot call log_prior_etas() because it's using omega
+    # as it is in the StatisticalModel, not the perturbed one
     log_likelihood_observation_term = log_likelihood_observation(
         model.data.full_obs,
         predictions,
         state.res_var,
         model.config.residual_min_variance,
     )
-    return log_prior_etas_term + log_likelihood_observation_term   
+    return log_prior_etas_term + log_likelihood_observation_term
 
 
 def compute_log_likelihood_around_estimates(
@@ -194,7 +193,7 @@ def compute_log_likelihood_around_estimates(
     log-likelihood is averaged over the conditional samples (phi_i fixed) and summed
     over patients: sum_i mean_m log p(y_i, phi_i^(m); theta)
     """
- 
+
     model = diagnostics.model
     estimates = get_displayed_estimates(model)
 
@@ -202,11 +201,11 @@ def compute_log_likelihood_around_estimates(
     predictions = samples.predictions
     offsets = np.linspace(-1.0, 1.0, nb_points)
     rows = []
-    gaussian_params = model.convert_etas_to_gaussian_all_patients(
-        samples.eta_samples
-    )
+    gaussian_params = model.convert_etas_to_gaussian_all_patients(samples.eta_samples)
     for name, estimate in estimates.items():
-        half_width = relative_width * max(abs(estimate), 0.1) # in case the variable is estimated to 0, manually tuned on score_visualializer notebook
+        half_width = relative_width * max(
+            abs(estimate), 0.1
+        )  # in case the variable is estimated to 0, manually tuned on score_visualializer notebook
         for offset in offsets:
             values = estimates.copy()
             values[name] += offset * half_width
@@ -239,9 +238,7 @@ def compute_score_samples(diagnostics, relative_step: float = 1e-3):
     model = diagnostics.model
     estimates = get_displayed_estimates(model)
     samples = diagnostics.sampler.total_samples
-    gaussian_params = model.convert_etas_to_gaussian_all_patients(
-        samples.eta_samples
-    )
+    gaussian_params = model.convert_etas_to_gaussian_all_patients(samples.eta_samples)
     scores = []
     for name, estimate in estimates.items():
         step = relative_step * max(abs(estimate), 0.1)
@@ -250,7 +247,7 @@ def compute_score_samples(diagnostics, relative_step: float = 1e-3):
             values = estimates.copy()
             values[name] += sign * step
             state = displayed_to_model_state(values, model)
-            if state is None: #could be an infinite value or Omega not being positive
+            if state is None:  # could be an infinite value or Omega not being positive
                 log_likelihoods.append(
                     torch.full(
                         gaussian_params.shape[:2],
@@ -270,7 +267,7 @@ def compute_score_samples(diagnostics, relative_step: float = 1e-3):
 
 
 def compute_normalized_scores(diagnostics, relative_step: float = 1e-3) -> pd.DataFrame:
-    """ sum_i mean_m g_ik(m) normalized by its noise:
+    """sum_i mean_m g_ik(m) normalized by its noise:
     z_k = sum_i mean_m g_ik(m) / sqrt(sum_i var_m(g_ik) / M), which should follow N(0, 1) at the optimum.
     """
     scores, names = compute_score_samples(diagnostics, relative_step)
@@ -280,8 +277,8 @@ def compute_normalized_scores(diagnostics, relative_step: float = 1e-3) -> pd.Da
             "At least 2 conditional samples per patient are needed to compute the score."
         )
 
-    total_score = scores.mean(dim=0).sum(dim=0) #g_k
-    score_sd = torch.sqrt(scores.var(dim=0).sum(dim=0) / nb_samples) #Var(g_k)
+    total_score = scores.mean(dim=0).sum(dim=0)  # g_k
+    score_sd = torch.sqrt(scores.var(dim=0).sum(dim=0) / nb_samples)  # Var(g_k)
 
     return pd.DataFrame(
         {
@@ -302,7 +299,6 @@ def compact_tick_label(value, _position=None) -> str:
             return label
     mantissa, exponent = f"{value:.0e}".split("e")
     return f"{mantissa}e{int(exponent)}"
-
 
 
 # plotting
@@ -329,7 +325,6 @@ def plot_log_likelihood_around_estimates(
             data["value"],
             data["complete_log_likelihood"] - reference,
             "o-",
-            
         )
         ax.axvline(estimate, color="red", linewidth=1.2, label="SAEM estimate")
         if normalized_scores is not None:
@@ -366,7 +361,7 @@ def plot_log_likelihood_around_estimates(
 def plot_normalized_scores(
     diagnostics,
     relative_step: float = 1e-3,
-    bounds: tuple = ( -1, 1),
+    bounds: tuple = (-1, 1),
     max_parameters: int = 40,
     bar_height: float = 0.3,
 ) -> pd.DataFrame:
