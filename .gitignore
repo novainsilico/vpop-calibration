@@ -7,3 +7,4 @@ dist
 .RData
 .coverage
 result
+docs/m_step_beta_omega.md

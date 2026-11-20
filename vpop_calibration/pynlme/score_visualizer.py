@@ -6,38 +6,33 @@ from matplotlib.ticker import FuncFormatter, MaxNLocator
 
 from vpop_calibration.config import device, default_dtype, smoke_test
 from vpop_calibration.pynlme.model import StatisticalModel
-from vpop_calibration.pynlme.params import Constraint
+from vpop_calibration.pynlme.params import transform_param
 from vpop_calibration.pynlme.residuals import log_likelihood_observation
-
-IDENTITY_LINK = (lambda x: x, lambda y: y)
-
-
-def constraint_link(constraint: Constraint):
-    shift, scale = constraint.shift, constraint.scale
-    if constraint.transform == "log":
-        return (lambda x: torch.log(x - shift), lambda y: shift + torch.exp(y))
-    return (
-        lambda x: torch.log((x - shift) / (shift + scale - x)),
-        lambda y: shift + scale / (1 + torch.exp(-y)),
-    )
+from vpop_calibration.pynlme.utils import inverse_transform_param
 
 
-def get_beta_links(model: StatisticalModel) -> list:
-    return [
-        (
-            constraint_link(model.input_params.pdu[name].constraint)
-            if name in model.pdu_names
-            else IDENTITY_LINK
+def to_natural(model: StatisticalModel, name: str, value: float) -> float:
+    if name in model.pdu_names:
+        return float(
+            inverse_transform_param(value, model.input_params.pdu[name].constraint)
         )
-        for name in model.beta_names
-    ]
+    if name in model.mi_names:
+        return float(
+            inverse_transform_param(
+                value, model.input_params.model_intrinsic[name].constraint
+            )
+        )
+    return value
 
 
-def get_mi_links(model: StatisticalModel) -> list:
-    return [
-        constraint_link(model.input_params.model_intrinsic[name].constraint)
-        for name in model.mi_names
-    ]
+def to_internal(model: StatisticalModel, name: str, value: float) -> float:
+    if name in model.pdu_names:
+        return float(transform_param(value, model.input_params.pdu[name].constraint))
+    if name in model.mi_names:
+        return float(
+            transform_param(value, model.input_params.model_intrinsic[name].constraint)
+        )
+    return value
 
 
 # little boring tools to display parameter names
@@ -73,10 +68,8 @@ def get_displayed_estimates(model: StatisticalModel) -> pd.Series:
     omega_sd = torch.sqrt(torch.diagonal(omega))
     estimates = {}
 
-    for name, (_, inverse_link), beta in zip(
-        model.beta_names, get_beta_links(model), model.population_betas
-    ):
-        estimates[name] = inverse_link(beta).item()
+    for name, beta in zip(model.beta_names, model.population_betas.tolist()):
+        estimates[name] = to_natural(model, name, beta)
 
     for k, pdu in enumerate(model.pdu_names):
         estimates[f"omega_{pdu}"] = omega_sd[k].item()
@@ -87,10 +80,8 @@ def get_displayed_estimates(model: StatisticalModel) -> pd.Series:
                 omega[row, col] / (omega_sd[row] * omega_sd[col])
             ).item()
 
-    for name, (_, inverse_link), log_mi in zip(
-        model.mi_names, get_mi_links(model), model.log_mi
-    ):
-        estimates[name] = inverse_link(log_mi).item()
+    for name, log_mi in zip(model.mi_names, model.log_mi.tolist()):
+        estimates[name] = to_natural(model, name, log_mi)
 
     for name, value in zip(model.surv_coeff_names, model.surv_coeffs):
         estimates[name] = value.item()
@@ -108,16 +99,12 @@ def displayed_to_model_state(values: pd.Series, model: StatisticalModel):
     Returns None if a value is non-finite once transformed or Omega is not positive
     definite."""
 
-    def to_internal(names, links):
-        return to_tensor(
-            [
-                link(torch.tensor(values[name], dtype=default_dtype)).item()
-                for name, (link, _) in zip(names, links)
-            ]
-        )
-
-    beta = to_internal(model.beta_names, get_beta_links(model))
-    log_mi = to_internal(model.mi_names, get_mi_links(model))
+    beta = to_tensor(
+        [to_internal(model, name, values[name]) for name in model.beta_names]
+    )
+    log_mi = to_tensor(
+        [to_internal(model, name, values[name]) for name in model.mi_names]
+    )
     surv_coeffs = to_tensor([values[name] for name in model.surv_coeff_names])
 
     omega_sd = to_tensor([values[f"omega_{pdu}"] for pdu in model.pdu_names])
@@ -202,30 +189,33 @@ def compute_log_likelihood_around_estimates(
     offsets = np.linspace(-1.0, 1.0, nb_points)
     rows = []
     gaussian_params = model.convert_etas_to_gaussian_all_patients(samples.eta_samples)
+
+    def mean_complete_log_likelihood(values):
+        state = displayed_to_model_state(values, model)
+        if state is None:
+            return np.nan
+        return (
+            complete_log_likelihood(model, state, gaussian_params, predictions)
+            .mean(dim=0)
+            .sum()
+            .item()
+        )
+
+    log_likelihood_at_estimates = mean_complete_log_likelihood(estimates)
     for name, estimate in estimates.items():
-        half_width = relative_width * max(
-            abs(estimate), 0.1
+        half_width = (
+            relative_width * max(abs(estimate), 0.1)
         )  # in case the variable is estimated to 0, manually tuned on score_visualializer notebook
         for offset in offsets:
             values = estimates.copy()
             values[name] += offset * half_width
-            state = displayed_to_model_state(values, model)
-
-            if state is None:
-                mean_complete_log_likelihood = np.nan
-            else:
-                mean_complete_log_likelihood = (
-                    complete_log_likelihood(model, state, gaussian_params, predictions)
-                    .mean(dim=0)
-                    .sum()
-                    .item()
-                )
-
             rows.append(
                 {
                     "parameter": name,
                     "value": values[name],
-                    "complete_log_likelihood": mean_complete_log_likelihood,
+                    "complete_log_likelihood": mean_complete_log_likelihood(values),
+                    "estimate": estimate,
+                    "log_likelihood_at_estimates": log_likelihood_at_estimates,
                 }
             )
     return pd.DataFrame(rows)
@@ -319,8 +309,8 @@ def plot_log_likelihood_around_estimates(
     )
     for ax, name in zip(axes.flat, names):
         data = log_likelihood_variations[log_likelihood_variations["parameter"] == name]
-        estimate = data["value"].iloc[len(data) // 2]
-        reference = data["complete_log_likelihood"].iloc[len(data) // 2]
+        estimate = data["estimate"].iloc[0]
+        reference = data["log_likelihood_at_estimates"].iloc[0]
         ax.plot(
             data["value"],
             data["complete_log_likelihood"] - reference,
@@ -346,8 +336,8 @@ def plot_log_likelihood_around_estimates(
         ax.grid(True, linestyle="--", alpha=0.3)
     for ax in list(axes.flat)[len(names) :]:
         ax.axis("off")
-    axes[0, 0].set_ylabel("Δ log-likelihood")
-    fig.suptitle("Log-likelihood around the estimates")
+    axes[0, 0].set_ylabel("Δ complete-data log-likelihood")
+    fig.suptitle("Complete-data log-likelihood around the estimates")
     handles, labels = axes[0, 0].get_legend_handles_labels()
     fig.legend(handles, labels, loc="lower center", ncol=len(labels), frameon=False)
     legend_height = 0.45 / fig.get_figheight()
@@ -361,7 +351,7 @@ def plot_log_likelihood_around_estimates(
 def plot_normalized_scores(
     diagnostics,
     relative_step: float = 1e-3,
-    bounds: tuple = (-1, 1),
+    bounds: tuple = (-1.96, 1.96),
     max_parameters: int = 40,
     bar_height: float = 0.3,
 ) -> pd.DataFrame:
