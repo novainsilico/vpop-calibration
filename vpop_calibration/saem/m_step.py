@@ -163,3 +163,54 @@ class MStepState:
         target_omega = clamp_eigen_values(self.outer_product / self.nb_patients)
 
         return MStepProposal(beta=target_beta, omega=target_omega)
+
+
+class CovarianceAwareMStepState(MStepState):
+    """M-step where beta is the generalized least squares estimate weighted by Omega
+    """
+
+    def compute_cross_product(self, gaussian_params: torch.Tensor) -> torch.Tensor: # this name is not consistent anymore : i'm about to change "cross_product" into "mean_gaussian_params" in the next commits
+        return gaussian_params.mean(dim=0)
+
+    def compute_outer_product( # this name is not consistent anymore : i'm about to change "outer_product" into "second_moment_gaussian" in the next commits
+        self, gaussian_params: torch.Tensor
+    ) -> tuple[torch.Tensor, None]:
+        outer_product = (
+            (gaussian_params.unsqueeze(-1) @ gaussian_params.unsqueeze(-2))
+            .sum(dim=1)
+            .mean(dim=0)
+        )
+        return outer_product, None
+
+    def update(
+        self, new_gaussian_params: torch.Tensor, learning_rate: float, omega: torch.Tensor
+    ) -> MStepProposal:
+        """
+        beta = (sum_i X_i^T @ Omega^{-1} @ X_i)^-1 @ (sum_i X_i^T @ Omega^{-1} @ psi_i)
+        """
+        self.cross_product = stochastic_approximation(
+            previous=self.cross_product,
+            new=self.compute_cross_product(new_gaussian_params),
+            learning_rate=learning_rate,
+        )
+        self.outer_product = stochastic_approximation(
+            previous=self.outer_product,
+            new=self.compute_outer_product(new_gaussian_params)[0],
+            learning_rate=learning_rate,
+        )
+
+        omega_inverse = torch.linalg.inv(omega)
+        weighted_inversible_matrix = (self.X.mT @ omega_inverse @ self.X).sum(dim=0)
+        weighted_cross_product = (
+            self.X.mT @ omega_inverse @ self.cross_product.unsqueeze(-1)
+        ).sum(dim=0)
+        beta = torch.linalg.solve(weighted_inversible_matrix, weighted_cross_product).squeeze(-1)
+
+        mu = (self.X @ beta.unsqueeze(-1)).squeeze(-1)
+        mu_times_mean = mu.T @ self.cross_product
+        residual_outer_product = (
+            self.outer_product - mu_times_mean - mu_times_mean.T + mu.T @ mu
+        )
+        target_omega = clamp_eigen_values(residual_outer_product / self.nb_patients)
+
+        return MStepProposal(beta=beta, omega=target_omega)

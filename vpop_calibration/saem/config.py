@@ -20,6 +20,8 @@ class SaemConfigDict(NamedTuple):
     learning_rate_power: float = 0.8
     # Simulated annealing factor
     annealing_factor: float = 0.95
+    # Use Omega in the beta update (generalized least squares), see docs/m_step_beta_omega.md
+    covariance_aware_m_step: bool = False
 
     # Fixed effects optimization parameters
     # Number of gradient descent steps in the inner fixed effects optimization loop

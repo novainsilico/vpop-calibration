@@ -14,7 +14,7 @@ from vpop_calibration.metropolis_hastings import (
     mh_step,
     refresh_mh_state,
 )
-from vpop_calibration.saem.m_step import MStepState
+from vpop_calibration.saem.m_step import MStepState, CovarianceAwareMStepState
 from vpop_calibration.saem.utils import (
     simulated_annealing,
     stochastic_approximation,
@@ -96,7 +96,12 @@ class PySaem:
             fixed_effects_loss=fixed_effects_loss,
             surv_coeffs=self.model.surv_coeffs,
         )
-        self.sufficient_statistics = MStepState.from_init_gaussian_params(
+        m_step_class = (
+            CovarianceAwareMStepState
+            if self.config.covariance_aware_m_step
+            else MStepState
+        )
+        self.sufficient_statistics = m_step_class.from_init_gaussian_params(
             design_matrix=self.model.full_design_matrix,
             init_gaussian_params=output.gaussian_params,
             nb_chains=self.model.nb_chains,
@@ -145,7 +150,12 @@ class PySaem:
             instance.pop_estimates = PopEstimates.from_state_dict(
                 state_dict=state_dict["pop_estimates"]
             )
-            instance.sufficient_statistics = MStepState.from_state_dict(
+            m_step_class = (
+                CovarianceAwareMStepState
+                if instance.config.covariance_aware_m_step
+                else MStepState
+            )
+            instance.sufficient_statistics = m_step_class.from_state_dict(
                 state_dict=state_dict["sufficient_statistics"]
             )
         return instance
@@ -323,10 +333,17 @@ class PySaem:
             new_params = new_params._replace(res_var=new_res_error_var)
 
             # Propose new values for beta and omega
-            mstep_proposal = self.sufficient_statistics.update(
-                new_gaussian_params=self.mh_state.gaussian_params,
-                learning_rate=self.scheduler.stochastic_approximation_rate,
-            )
+            if self.config.covariance_aware_m_step:
+                mstep_proposal = self.sufficient_statistics.update(
+                    new_gaussian_params=self.mh_state.gaussian_params,
+                    learning_rate=self.scheduler.stochastic_approximation_rate,
+                    omega=self.model.omega_pop,
+                )
+            else:
+                mstep_proposal = self.sufficient_statistics.update(
+                    new_gaussian_params=self.mh_state.gaussian_params,
+                    learning_rate=self.scheduler.stochastic_approximation_rate,
+                )
             self.model.update_betas(mstep_proposal.beta)
             new_params = new_params._replace(beta=mstep_proposal.beta)
             # Applying simulated annealing to omega, if in learning phase
