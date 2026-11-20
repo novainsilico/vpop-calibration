@@ -11,7 +11,13 @@ from vpop_calibration.pynlme.residuals import (
     calculate_residuals,
     compute_error_variance,
 )
-from vpop_calibration.config import smoke_test
+from vpop_calibration.config import smoke_test, device, default_dtype
+from vpop_calibration.pynlme.score_visualizer import (
+    complete_log_likelihood,
+    displayed_to_model_state,
+    get_displayed_estimates,
+    natural_bounds,
+)
 from vpop_calibration.pynlme.conditional_distribution import (
     ConditionalDistributionSampler,
 )
@@ -47,6 +53,8 @@ class ModelDiagnostics:
         self.shrinkage: torch.Tensor | None = None
         self.vpc: pd.DataFrame | None = None
         self.cached_population_predictions: torch.Tensor | None = None
+        self.log_likelihood_around_estimates: pd.DataFrame | None = None
+        self.normalized_scores: pd.DataFrame | None = None
 
     def get_state_dict(self) -> dict[str, Any]:
         state_dict = {
@@ -77,6 +85,8 @@ class ModelDiagnostics:
         self.sampler.run_sampler(
             nb_samples=nb_samples, optimizer_last_state=optimizer_last_state
         )
+        self.log_likelihood_around_estimates = None
+        self.normalized_scores = None
 
     def compute_iwres(self) -> None:
         """Compute Individual Weighted Residuals (IWRES), following the formula :
@@ -490,3 +500,122 @@ class ModelDiagnostics:
             conditional_samples=self.sampler.total_samples
         )
         self.importance_sampler.compute_likelihood(nb_samples=nb_proposal_samples)
+
+    def compute_log_likelihood_around_estimates(
+        self, nb_points: int = 11, relative_width: float = 0.2
+    ) -> None:
+        """Each parameter is moved on a window of +- relative_width *
+        max(|value|, 0.1), the others being fixed. At each point, the complete
+        log-likelihood is averaged over the conditional samples (phi_i fixed) and summed
+        over patients: sum_i mean_m log p(y_i, phi_i^(m); theta)
+        """
+        if not hasattr(self.sampler, "samples"):
+            raise ValueError(
+                "The conditional distribution has not yet been sampled from. Use `sample_conditional_distribution` first."
+            )
+        estimates = get_displayed_estimates(self.model)
+        samples = self.sampler.total_samples
+        gaussian_params = self.model.convert_etas_to_gaussian_all_patients(
+            samples.eta_samples
+        )
+
+        def mean_complete_log_likelihood(values):
+            state = displayed_to_model_state(values, self.model)
+            if state is None:
+                return np.nan
+            return (
+                complete_log_likelihood(
+                    self.model, state, gaussian_params, samples.predictions
+                )
+                .mean(dim=0)
+                .sum()
+                .item()
+            )
+
+        log_likelihood_at_estimates = mean_complete_log_likelihood(estimates)
+        rows = []
+        for name, estimate in estimates.items():
+            half_width = (
+                relative_width * max(abs(estimate), 0.1)
+            )  # in case the variable is estimated to 0, manually tuned on score_visualializer notebook
+            low, high = natural_bounds(self.model, name)
+            for offset in np.linspace(-1.0, 1.0, nb_points):
+                values = estimates.copy()
+                values[name] += offset * half_width
+                if not low < values[name] < high:
+                    continue
+                rows.append(
+                    {
+                        "parameter": name,
+                        "value": values[name],
+                        "complete_log_likelihood": mean_complete_log_likelihood(values),
+                        "estimate": estimate,
+                        "log_likelihood_at_estimates": log_likelihood_at_estimates,
+                    }
+                )
+        self.log_likelihood_around_estimates = pd.DataFrame(rows)
+
+    def compute_score_samples(
+        self, relative_step: float = 1e-3
+    ) -> tuple[torch.Tensor, list[str]]:
+        """Score g_ik(m) = d/d theta_k log p(y_i, phi_i(m); theta) at the estimates,
+        by finite differences, per (sample m, patient i, parameter k).
+        """
+        estimates = get_displayed_estimates(self.model)
+        samples = self.sampler.total_samples
+        gaussian_params = self.model.convert_etas_to_gaussian_all_patients(
+            samples.eta_samples
+        )
+        scores = []
+        for name, estimate in estimates.items():
+            step = relative_step * max(abs(estimate), 0.1)
+            log_likelihoods = []
+            for sign in (1, -1):
+                values = estimates.copy()
+                values[name] += sign * step
+                state = displayed_to_model_state(values, self.model)
+                if (
+                    state is None
+                ):  # could be an infinite value or Omega not being positive
+                    log_likelihoods.append(
+                        torch.full(
+                            gaussian_params.shape[:2],
+                            torch.nan,
+                            device=device,
+                            dtype=default_dtype,
+                        )
+                    )
+                else:
+                    log_likelihoods.append(
+                        complete_log_likelihood(
+                            self.model, state, gaussian_params, samples.predictions
+                        )
+                    )
+            scores.append((log_likelihoods[0] - log_likelihoods[1]) / (2 * step))
+        return torch.stack(scores, dim=-1), list(estimates.index)
+
+    def compute_normalized_scores(self, relative_step: float = 1e-3) -> None:
+        """sum_i mean_m g_ik(m) normalized by its noise:
+        z_k = sum_i mean_m g_ik(m) / sqrt(sum_i var_m(g_ik) / M), which should follow N(0, 1) at the optimum.
+        """
+        if not hasattr(self.sampler, "samples"):
+            raise ValueError(
+                "The conditional distribution has not yet been sampled from. Use `sample_conditional_distribution` first."
+            )
+        scores, names = self.compute_score_samples(relative_step)
+        nb_samples = scores.shape[0]
+        if nb_samples < 2:
+            raise ValueError(
+                "At least 2 conditional samples per patient are needed to compute the score."
+            )
+
+        total_score = scores.mean(dim=0).sum(dim=0)  # g_k
+        score_sd = torch.sqrt(scores.var(dim=0).sum(dim=0) / nb_samples)  # Var(g_k)
+
+        self.normalized_scores = pd.DataFrame(
+            {
+                "total_score": total_score.cpu().numpy(),
+                "z_score": (total_score / score_sd).cpu().numpy(),
+            },
+            index=names,
+        )

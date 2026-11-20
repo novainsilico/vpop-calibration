@@ -1,10 +1,8 @@
 import numpy as np
 import pandas as pd
 import torch
-import matplotlib.pyplot as plt
-from matplotlib.ticker import FuncFormatter, MaxNLocator
 
-from vpop_calibration.config import device, default_dtype, smoke_test
+from vpop_calibration.config import device, default_dtype
 from vpop_calibration.pynlme.model import StatisticalModel
 from vpop_calibration.pynlme.params import transform_param
 from vpop_calibration.pynlme.residuals import log_likelihood_observation
@@ -33,6 +31,29 @@ def to_internal(model: StatisticalModel, name: str, value: float) -> float:
             transform_param(value, model.input_params.model_intrinsic[name].constraint)
         )
     return value
+
+
+def natural_bounds(model: StatisticalModel, name: str) -> tuple[float, float]:
+    """Open interval of admissible values of a displayed parameter."""
+    if name in model.pdu_names:
+        constraint = model.input_params.pdu[name].constraint
+    elif name in model.mi_names:
+        constraint = model.input_params.model_intrinsic[name].constraint
+    elif name in [f"omega_{pdu}" for pdu in model.pdu_names] or name in [
+        residual_name for residual_name, _, _ in residual_components(model)
+    ]:
+        return 0.0, np.inf
+    elif name in [
+        correlation_name(model, row, col)
+        for row in range(model.nb_pdu)
+        for col in range(row)
+    ]:
+        return -1.0, 1.0
+    else:
+        return -np.inf, np.inf
+    if constraint.transform == "logit":
+        return constraint.shift, constraint.shift + constraint.scale
+    return constraint.shift, np.inf
 
 
 # little boring tools to display parameter names
@@ -166,214 +187,3 @@ def complete_log_likelihood(model, state, gaussian_params, predictions):
         model.config.residual_min_variance,
     )
     return log_prior_etas_term + log_likelihood_observation_term
-
-
-def compute_log_likelihood_around_estimates(
-    diagnostics,
-    nb_points: int = 11,
-    relative_width: float = 0.2,
-) -> pd.DataFrame:
-    """
-
-    Each parameter is moved on a window of +- relative_width *
-    max(|value|, 0.1), the others being fixed. At each point, the complete
-    log-likelihood is averaged over the conditional samples (phi_i fixed) and summed
-    over patients: sum_i mean_m log p(y_i, phi_i^(m); theta)
-    """
-
-    model = diagnostics.model
-    estimates = get_displayed_estimates(model)
-
-    samples = diagnostics.sampler.total_samples
-    predictions = samples.predictions
-    offsets = np.linspace(-1.0, 1.0, nb_points)
-    rows = []
-    gaussian_params = model.convert_etas_to_gaussian_all_patients(samples.eta_samples)
-
-    def mean_complete_log_likelihood(values):
-        state = displayed_to_model_state(values, model)
-        if state is None:
-            return np.nan
-        return (
-            complete_log_likelihood(model, state, gaussian_params, predictions)
-            .mean(dim=0)
-            .sum()
-            .item()
-        )
-
-    log_likelihood_at_estimates = mean_complete_log_likelihood(estimates)
-    for name, estimate in estimates.items():
-        half_width = (
-            relative_width * max(abs(estimate), 0.1)
-        )  # in case the variable is estimated to 0, manually tuned on score_visualializer notebook
-        for offset in offsets:
-            values = estimates.copy()
-            values[name] += offset * half_width
-            rows.append(
-                {
-                    "parameter": name,
-                    "value": values[name],
-                    "complete_log_likelihood": mean_complete_log_likelihood(values),
-                    "estimate": estimate,
-                    "log_likelihood_at_estimates": log_likelihood_at_estimates,
-                }
-            )
-    return pd.DataFrame(rows)
-
-
-def compute_score_samples(diagnostics, relative_step: float = 1e-3):
-    """Score g_ik(m) = d/d theta_k log p(y_i, phi_i(m); theta) at the estimates,
-    by finite differences, per (sample m, patient i, parameter k).
-    """
-    model = diagnostics.model
-    estimates = get_displayed_estimates(model)
-    samples = diagnostics.sampler.total_samples
-    gaussian_params = model.convert_etas_to_gaussian_all_patients(samples.eta_samples)
-    scores = []
-    for name, estimate in estimates.items():
-        step = relative_step * max(abs(estimate), 0.1)
-        log_likelihoods = []
-        for sign in (1, -1):
-            values = estimates.copy()
-            values[name] += sign * step
-            state = displayed_to_model_state(values, model)
-            if state is None:  # could be an infinite value or Omega not being positive
-                log_likelihoods.append(
-                    torch.full(
-                        gaussian_params.shape[:2],
-                        torch.nan,
-                        device=device,
-                        dtype=default_dtype,
-                    )
-                )
-            else:
-                log_likelihoods.append(
-                    complete_log_likelihood(
-                        model, state, gaussian_params, samples.predictions
-                    )
-                )
-        scores.append((log_likelihoods[0] - log_likelihoods[1]) / (2 * step))
-    return torch.stack(scores, dim=-1), list(estimates.index)
-
-
-def compute_normalized_scores(diagnostics, relative_step: float = 1e-3) -> pd.DataFrame:
-    """sum_i mean_m g_ik(m) normalized by its noise:
-    z_k = sum_i mean_m g_ik(m) / sqrt(sum_i var_m(g_ik) / M), which should follow N(0, 1) at the optimum.
-    """
-    scores, names = compute_score_samples(diagnostics, relative_step)
-    nb_samples = scores.shape[0]
-    if nb_samples < 2:
-        raise ValueError(
-            "At least 2 conditional samples per patient are needed to compute the score."
-        )
-
-    total_score = scores.mean(dim=0).sum(dim=0)  # g_k
-    score_sd = torch.sqrt(scores.var(dim=0).sum(dim=0) / nb_samples)  # Var(g_k)
-
-    return pd.DataFrame(
-        {
-            "total_score": total_score.cpu().numpy(),
-            "z_score": (total_score / score_sd).cpu().numpy(),
-        },
-        index=names,
-    )
-
-
-# a boring tool for improving label visualization :
-def compact_tick_label(value, _position=None) -> str:
-    for precision in (3, 2, 1):
-        label = f"{value:.{precision}g}"
-        label = label.replace("-0.", "-.") if len(label) > 4 else label
-        label = label.replace("0.", ".", 1) if len(label) > 4 else label
-        if len(label) <= 4:
-            return label
-    mantissa, exponent = f"{value:.0e}".split("e")
-    return f"{mantissa}e{int(exponent)}"
-
-
-# plotting
-def plot_log_likelihood_around_estimates(
-    log_likelihood_variations: pd.DataFrame,
-    nb_columns: int = 5,
-    facet_width: float = 3.5,
-    facet_height: float = 2.8,
-    normalized_scores: pd.DataFrame | None = None,
-) -> None:
-    names = list(dict.fromkeys(log_likelihood_variations["parameter"]))
-    nb_rows = int(np.ceil(len(names) / nb_columns))
-    fig, axes = plt.subplots(
-        nb_rows,
-        nb_columns,
-        figsize=(facet_width * nb_columns, facet_height * nb_rows),
-        squeeze=False,
-    )
-    for ax, name in zip(axes.flat, names):
-        data = log_likelihood_variations[log_likelihood_variations["parameter"] == name]
-        estimate = data["estimate"].iloc[0]
-        reference = data["log_likelihood_at_estimates"].iloc[0]
-        ax.plot(
-            data["value"],
-            data["complete_log_likelihood"] - reference,
-            "o-",
-        )
-        ax.axvline(estimate, color="red", linewidth=1.2, label="SAEM estimate")
-        if normalized_scores is not None:
-            y_limits = ax.get_ylim()
-            slope = normalized_scores.loc[name, "total_score"]
-            ax.plot(
-                data["value"],
-                slope * (data["value"] - estimate),
-                "--",
-                color="orange",
-                label="Tangent from the score (slope = score)",
-            )
-            ax.set_ylim(y_limits)
-        ax.xaxis.set_major_locator(MaxNLocator(nbins=3))
-        ax.xaxis.set_major_formatter(FuncFormatter(compact_tick_label))
-        ax.yaxis.set_major_locator(MaxNLocator(nbins=4))
-        ax.yaxis.set_major_formatter(FuncFormatter(compact_tick_label))
-        ax.set_title(name)
-        ax.grid(True, linestyle="--", alpha=0.3)
-    for ax in list(axes.flat)[len(names) :]:
-        ax.axis("off")
-    axes[0, 0].set_ylabel("Δ complete-data log-likelihood")
-    fig.suptitle("Complete-data log-likelihood around the estimates")
-    handles, labels = axes[0, 0].get_legend_handles_labels()
-    fig.legend(handles, labels, loc="lower center", ncol=len(labels), frameon=False)
-    legend_height = 0.45 / fig.get_figheight()
-
-    if not smoke_test:
-        plt.tight_layout(rect=(0, legend_height, 1, 1))
-        plt.show()
-    plt.close(fig)
-
-
-def plot_normalized_scores(
-    diagnostics,
-    relative_step: float = 1e-3,
-    bounds: tuple = (-1.96, 1.96),
-    max_parameters: int = 40,
-    bar_height: float = 0.3,
-) -> pd.DataFrame:
-    normalized_scores = compute_normalized_scores(diagnostics, relative_step)
-    z = normalized_scores["z_score"]
-    title = "Normalized score at the estimates"
-    if len(z) > max_parameters:
-        largest = z.abs().sort_values(ascending=False).index[:max_parameters]
-        z = z[z.index.isin(largest)]
-        title += f"\n({max_parameters} largest |z| out of {len(normalized_scores)})"
-
-    fig, ax = plt.subplots(figsize=(6, max(2.0, 1.0 + bar_height * len(z))))
-    ax.barh(z.index, z)
-    for bound in bounds:
-        ax.axvline(bound, color="grey", linestyle="--", linewidth=0.8)
-    ax.axvline(0, color="black", linewidth=1)
-    ax.set_ylim(len(z) - 0.5, -0.5)
-    ax.set_xlabel("normalized score")
-    ax.set_title(title)
-
-    if not smoke_test:
-        plt.tight_layout()
-        plt.show()
-    plt.close(fig)
-    return normalized_scores

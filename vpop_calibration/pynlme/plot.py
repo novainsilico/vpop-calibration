@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
+from matplotlib.ticker import FuncFormatter, MaxNLocator
 from sklearn.metrics import r2_score
 import random as rand
 import scipy.stats as stats
@@ -1016,3 +1017,108 @@ class PlottingUtility:
         if not smoke_test:
             plt.show()
         plt.close(fig)
+
+    def log_likelihood_around_estimates(
+        self,
+        nb_columns: int = 5,
+        facet_width: float = 3.5,
+        facet_height: float = 2.8,
+    ) -> None:
+        if self.model_diag.log_likelihood_around_estimates is None:
+            self.model_diag.compute_log_likelihood_around_estimates()
+        if self.model_diag.normalized_scores is None:
+            self.model_diag.compute_normalized_scores()
+        log_likelihood_variations = self.model_diag.log_likelihood_around_estimates
+        normalized_scores = self.model_diag.normalized_scores
+
+        names = list(dict.fromkeys(log_likelihood_variations["parameter"]))
+        nb_rows = int(np.ceil(len(names) / nb_columns))
+        fig, axes = plt.subplots(
+            nb_rows,
+            nb_columns,
+            figsize=(facet_width * nb_columns, facet_height * nb_rows),
+            squeeze=False,
+        )
+        for ax, name in zip(axes.flat, names):
+            data = log_likelihood_variations[
+                log_likelihood_variations["parameter"] == name
+            ]
+            estimate = data["estimate"].iloc[0]
+            reference = data["log_likelihood_at_estimates"].iloc[0]
+            ax.plot(
+                data["value"],
+                data["complete_log_likelihood"] - reference,
+                "o-",
+            )
+            ax.axvline(estimate, color="red", linewidth=1.2, label="SAEM estimate")
+            y_limits = ax.get_ylim()
+            slope = normalized_scores.loc[name, "total_score"]
+            ax.plot(
+                data["value"],
+                slope * (data["value"] - estimate),
+                "--",
+                color="orange",
+                label="Tangent from the score (slope = score)",
+            )
+            ax.set_ylim(y_limits)
+            ax.xaxis.set_major_locator(MaxNLocator(nbins=3))
+            ax.xaxis.set_major_formatter(FuncFormatter(compact_tick_label))
+            ax.yaxis.set_major_locator(MaxNLocator(nbins=4))
+            ax.yaxis.set_major_formatter(FuncFormatter(compact_tick_label))
+            ax.set_title(name)
+            ax.grid(True, linestyle="--", alpha=0.3)
+        for ax in list(axes.flat)[len(names) :]:
+            ax.axis("off")
+        axes[0, 0].set_ylabel("Δ complete-data log-likelihood")
+        fig.suptitle("Complete-data log-likelihood around the estimates")
+        handles, labels = axes[0, 0].get_legend_handles_labels()
+        fig.legend(handles, labels, loc="lower center", ncol=len(labels), frameon=False)
+        legend_height = 0.45 / fig.get_figheight()
+
+        if not smoke_test:
+            plt.tight_layout(rect=(0, legend_height, 1, 1))
+            plt.show()
+        plt.close(fig)
+
+    def normalized_scores(
+        self,
+        bounds: tuple = (-1.96, 1.96),
+        max_parameters: int = 40,
+        bar_height: float = 0.3,
+    ) -> None:
+        if self.model_diag.normalized_scores is None:
+            self.model_diag.compute_normalized_scores()
+        normalized_scores = self.model_diag.normalized_scores
+
+        z = normalized_scores["z_score"]
+        title = "Normalized score at the estimates"
+        if len(z) > max_parameters:
+            largest = z.abs().sort_values(ascending=False).index[:max_parameters]
+            z = z[z.index.isin(largest)]
+            title += f"\n({max_parameters} largest |z| out of {len(normalized_scores)})"
+
+        fig, ax = plt.subplots(figsize=(6, max(2.0, 1.0 + bar_height * len(z))))
+        ax.barh(z.index, z)
+        for bound in bounds:
+            ax.axvline(bound, color="grey", linestyle="--", linewidth=0.8)
+        ax.axvline(0, color="black", linewidth=1)
+        ax.set_ylim(len(z) - 0.5, -0.5)
+        ax.set_xlabel("normalized score")
+        ax.set_title(title)
+
+        if not smoke_test:
+            plt.tight_layout()
+            plt.show()
+        plt.close(fig)
+
+
+# a boring tool for improving label visualization :
+def compact_tick_label(value, _position=None) -> str:
+    for precision in (3, 2, 1):
+        label = f"{value:.{precision}g}"
+        label = label.replace("-0.", "-.") if len(label) > 4 else label
+        label = label.replace("0.", ".", 1) if len(label) > 4 else label
+        if len(label) <= 4:
+            return label
+    mantissa, exponent = f"{value:.0e}".split("e")
+    return f"{mantissa}e{int(exponent)}"
